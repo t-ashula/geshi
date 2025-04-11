@@ -10,20 +10,151 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-// モデル定義
-model Article {
+// チャンネル（番組）情報
+model Channel {
     id        String   @id @default(uuid())
+    slug      String   @unique // 公開ID（URL用）
     title     String
-    content   String
-    url       String   @unique
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    rssUrl    String   @unique @map("rss_url")
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    // リレーション
+    episodes Episode[]
+    jobs     Job[]
+
+    @@map("channels")
 }
 
-model Summary {
+// チャンネル内の配信エピソード
+model Episode {
+    id          String    @id @default(uuid())
+    slug        String // 公開ID
+    channelId   String    @map("channel_id")
+    title       String
+    publishedAt DateTime  @map("published_at")
+    audioUrl    String    @map("audio_url")
+    type        String // 録画種別（例: static, hls, live）
+    scheduledAt DateTime? @map("scheduled_at")
+    sizeBytes   Int?      @map("size_bytes")
+    createdAt   DateTime  @default(now()) @map("created_at")
+    updatedAt   DateTime  @updatedAt @map("updated_at")
+
+    // リレーション
+    channel            Channel             @relation(fields: [channelId], references: [id])
+    jobs               Job[]
+    transcriptRequests TranscriptRequest[]
+
+    @@map("episodes")
+}
+
+// クローラや要約など非同期処理の記録
+model Job {
+    id         String    @id @default(uuid())
+    channelId  String?   @map("channel_id")
+    episodeId  String?   @map("episode_id")
+    type       String // 'crawl', 'download', 'transcribe', 'summarize' など
+    status     String // 'pending', 'working', 'done', 'error'
+    payload    Json
+    result     Json?
+    startedAt  DateTime? @map("started_at")
+    finishedAt DateTime? @map("finished_at")
+    createdAt  DateTime  @default(now()) @map("created_at")
+
+    // リレーション
+    channel Channel? @relation(fields: [channelId], references: [id])
+    episode Episode? @relation(fields: [episodeId], references: [id])
+
+    @@map("jobs")
+}
+
+// エピソードに対しての文字起こし要求
+model TranscriptRequest {
+    id          String   @id @default(uuid())
+    episodeId   String   @map("episode_id")
+    language    String // 言語コード
+    status      String
+    requestedAt DateTime @default(now()) @map("requested_at")
+    resultId    String?  @unique @map("result_id")
+
+    // リレーション
+    episode    Episode     @relation(fields: [episodeId], references: [id])
+    transcript Transcript? @relation(fields: [resultId], references: [id])
+
+    @@map("transcript_requests")
+}
+
+// 文字起こし全体
+model Transcript {
     id        String   @id @default(uuid())
-    content   String
-    articleId String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+    requestId String?  @unique @map("request_id")
+    version   String
+    createdAt DateTime @default(now()) @map("created_at")
+
+    // リレーション
+    request           TranscriptRequest?
+    segments          TranscriptSegment[]
+    summarizeRequests SummarizeRequest[]
+
+    @@map("transcripts")
+}
+
+// 発話の時間帯ごとのテキスト
+model TranscriptSegment {
+    id           String  @id @default(uuid())
+    transcriptId String  @map("transcript_id")
+    startSeconds Float   @map("start_seconds")
+    endSeconds   Float   @map("end_seconds")
+    text         String
+    speaker      String?
+
+    // リレーション
+    transcript Transcript @relation(fields: [transcriptId], references: [id])
+
+    @@map("transcript_segments")
+}
+
+// 文字起こしをもとに要約生成要求
+model SummarizeRequest {
+    id           String   @id @default(uuid())
+    transcriptId String   @map("transcript_id")
+    strength     Int
+    startSeconds Float?   @map("start_seconds")
+    endSeconds   Float?   @map("end_seconds")
+    status       String
+    requestedAt  DateTime @default(now()) @map("requested_at")
+    resultId     String?  @unique @map("result_id")
+
+    // リレーション
+    transcript Transcript @relation(fields: [transcriptId], references: [id])
+    summary    Summary?   @relation(fields: [resultId], references: [id])
+
+    @@map("summarize_requests")
+}
+
+// 要約のまとまり（複数セグメントを含む）
+model Summary {
+    id          String   @id @default(uuid())
+    requestId   String?  @unique @map("request_id")
+    generatedAt DateTime @default(now()) @map("generated_at")
+
+    // リレーション
+    request  SummarizeRequest?
+    segments SummarySegment[]
+
+    @@map("summaries")
+}
+
+// トピックごとの要約文（時間付き）
+model SummarySegment {
+    id           String @id @default(uuid())
+    summaryId    String @map("summary_id")
+    startSeconds Float  @map("start_seconds")
+    endSeconds   Float  @map("end_seconds")
+    content      String
+
+    // リレーション
+    summary Summary @relation(fields: [summaryId], references: [id])
+
+    @@map("summary_segments")
 }
