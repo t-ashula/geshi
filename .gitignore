@@ -1,0 +1,16 @@
+# tmp ディレクトリは .keep 以外は git 管理外
+tmp/*
+!tmp/.keep
+
+# エディタ関連
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# OS関連
+.DS_Store
+Thumbs.db
