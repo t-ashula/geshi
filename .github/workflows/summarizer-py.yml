@@ -1,0 +1,45 @@
+name: Python Summarizer Checks
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "summarizer/**"
+
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5.0.0
+        with:
+          python-version: "3.12.7"
+          cache: "pip"
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install dependencies
+        working-directory: summarizer
+        run: poetry install
+
+      - name: Lint with black
+        working-directory: summarizer
+        run: poetry run black --check .
+
+      - name: Lint with isort
+        working-directory: summarizer
+        run: poetry run isort --check .
+
+      - name: Type check with mypy
+        working-directory: summarizer
+        run: poetry run mypy .
+
+      - name: Test with pytest
+        working-directory: summarizer
+        run: poetry run pytest

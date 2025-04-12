@@ -1,0 +1,33 @@
+name: UI Checks
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - "geshi/ui/**"
+
+jobs:
+  lint-and-test:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.1.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version: "22.14.0"
+          cache: "npm"
+          cache-dependency-path: "geshi/ui/package.json"
+
+      - name: Install dependencies
+        working-directory: geshi/ui
+        run: npm ci
+
+      - name: Lint
+        working-directory: geshi/ui
+        run: npm run lint
+
+      - name: Test
+        working-directory: geshi/ui
+        run: npm run test
