@@ -15,9 +15,10 @@ jobs:
         run: |
           git fetch origin ${{ github.base_ref }}
       - name: Check commit messages
+        shell: bash
         run: |
-          echo "🔍 Checking PR commits (excluding merge commit)..."
-          git log origin/${{ github.base_ref }}..HEAD --pretty=format:'%s' | while read subject; do
+          echo "🔍 Checking PR commits..."
+          git log origin/${{ github.base_ref }}..HEAD --pretty=format:'%s' | while read subject || [ -n "$subject" ]; do
             echo "→ $subject"
             if echo "$subject" | grep -qE '^:.*: '; then
               continue
