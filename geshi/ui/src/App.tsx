@@ -1,12 +1,11 @@
-import { useState } from 'react'
-import { Routes, Route } from 'react-router-dom'
-import './App.css'
+import { Routes, Route } from "react-router-dom";
+import "./App.css";
 
 // 仮のコンポーネント
-const Home = () => <div>ホームページ</div>
-const Transcribe = () => <div>文字起こしページ</div>
-const Summarize = () => <div>要約ページ</div>
-const NotFound = () => <div>404 - ページが見つかりません</div>
+const Home = () => <div>ホームページ</div>;
+const Transcribe = () => <div>文字起こしページ</div>;
+const Summarize = () => <div>要約ページ</div>;
+const NotFound = () => <div>404 - ページが見つかりません</div>;
 
 function App() {
   return (
@@ -15,9 +14,15 @@ function App() {
         <h1>Geshi - 文字起こしと要約</h1>
         <nav>
           <ul>
-            <li><a href="/">ホーム</a></li>
-            <li><a href="/transcribe">文字起こし</a></li>
-            <li><a href="/summarize">要約</a></li>
+            <li>
+              <a href="/">ホーム</a>
+            </li>
+            <li>
+              <a href="/transcribe">文字起こし</a>
+            </li>
+            <li>
+              <a href="/summarize">要約</a>
+            </li>
           </ul>
         </nav>
       </header>
@@ -35,7 +40,7 @@ function App() {
         <p>&copy; 2025 Geshi Project</p>
       </footer>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
