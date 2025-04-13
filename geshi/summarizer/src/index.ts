@@ -3,8 +3,6 @@
  * 要約APIクライアントモジュール
  */
 
-import axios from 'axios';
-
 export interface SummarizeOptions {
   text: string;
   maxLength?: number;
@@ -21,9 +19,11 @@ export interface SummarizeResult {
  * @param options 要約オプション
  * @returns 要約結果
  */
-export async function summarize(options: SummarizeOptions): Promise<SummarizeResult> {
+export async function summarize(
+  options: SummarizeOptions,
+): Promise<SummarizeResult> {
   // 実装はここに追加
-  console.log(`Summarizing text of length ${options.text.length}`);
+  // console.log(`Summarizing text of length ${options.text.length}`);
 
   // 実際のAPIリクエストはここに実装
   // const response = await axios.post('https://api.example.com/summarize', {
@@ -33,7 +33,7 @@ export async function summarize(options: SummarizeOptions): Promise<SummarizeRes
 
   // サンプルレスポンス
   return {
-    summary: `This is a sample summary of the text: "${options.text.substring(0, 30)}..."`
+    summary: `This is a sample summary of the text: "${options.text.substring(0, 30)}..."`,
   };
 }
 
