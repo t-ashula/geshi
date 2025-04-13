@@ -1,4 +1,4 @@
-name: Python Summarizer Checks
+name: Summarizer PR Checks
 
 on:
   pull_request:
@@ -28,11 +28,11 @@ jobs:
         working-directory: summarizer
         run: poetry install
 
-      - name: Lint with black
+      - name: Format check with black
         working-directory: summarizer
         run: poetry run black --check .
 
-      - name: Lint with isort
+      - name: Format check with isort
         working-directory: summarizer
         run: poetry run isort --check .
 
