@@ -124,3 +124,4 @@
 ```plain
 Channel 1 ────< Episode 1 ────< TranscriptRequest 1 ────> Transcript 1 ────< TranscriptSegment
                                            └─────> SummarizeRequest 1 ────> Summary 1 ────< SummarySegment
+```
