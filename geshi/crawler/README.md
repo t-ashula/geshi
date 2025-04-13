@@ -9,7 +9,7 @@
 ## 使用方法
 
 ```typescript
-import { crawler } from '@geshi/crawler';
+import { crawler } from "@geshi/crawler";
 
 // 使用例
 ```
@@ -25,3 +25,4 @@ npm test
 
 # ビルド
 npm run build
+```
