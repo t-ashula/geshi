@@ -9,11 +9,11 @@
 ## 使用方法
 
 ```typescript
-import { summarize } from '@geshi/summarizer';
+import { summarize } from "@geshi/summarizer";
 
 // 使用例
 const result = await summarize({
-  text: 'ここに要約したいテキストを入力します。長文のテキストを短く要約するためのAPIです。'
+  text: "ここに要約したいテキストを入力します。長文のテキストを短く要約するためのAPIです。",
 });
 ```
 
@@ -28,3 +28,4 @@ npm test
 
 # ビルド
 npm run build
+```

@@ -1,4 +1,4 @@
-name: Python Transcriber Checks
+name: Transcriber PR Checks
 
 on:
   pull_request:
@@ -28,11 +28,11 @@ jobs:
         working-directory: transcriber
         run: poetry install
 
-      - name: Lint with black
+      - name: Format check with black
         working-directory: transcriber
         run: poetry run black --check .
 
-      - name: Lint with isort
+      - name: Format check with isort
         working-directory: transcriber
         run: poetry run isort --check .
 

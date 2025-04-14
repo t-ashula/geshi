@@ -1,3 +1,4 @@
+import { expect } from "vitest";
 import { createPrismaClient } from "../src";
 
 async function main() {
@@ -12,19 +13,10 @@ async function main() {
       },
     });
 
-    console.log("=== チャンネルとエピソード ===");
-    channels.forEach((channel) => {
-      console.log(`チャンネル: ${channel.title} (${channel.slug})`);
-      console.log(`RSS URL: ${channel.rssUrl}`);
-      console.log("エピソード:");
-      channel.episodes.forEach((episode) => {
-        console.log(`- ${episode.title} (${episode.type})`);
-        console.log(`  公開日: ${episode.publishedAt}`);
-        console.log(`  音声URL: ${episode.audioUrl}`);
-      });
-      console.log("---");
-    });
+    //
+    expect(channels).toBeTruthy();
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error("エラーが発生しました:", error);
   } finally {
     // Prisma クライアントを切断

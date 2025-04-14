@@ -1,10 +1,10 @@
-name: UI Checks
+name: Geshi PR Checks
 
 on:
   pull_request:
     branches: [master]
     paths:
-      - "geshi/ui/**"
+      - "geshi/**"
 
 jobs:
   lint-and-test:
@@ -18,16 +18,20 @@ jobs:
         with:
           node-version: "22.14.0"
           cache: "npm"
-          cache-dependency-path: "geshi/ui/package.json"
+          cache-dependency-path: "geshi/package-lock.json"
 
       - name: Install dependencies
-        working-directory: geshi/ui
+        working-directory: geshi
         run: npm ci
 
+      - name: Format check
+        working-directory: geshi
+        run: npm run format:check || npm run format -- --check
+
       - name: Lint
-        working-directory: geshi/ui
+        working-directory: geshi
         run: npm run lint
 
       - name: Test
-        working-directory: geshi/ui
+        working-directory: geshi
         run: npm run test

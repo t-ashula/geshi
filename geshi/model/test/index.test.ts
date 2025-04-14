@@ -25,6 +25,7 @@ import { createPrismaClient } from "../src";
 
 describe("Model", () => {
   it("should create a PrismaClient instance", () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const client = createPrismaClient();
     expect(PrismaClient).toHaveBeenCalled();
   });

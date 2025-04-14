@@ -9,7 +9,7 @@
 ## 使用方法
 
 ```typescript
-import { PrismaClient } from '@geshi/model';
+import { PrismaClient } from "@geshi/model";
 
 const prisma = new PrismaClient();
 
@@ -33,3 +33,4 @@ npm test
 
 # ビルド
 npm run build
+```

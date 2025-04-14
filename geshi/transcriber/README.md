@@ -9,11 +9,11 @@
 ## 使用方法
 
 ```typescript
-import { transcribe } from '@geshi/transcriber';
+import { transcribe } from "@geshi/transcriber";
 
 // 使用例
 const result = await transcribe({
-  audioUrl: 'https://example.com/audio.mp3'
+  audioUrl: "https://example.com/audio.mp3",
 });
 ```
 
@@ -28,3 +28,4 @@ npm test
 
 # ビルド
 npm run build
+```
