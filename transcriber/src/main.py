@@ -1,31 +1,65 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+import json
+import os
+import shutil
+import uuid
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional, Union
+
+import redis
+import uvicorn
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
-import uvicorn
+from rq import Queue
+
+from .transcription import process_transcription
+
+# Application settings
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+MAX_FILE_SIZE = 1 * 1024 * 1024 * 1024  # 1GiB
+REDIS_TTL = 60 * 60 * 24  # 24 hours (seconds)
+
+# Redis connection settings
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
+
+# Connect to Redis
+redis_conn = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
+queue = Queue(connection=redis_conn)
 
 app = FastAPI(
     title="Transcriber API",
-    description="音声ファイルから文字起こしを行うAPI",
+    description="API for transcribing audio files to text",
     version="0.1.0",
 )
 
-# CORS設定
+# CORS settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 本番環境では適切に制限する
+    allow_origins=["*"],  # Should be restricted appropriately in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# モデル定義
-class TranscriptionResponse(BaseModel):
-    id: str
-    text: str
-    duration: float
-    created_at: str
+# Model definitions
+class TranscribeRequest(BaseModel):
+    request_id: str
+
+
+class TranscribeResponse(BaseModel):
+    status: str
+    text: Optional[str] = None
+    error: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+class ErrorResponse(BaseModel):
+    error: str
 
 
 @app.get("/")
@@ -33,59 +67,79 @@ async def root():
     return {"message": "Transcriber API"}
 
 
-@app.get("/api/health")
+@app.get("/health")
 async def health_check():
     return {"status": "ok"}
 
 
-@app.post("/api/transcribe", response_model=TranscriptionResponse)
-async def transcribe_audio(file: UploadFile = File(...)):
+@app.post("/transcribe", status_code=202, response_model=TranscribeRequest)
+async def transcribe_audio(
+    file: UploadFile = File(...), language: str = Form("ja"), model: str = Form("base")
+):
     """
-    音声ファイルをアップロードして文字起こしを行う
+    Upload an audio file for transcription
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="ファイルが提供されていません")
+    # Check file format
+    if not file.filename or not file.filename.lower().endswith(".wav"):
+        raise HTTPException(
+            status_code=400, detail={"error": "unsupported file format"}
+        )
 
-    # ここに実際の文字起こし処理を実装
-    # 現在はダミーレスポンスを返す
-    return {
-        "id": "sample-id-123",
-        "text": "これはサンプルの文字起こしテキストです。",
-        "duration": 30.5,
-        "created_at": "2025-04-11T12:00:00Z",
-    }
+    # Check file size (estimated from headers)
+    content_length = int(file.headers.get("content-length", 0))
+    if content_length > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail={"error": "file too large"})
+
+    # Generate request ID
+    request_id = str(uuid.uuid4())
+
+    # Create upload directory
+    upload_path = UPLOAD_DIR / request_id
+    upload_path.mkdir(exist_ok=True)
+
+    # Save the file
+    file_path = upload_path / file.filename
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    # Save initial status to Redis
+    redis_conn.setex(
+        f"transcription:{request_id}", REDIS_TTL, json.dumps({"status": "pending"})
+    )
+
+    # Enqueue RQ job
+    queue.enqueue(process_transcription, request_id, str(file_path), language, model)
+
+    return {"request_id": request_id}
 
 
-@app.get("/api/transcriptions", response_model=List[TranscriptionResponse])
-async def get_transcriptions():
+@app.get(
+    "/transcribe/{request_id}",
+    response_model=Union[TranscribeResponse, ErrorResponse],
+    responses={
+        200: {"model": TranscribeResponse},
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def get_transcription(request_id: str):
     """
-    文字起こし結果の一覧を取得する
+    Get transcription result
     """
-    # ここに実際のデータベース検索処理を実装
-    # 現在はダミーデータを返す
-    return [
-        {
-            "id": "sample-id-123",
-            "text": "これはサンプルの文字起こしテキストです。",
-            "duration": 30.5,
-            "created_at": "2025-04-11T12:00:00Z",
-        }
-    ]
+    # Get result from Redis
+    result = redis_conn.get(f"transcription:{request_id}")
 
+    if not result:
+        raise HTTPException(status_code=404, detail={"error": "request not found"})
 
-@app.get("/api/transcriptions/{transcription_id}", response_model=TranscriptionResponse)
-async def get_transcription(transcription_id: str):
-    """
-    特定の文字起こし結果を取得する
-    """
-    # ここに実際のデータベース検索処理を実装
-    # 現在はダミーデータを返す
-    return {
-        "id": transcription_id,
-        "text": "これはサンプルの文字起こしテキストです。",
-        "duration": 30.5,
-        "created_at": "2025-04-11T12:00:00Z",
-    }
+    try:
+        # Parse string as JSON
+        result_str = result.decode("utf-8")
+        # Convert JSON to dictionary
+        result_dict = json.loads(result_str)
+        return result_dict
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": "internal server error"})
 
 
 if __name__ == "__main__":
