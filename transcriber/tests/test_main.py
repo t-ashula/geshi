@@ -69,9 +69,9 @@ def test_health_check():
 
 
 # Tests for POST /transcribe endpoint
-@mock.patch("src.main.magic.magic_buffer")
+@mock.patch("src.main.magic.from_buffer")
 def test_transcribe_success(
-    mock_magic_buffer, mock_redis, mock_queue, mock_ulid, test_wav_file
+    mock_from_buffer, mock_redis, mock_queue, mock_ulid, test_wav_file
 ):
     """Test for successful request"""
     # Prepare test file
@@ -81,7 +81,7 @@ def test_transcribe_success(
     # Set up mocks
     mock_redis.setex.return_value = True
     mock_queue.enqueue.return_value = None
-    mock_magic_buffer.return_value = "audio/x-wav"  # Mock magic to identify as WAV
+    mock_from_buffer.return_value = "audio/x-wav"  # Mock magic to identify as WAV
 
     # Execute request
     response = client.post("/transcribe", files=files, data=data)
@@ -93,18 +93,18 @@ def test_transcribe_success(
     # Verify mock calls
     mock_redis.setex.assert_called_once()
     mock_queue.enqueue.assert_called_once()
-    mock_magic_buffer.assert_called_once()  # Verify magic was called
+    mock_from_buffer.assert_called_once()  # Verify magic was called
 
 
-@mock.patch("src.main.magic.magic_buffer")
-def test_transcribe_invalid_format(mock_magic_buffer, mock_redis, mock_queue):
+@mock.patch("src.main.magic.from_buffer")
+def test_transcribe_invalid_format(mock_from_buffer, mock_redis, mock_queue):
     """Test for invalid file format"""
     # Prepare test file (mp3 format)
     files = {"file": ("test.mp3", io.BytesIO(b"dummy mp3 content"), "audio/mp3")}
     data = {"language": "ja", "model": "base"}
 
     # Set up mock to identify as MP3
-    mock_magic_buffer.return_value = "audio/mpeg"
+    mock_from_buffer.return_value = "audio/mpeg"
 
     # Execute request
     response = client.post("/transcribe", files=files, data=data)
@@ -116,12 +116,12 @@ def test_transcribe_invalid_format(mock_magic_buffer, mock_redis, mock_queue):
     # Verify mocks were not called
     mock_redis.setex.assert_not_called()
     mock_queue.enqueue.assert_not_called()
-    mock_magic_buffer.assert_called_once()  # Verify magic was called
+    mock_from_buffer.assert_called_once()  # Verify magic was called
 
 
-@mock.patch("src.main.magic.magic_buffer")
+@mock.patch("src.main.magic.from_buffer")
 def test_transcribe_file_too_large(
-    mock_magic_buffer, mock_redis, mock_queue, monkeypatch
+    mock_from_buffer, mock_redis, mock_queue, monkeypatch
 ):
     """Test for file size exceeding limit"""
     # Prepare test file
@@ -142,7 +142,7 @@ def test_transcribe_file_too_large(
     monkeypatch.setattr("fastapi.File.__call__", mock_file)
 
     # Set up magic mock to identify as WAV
-    mock_magic_buffer.return_value = "audio/x-wav"
+    mock_from_buffer.return_value = "audio/x-wav"
 
     # Execute request
     response = client.post("/transcribe", files=files, data=data)

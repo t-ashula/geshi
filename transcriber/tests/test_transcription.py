@@ -6,6 +6,7 @@ from unittest import mock
 
 import pytest
 import redis
+
 from src.transcriber import transcribe_with_model
 
 # Add the parent directory to sys.path

@@ -76,7 +76,7 @@ async def transcribe_audio(
         )
 
     # Check file format
-    mime_type = magic.magic_buffer(file.file.read(1024))
+    mime_type = magic.from_buffer(file.file.read(1024), mime=True)
     if mime_type != "audio/x-wav":
         raise HTTPException(
             status_code=400, detail={"error": "unsupported file format"}
