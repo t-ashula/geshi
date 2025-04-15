@@ -101,8 +101,8 @@ venv.bak/
 .mypy_cache/
 
 # Poetry
-poetry.lock
+# poetry.lock
 
-# uploads
-uploads/*
-!uploads/.keep
+# tmp
+tmp/*
+!tmp/.keep
