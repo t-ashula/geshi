@@ -1,7 +1,7 @@
 import json
 import os
 import shutil
-import uuid
+import ulid
 
 from pathlib import Path
 from typing import Optional, Union
@@ -89,7 +89,7 @@ async def transcribe_audio(
         raise HTTPException(status_code=400, detail={"error": "file too large"})
 
     # Generate request ID
-    request_id = str(uuid.uuid4())
+    request_id = str(ulid.ULID())
 
     # Create upload directory
     upload_path = UPLOAD_DIR / request_id
