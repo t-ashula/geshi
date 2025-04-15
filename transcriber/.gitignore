@@ -102,3 +102,7 @@ venv.bak/
 
 # Poetry
 poetry.lock
+
+# uploads
+uploads/*
+!uploads/.keep
