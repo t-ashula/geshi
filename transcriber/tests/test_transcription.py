@@ -46,12 +46,12 @@ def test_process_transcription_success(mock_redis, mock_file_path):
     result = process_transcription("test-id", mock_file_path, "ja", "base")
 
     # Verify result
-    # Note: In the current implementation with mocks, the process always returns an error
-    assert result["status"] == "error"
-    assert "error" in result
+    assert result["status"] == "done"
+    assert "error" not in result
 
     # Verify mock call
-    mock_redis.setex.assert_called_once()
+    # TODO: check call arguments
+    assert mock_redis.setex.call_count == 2
 
 
 def test_process_transcription_file_not_found(mock_redis):
@@ -62,19 +62,22 @@ def test_process_transcription_file_not_found(mock_redis):
     # Verify result
     assert result["status"] == "error"
     assert "error" in result
-    # Note: In the current implementation with mocks, the error message is about JSON serialization
-    assert "JSON" in result["error"] or "json" in result["error"]
+    assert result["error"] == "FileNotFoundError"
 
     # Verify mock call
-    mock_redis.setex.assert_called_once()
+    # TODO: check call arguments
+    assert mock_redis.setex.call_count == 2
 
 
 def test_process_transcription_exception(mock_redis, mock_file_path, monkeypatch):
     """Test for exception handling"""
 
     # Set up mock
+    class RuntimeCustomException(Exception):
+        pass
+
     def mock_sleep(*args, **kwargs):
-        raise Exception("Test exception")
+        raise RuntimeCustomException("Test exception")
 
     monkeypatch.setattr("time.sleep", mock_sleep)
     mock_redis.setex.return_value = True
@@ -85,8 +88,7 @@ def test_process_transcription_exception(mock_redis, mock_file_path, monkeypatch
     # Verify result
     assert result["status"] == "error"
     assert "error" in result
-    # Note: In the current implementation with mocks, the error message is about JSON serialization
-    assert "JSON" in result["error"] or "json" in result["error"]
+    assert result["error"] == "RuntimeCustomException"
 
 
 def test_update_status_new_key(mock_redis):

@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 
 import redis
-from rq_scheduler import Scheduler
+from rq_scheduler import Scheduler  # type: ignore
 
 # Logging configuration
 logging.basicConfig(

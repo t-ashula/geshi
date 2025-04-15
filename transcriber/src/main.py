@@ -134,10 +134,16 @@ async def get_transcription(request_id: str):
 
     try:
         # Parse string as JSON
-        result_str = result.decode("utf-8")
+        if isinstance(result, str):
+            result_str = result
+        elif isinstance(result, bytes):
+            result_str = result.decode("utf-8")
+        else:
+            raise ValueError("Unexpected result type")
+
         # Convert JSON to dictionary
-        result_dict = json.loads(result_str)
-        return result_dict
+        transcription_result = json.loads(result_str)
+        return transcription_result
     except Exception as e:
         raise HTTPException(status_code=500, detail={"error": "internal server error"})
 

@@ -82,7 +82,7 @@ def process_transcription(request_id: str, file_path: str, language: str, model:
         logger.error(f"Error occurred during transcription process: {e}")
 
         # Save error information to Redis
-        error_result = {"status": "error", "error": str(e)}
+        error_result = {"status": "error", "error": str(e.__class__.__name__)}
 
         try:
             redis_conn.setex(
@@ -103,7 +103,14 @@ def update_status(request_id: str, status: str):
         request_id: Request ID
         status: Status (pending, working, done, error)
     """
-    current = redis_conn.get(f"transcription:{request_id}")
+    job_status = redis_conn.get(f"transcription:{request_id}")
+
+    current = None
+    if job_status:
+        if isinstance(job_status, str):
+            current = job_status
+        elif isinstance(job_status, bytes):
+            current = job_status.decode("utf-8")
 
     if current:
         try:
