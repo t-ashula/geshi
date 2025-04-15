@@ -2,14 +2,13 @@ import json
 import os
 import shutil
 import uuid
-from datetime import datetime, timedelta
+
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 import redis
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from rq import Queue
 
@@ -34,15 +33,6 @@ app = FastAPI(
     title="Transcriber API",
     description="API for transcribing audio files to text",
     version="0.1.0",
-)
-
-# CORS settings
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Should be restricted appropriately in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 
