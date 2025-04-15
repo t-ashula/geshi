@@ -1,17 +1,16 @@
 import json
 import os
 import shutil
-import ulid
-
 from pathlib import Path
 from typing import Optional, Union
 
+import magic
 import redis
+import ulid
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from rq import Queue
-import magic
 
 from .transcription import process_transcription
 

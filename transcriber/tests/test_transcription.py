@@ -6,6 +6,7 @@ from unittest import mock
 
 import pytest
 import redis
+from src.transcriber import transcribe_with_model
 
 # Add the parent directory to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -37,7 +38,26 @@ def mock_file_path(tmp_path):
     return str(test_file)
 
 
-def test_process_transcription_success(mock_redis, mock_file_path):
+@pytest.fixture
+def mock_transcribe_with_model(monkeypatch):
+    """Mock for transcribe_with_model"""
+    mock_func = mock.MagicMock()
+    mock_func.return_value = {
+        "text": "これはテストの文字起こしです。",
+        "lang": "ja",
+        "segments": [
+            {"start": 0.0, "end": 2.0, "text": "これはテスト"},
+            {"start": 2.0, "end": 4.0, "text": "の文字起こしです。"},
+        ],
+        "stats": {"process_time": 1.5},
+    }
+    monkeypatch.setattr("src.transcription.transcribe_with_model", mock_func)
+    return mock_func
+
+
+def test_process_transcription_success(
+    mock_redis, mock_file_path, mock_transcribe_with_model
+):
     """Test for successful transcription processing"""
     # Set up mock
     mock_redis.setex.return_value = True
@@ -54,7 +74,7 @@ def test_process_transcription_success(mock_redis, mock_file_path):
     assert mock_redis.setex.call_count == 2
 
 
-def test_process_transcription_file_not_found(mock_redis):
+def test_process_transcription_file_not_found(mock_redis, mock_transcribe_with_model):
     """Test for non-existent file"""
     # Execute function
     result = process_transcription("test-id", "/nonexistent/path.wav", "ja", "base")
@@ -69,17 +89,17 @@ def test_process_transcription_file_not_found(mock_redis):
     assert mock_redis.setex.call_count == 2
 
 
-def test_process_transcription_exception(mock_redis, mock_file_path, monkeypatch):
+def test_process_transcription_exception(
+    mock_redis, mock_file_path, mock_transcribe_with_model, monkeypatch
+):
     """Test for exception handling"""
 
     # Set up mock
     class RuntimeCustomException(Exception):
         pass
 
-    def mock_sleep(*args, **kwargs):
-        raise RuntimeCustomException("Test exception")
-
-    monkeypatch.setattr("time.sleep", mock_sleep)
+    # Mock transcribe_with_model to raise an exception
+    mock_transcribe_with_model.side_effect = RuntimeCustomException("Test exception")
     mock_redis.setex.return_value = True
 
     # Execute function

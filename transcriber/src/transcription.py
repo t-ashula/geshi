@@ -6,6 +6,8 @@ from pathlib import Path
 
 import redis
 
+from .transcriber import transcribe_with_model
+
 # Logging configuration
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -46,23 +48,13 @@ def process_transcription(request_id: str, file_path: str, language: str, model:
         if not file_path_obj.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        # Implement actual transcription process here
-        # For example: Call Whisper API
-        # This example returns a dummy result
-
-        # Simulate processing time (remove in actual implementation)
-        import time
-
-        time.sleep(2)
-
-        # Dummy transcription result
-        transcription_text = "This is a sample transcription text. In an actual implementation, text would be generated based on the content of the audio file."
+        transcribe_result = transcribe_with_model(file_path, "")
 
         # Save result to Redis
         expires_at = datetime.utcnow() + timedelta(seconds=REDIS_TTL)
         result = {
             "status": "done",
-            "text": transcription_text,
+            "text": transcribe_result["text"],
             "expires_at": expires_at.isoformat() + "Z",
         }
 
