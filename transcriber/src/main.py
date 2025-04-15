@@ -11,12 +11,13 @@ import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from rq import Queue
+import magic
 
 from .transcription import process_transcription
 
 # Application settings
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = Path(os.getenv("GESHI_UPLOAD_DIR", "tmp/uploads"))
+UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 MAX_FILE_SIZE = 1 * 1024 * 1024 * 1024  # 1GiB
 REDIS_TTL = 60 * 60 * 24  # 24 hours (seconds)
 
@@ -69,8 +70,15 @@ async def transcribe_audio(
     """
     Upload an audio file for transcription
     """
+    # Check file
+    if not file.filename:
+        raise HTTPException(
+            status_code=400, detail={"error": "unsupported file format"}
+        )
+
     # Check file format
-    if not file.filename or not file.filename.lower().endswith(".wav"):
+    mime_type = magic.magic_buffer(file.file.read(1024))
+    if mime_type != "audio/x-wav":
         raise HTTPException(
             status_code=400, detail={"error": "unsupported file format"}
         )
