@@ -1,37 +1,64 @@
-from typing import List, Optional
+import json
+import os
+from typing import Optional, Union
 
+import redis
+import ulid
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from rq import Queue
+
+from .summarization import process_summarization
+
+# Application settings
+REDIS_TTL = 60 * 60 * 24  # 24 hours (seconds)
+
+# Redis connection settings
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
+REDIS_DB = int(os.getenv("REDIS_DB", 0))
+
+# Connect to Redis
+redis_conn = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB)
+queue = Queue(connection=redis_conn)
 
 app = FastAPI(
     title="Summarizer API",
-    description="テキストの要約を行うAPI",
+    description="API for text summarization",
     version="0.1.0",
 )
 
-# CORS設定
+# CORS settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 本番環境では適切に制限する
+    allow_origins=["*"],  # Should be properly restricted in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# モデル定義
+# Model definitions
 class SummarizeRequest(BaseModel):
     text: str
-    max_length: Optional[int] = 200
+    strength: int = Field(..., ge=1, le=5, description="Summarization strength (1-5)")
 
 
-class SummaryResponse(BaseModel):
-    id: str
-    original_text: str
-    summary: str
-    created_at: str
+class SummarizeResponse(BaseModel):
+    request_id: str
+
+
+class SummarizeStatusResponse(BaseModel):
+    status: str
+    summary: Optional[str] = None
+    error: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+class ErrorResponse(BaseModel):
+    error: str
 
 
 @app.get("/")
@@ -39,59 +66,67 @@ async def root():
     return {"message": "Summarizer API"}
 
 
-@app.get("/api/health")
+@app.get("/health")
 async def health_check():
     return {"status": "ok"}
 
 
-@app.post("/api/summarize", response_model=SummaryResponse)
+@app.post("/summarize", status_code=202, response_model=SummarizeResponse)
 async def summarize_text(request: SummarizeRequest):
     """
-    テキストを要約する
+    Register a job to summarize text
     """
     if not request.text:
-        raise HTTPException(status_code=400, detail="テキストが提供されていません")
+        raise HTTPException(status_code=400, detail={"error": "invalid input"})
 
-    # ここに実際の要約処理を実装
-    # 現在はダミーレスポンスを返す
-    return {
-        "id": "sample-id-456",
-        "original_text": request.text,
-        "summary": f"これは「{request.text[:30]}...」の要約です。",
-        "created_at": "2025-04-11T12:00:00Z",
-    }
+    # Generate request ID
+    request_id = str(ulid.ULID())
+
+    # Save initial status to Redis
+    redis_conn.setex(
+        f"summarize:{request_id}", REDIS_TTL, json.dumps({"status": "pending"})
+    )
+
+    # Enqueue RQ job
+    queue.enqueue(process_summarization, request_id, request.text, request.strength)
+
+    return {"request_id": request_id}
 
 
-@app.get("/api/summaries", response_model=List[SummaryResponse])
-async def get_summaries():
+@app.get(
+    "/summarize/{request_id}",
+    response_model=Union[SummarizeStatusResponse, ErrorResponse],
+    response_model_exclude_none=True,
+    responses={
+        200: {"model": SummarizeStatusResponse},
+        404: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+    },
+)
+async def get_summarization(request_id: str):
     """
-    要約結果の一覧を取得する
+    Get summarization result
     """
-    # ここに実際のデータベース検索処理を実装
-    # 現在はダミーデータを返す
-    return [
-        {
-            "id": "sample-id-456",
-            "original_text": "これは長いテキストの例です。要約されると短くなります。",
-            "summary": "これは長いテキストの要約です。",
-            "created_at": "2025-04-11T12:00:00Z",
-        }
-    ]
+    # Get result from Redis
+    result = redis_conn.get(f"summarize:{request_id}")
 
+    if not result:
+        raise HTTPException(status_code=404, detail={"error": "request not found"})
 
-@app.get("/api/summaries/{summary_id}", response_model=SummaryResponse)
-async def get_summary(summary_id: str):
-    """
-    特定の要約結果を取得する
-    """
-    # ここに実際のデータベース検索処理を実装
-    # 現在はダミーデータを返す
-    return {
-        "id": summary_id,
-        "original_text": "これは長いテキストの例です。要約されると短くなります。",
-        "summary": "これは長いテキストの要約です。",
-        "created_at": "2025-04-11T12:00:00Z",
-    }
+    try:
+        # Parse string as JSON
+        if isinstance(result, str):
+            result_str = result
+        elif isinstance(result, bytes):
+            result_str = result.decode("utf-8")
+        else:
+            raise ValueError("Unexpected result type")
+
+        # Convert JSON to dictionary
+        summarization_result = json.loads(result_str)
+        return summarization_result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": "internal server error"})
 
 
 if __name__ == "__main__":
