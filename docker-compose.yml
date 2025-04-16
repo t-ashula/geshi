@@ -1,32 +1,4 @@
 services:
-  transcriber:
-    build:
-      context: ./transcriber
-      dockerfile: Dockerfile
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./transcriber:/app
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/geshi
-    depends_on:
-      - db
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
-  summarizer:
-    build:
-      context: ./summarizer
-      dockerfile: Dockerfile
-    ports:
-      - "8001:8000"
-    volumes:
-      - ./summarizer:/app
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/geshi
-    depends_on:
-      - db
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-
   ui:
     build:
       context: ./geshi/ui
@@ -36,8 +8,7 @@ services:
     volumes:
       - ./geshi/ui:/app
     depends_on:
-      - transcriber
-      - summarizer
+      - scribe-api
     command: npm start
 
   db:
@@ -50,6 +21,84 @@ services:
       - POSTGRES_DB=geshi
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  scribe-api:
+    build:
+      context: ./scribe
+      dockerfile: Dockerfile
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./scribe:/app
+      - ./tmp/uploads:/app/tmp/uploads
+    ports:
+      - "8002:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/geshi
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - GESHI_UPLOAD_DIR=/app/tmp/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scribe-worker:
+    build:
+      context: ./scribe
+      dockerfile: Dockerfile
+    command: python -m src.worker
+    volumes:
+      - ./scribe:/app
+      - ./tmp/uploads:/app/tmp/uploads
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - GESHI_UPLOAD_DIR=/app/tmp/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scribe-scheduler:
+    build:
+      context: ./scribe
+      dockerfile: Dockerfile
+    command: python -m src.scheduler
+    volumes:
+      - ./scribe:/app
+      - ./tmp/uploads:/app/tmp/uploads
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - GESHI_UPLOAD_DIR=/app/tmp/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  redis-data:
