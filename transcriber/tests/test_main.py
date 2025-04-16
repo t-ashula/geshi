@@ -2,10 +2,10 @@ import io
 import json
 import os
 import sys
-import uuid
 from unittest import mock
 
 import pytest
+import ulid
 from fastapi.testclient import TestClient
 
 # Add the parent directory to sys.path
@@ -35,12 +35,16 @@ def mock_queue(monkeypatch):
 
 
 @pytest.fixture
-def mock_uuid(monkeypatch):
-    """Mock for uuid.uuid4"""
-    mock_uuid = mock.MagicMock()
-    mock_uuid.return_value = "test-uuid-123"
-    monkeypatch.setattr("uuid.uuid4", mock_uuid)
-    return mock_uuid
+def mock_ulid(monkeypatch):
+    """Mock for ulid.ULID"""
+    mock_ulid_instance = mock.MagicMock()
+    mock_ulid_instance.__str__.return_value = "01HPQRS9ABCDEFGHJKMNPQRST"
+
+    mock_ulid_class = mock.MagicMock()
+    mock_ulid_class.return_value = mock_ulid_instance
+
+    monkeypatch.setattr("ulid.ULID", mock_ulid_class)
+    return mock_ulid_class
 
 
 @pytest.fixture
@@ -65,7 +69,10 @@ def test_health_check():
 
 
 # Tests for POST /transcribe endpoint
-def test_transcribe_success(mock_redis, mock_queue, mock_uuid, test_wav_file):
+@mock.patch("src.main.magic.from_buffer")
+def test_transcribe_success(
+    mock_from_buffer, mock_redis, mock_queue, mock_ulid, test_wav_file
+):
     """Test for successful request"""
     # Prepare test file
     files = {"file": ("test.wav", test_wav_file, "audio/wav")}
@@ -74,24 +81,30 @@ def test_transcribe_success(mock_redis, mock_queue, mock_uuid, test_wav_file):
     # Set up mocks
     mock_redis.setex.return_value = True
     mock_queue.enqueue.return_value = None
+    mock_from_buffer.return_value = "audio/x-wav"  # Mock magic to identify as WAV
 
     # Execute request
     response = client.post("/transcribe", files=files, data=data)
 
     # Verify response
     assert response.status_code == 202
-    assert response.json() == {"request_id": "test-uuid-123"}
+    assert response.json() == {"request_id": "01HPQRS9ABCDEFGHJKMNPQRST"}
 
     # Verify mock calls
     mock_redis.setex.assert_called_once()
     mock_queue.enqueue.assert_called_once()
+    mock_from_buffer.assert_called_once()  # Verify magic was called
 
 
-def test_transcribe_invalid_format(mock_redis, mock_queue):
+@mock.patch("src.main.magic.from_buffer")
+def test_transcribe_invalid_format(mock_from_buffer, mock_redis, mock_queue):
     """Test for invalid file format"""
     # Prepare test file (mp3 format)
     files = {"file": ("test.mp3", io.BytesIO(b"dummy mp3 content"), "audio/mp3")}
     data = {"language": "ja", "model": "base"}
+
+    # Set up mock to identify as MP3
+    mock_from_buffer.return_value = "audio/mpeg"
 
     # Execute request
     response = client.post("/transcribe", files=files, data=data)
@@ -103,9 +116,13 @@ def test_transcribe_invalid_format(mock_redis, mock_queue):
     # Verify mocks were not called
     mock_redis.setex.assert_not_called()
     mock_queue.enqueue.assert_not_called()
+    mock_from_buffer.assert_called_once()  # Verify magic was called
 
 
-def test_transcribe_file_too_large(mock_redis, mock_queue, monkeypatch):
+@mock.patch("src.main.magic.from_buffer")
+def test_transcribe_file_too_large(
+    mock_from_buffer, mock_redis, mock_queue, monkeypatch
+):
     """Test for file size exceeding limit"""
     # Prepare test file
     test_file = io.BytesIO(b"dummy wav content")
@@ -123,6 +140,9 @@ def test_transcribe_file_too_large(mock_redis, mock_queue, monkeypatch):
         return MockUploadFile()
 
     monkeypatch.setattr("fastapi.File.__call__", mock_file)
+
+    # Set up magic mock to identify as WAV
+    mock_from_buffer.return_value = "audio/x-wav"
 
     # Execute request
     response = client.post("/transcribe", files=files, data=data)
@@ -146,14 +166,14 @@ def test_get_transcription_done(mock_redis):
     mock_redis.get.return_value = json.dumps(result).encode()
 
     # Execute request
-    response = client.get("/transcribe/test-uuid-123")
+    response = client.get("/transcribe/01HPQRS9ABCDEFGHJKMNPQRST")
 
     # Verify response
     assert response.status_code == 200
     assert response.json() == result
 
     # Verify mock call
-    mock_redis.get.assert_called_once_with("transcription:test-uuid-123")
+    mock_redis.get.assert_called_once_with("transcription:01HPQRS9ABCDEFGHJKMNPQRST")
 
 
 def test_get_transcription_pending(mock_redis):
@@ -163,7 +183,7 @@ def test_get_transcription_pending(mock_redis):
     mock_redis.get.return_value = json.dumps(result).encode()
 
     # Execute request
-    response = client.get("/transcribe/test-uuid-123")
+    response = client.get("/transcribe/01HPQRS9ABCDEFGHJKMNPQRST")
 
     # Verify response
     assert response.status_code == 200
@@ -182,7 +202,7 @@ def test_get_transcription_error(mock_redis):
     mock_redis.get.return_value = json.dumps(result).encode()
 
     # Execute request
-    response = client.get("/transcribe/test-uuid-123")
+    response = client.get("/transcribe/01HPQRS9ABCDEFGHJKMNPQRST")
 
     # Verify response
     assert response.status_code == 200

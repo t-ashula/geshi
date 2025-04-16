@@ -1,23 +1,22 @@
 import json
 import os
 import shutil
-import uuid
-from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
+import magic
 import redis
+import ulid
 import uvicorn
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from rq import Queue
 
 from .transcription import process_transcription
 
 # Application settings
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = Path(os.getenv("GESHI_UPLOAD_DIR", "tmp/uploads"))
+UPLOAD_DIR.mkdir(exist_ok=True, parents=True)
 MAX_FILE_SIZE = 1 * 1024 * 1024 * 1024  # 1GiB
 REDIS_TTL = 60 * 60 * 24  # 24 hours (seconds)
 
@@ -34,15 +33,6 @@ app = FastAPI(
     title="Transcriber API",
     description="API for transcribing audio files to text",
     version="0.1.0",
-)
-
-# CORS settings
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Should be restricted appropriately in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 
@@ -79,8 +69,15 @@ async def transcribe_audio(
     """
     Upload an audio file for transcription
     """
+    # Check file
+    if not file.filename:
+        raise HTTPException(
+            status_code=400, detail={"error": "unsupported file format"}
+        )
+
     # Check file format
-    if not file.filename or not file.filename.lower().endswith(".wav"):
+    mime_type = magic.from_buffer(file.file.read(1024), mime=True)
+    if mime_type != "audio/x-wav":
         raise HTTPException(
             status_code=400, detail={"error": "unsupported file format"}
         )
@@ -91,7 +88,7 @@ async def transcribe_audio(
         raise HTTPException(status_code=400, detail={"error": "file too large"})
 
     # Generate request ID
-    request_id = str(uuid.uuid4())
+    request_id = str(ulid.ULID())
 
     # Create upload directory
     upload_path = UPLOAD_DIR / request_id
