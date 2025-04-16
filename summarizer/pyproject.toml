@@ -16,6 +16,11 @@ pydantic = "^2.6.0"
 python-dotenv = "^1.0.0"
 httpx = "^0.28.1"
 python-multipart = "^0.0.20"
+redis = "^5.0.1"
+rq = "^1.15.1"
+python-ulid = "^3.0.0"
+transformers = "^4.38.2"
+torch = "^2.2.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.4"
