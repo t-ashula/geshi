@@ -5,10 +5,8 @@
   "workspaces": [
     "crawler",
     "model",
-    "transcriber",
-    "summarizer",
-    "ui",
-    "scribe"
+    "scribe",
+    "ui"
   ],
   "scripts": {
     "test": "vitest run",
