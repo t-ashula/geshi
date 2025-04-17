@@ -7,7 +7,8 @@
     "model",
     "transcriber",
     "summarizer",
-    "ui"
+    "ui",
+    "scribe"
   ],
   "scripts": {
     "test": "vitest run",
