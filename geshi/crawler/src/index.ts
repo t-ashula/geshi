@@ -1,29 +1,57 @@
 /**
  * @geshi/crawler
- * クローラーモジュール
+ * クローラーコンポーネント
  */
 
-export interface CrawlerOptions {
-  url: string;
-  // 他のオプションをここに追加
-}
+// 型定義のエクスポート
+export * from "./types";
 
-export type CrawlerResult = {
-  url: string;
-  data: string;
-};
+// BullMQキューのエクスポート
+export {
+  queues,
+  produceQueue,
+  crawlQueue,
+  downloadQueue,
+  recordReserveQueue,
+  recordQueue,
+  updateQueue,
+  QUEUE_NAMES,
+} from "./bull";
 
-/**
- * クローラー関数
- * @param options クローラーオプション
- * @returns 取得したデータ
- */
-export async function crawler(options: CrawlerOptions): Promise<CrawlerResult> {
-  // 実装はここに追加
-  // console.log(`Crawling ${options.url}`);
-  return { url: options.url, data: "Sample data" };
-}
+// プロデューサーのエクスポート
+export {
+  listChannels,
+  listEpisodes,
+  produceCrawlJobs,
+  produceDownloadJobs,
+  produceRecordReserveJobs,
+  produceAllJobs,
+} from "./producer";
+
+// ワーカーのエクスポート
+export { default as crawlWorker } from "./crawl-worker";
+export { default as downloadWorker } from "./download-worker";
+export { default as recordReserveWorker } from "./record-reserve-worker";
+export { default as recordWorker } from "./record-worker";
+export { default as updateWorker } from "./update-worker";
+
+// デフォルトエクスポート
+import * as bull from "./bull";
+import * as producer from "./producer";
+import crawlWorker from "./crawl-worker";
+import downloadWorker from "./download-worker";
+import recordReserveWorker from "./record-reserve-worker";
+import recordWorker from "./record-worker";
+import updateWorker from "./update-worker";
 
 export default {
-  crawler,
+  bull,
+  producer,
+  workers: {
+    crawlWorker,
+    downloadWorker,
+    recordReserveWorker,
+    recordWorker,
+    updateWorker,
+  },
 };
