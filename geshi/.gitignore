@@ -35,3 +35,7 @@ coverage/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# tmp ディレクトリは .keep 以外は git 管理外
+tmp/*
+!tmp/.keep

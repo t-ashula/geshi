@@ -5,8 +5,7 @@
   "workspaces": [
     "crawler",
     "model",
-    "transcriber",
-    "summarizer",
+    "scribe",
     "ui"
   ],
   "scripts": {
