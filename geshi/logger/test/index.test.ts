@@ -8,9 +8,9 @@ import {
 } from "../src/index";
 
 describe("Logger", () => {
-  // モックの設定
+  // Setup mocks
   beforeEach(() => {
-    // pino のメソッドをスパイ
+    // Spy on pino methods
     vi.spyOn(logger, "info");
     vi.spyOn(logger, "error");
     vi.spyOn(logger, "debug");
@@ -21,7 +21,7 @@ describe("Logger", () => {
     vi.restoreAllMocks();
   });
 
-  it("デフォルトロガーが存在する", () => {
+  it("Default logger exists", () => {
     expect(logger).toBeDefined();
     expect(typeof logger.info).toBe("function");
     expect(typeof logger.error).toBe("function");
@@ -29,7 +29,7 @@ describe("Logger", () => {
     expect(typeof logger.warn).toBe("function");
   });
 
-  it("createLogger でカスタムロガーを作成できる", () => {
+  it("Can create a custom logger with createLogger", () => {
     const customLogger = createLogger("test-namespace");
     expect(customLogger).toBeDefined();
     expect(customLogger.bindings()).toHaveProperty(
@@ -38,7 +38,7 @@ describe("Logger", () => {
     );
   });
 
-  it("createModuleLogger でモジュール用ロガーを作成できる", () => {
+  it("Can create a module logger with createModuleLogger", () => {
     const moduleLogger = createModuleLogger("test-module");
     expect(moduleLogger).toBeDefined();
     expect(moduleLogger.bindings()).toHaveProperty(
@@ -47,7 +47,7 @@ describe("Logger", () => {
     );
   });
 
-  it("createServiceLogger でサービス用ロガーを作成できる", () => {
+  it("Can create a service logger with createServiceLogger", () => {
     const serviceLogger = createServiceLogger("test-service");
     expect(serviceLogger).toBeDefined();
     expect(serviceLogger.bindings()).toHaveProperty(
@@ -56,7 +56,7 @@ describe("Logger", () => {
     );
   });
 
-  it("setLogLevel でログレベルを変更できる", () => {
+  it("Can change log level with setLogLevel", () => {
     const originalLevel = logger.level;
 
     setLogLevel("debug");
@@ -65,15 +65,15 @@ describe("Logger", () => {
     setLogLevel("error");
     expect(logger.level).toBe("error");
 
-    // 元のレベルに戻す
+    // Restore original level
     setLogLevel(originalLevel as any);
   });
 
-  it("ロガーでメッセージを出力できる", () => {
-    logger.info("テスト情報メッセージ");
-    expect(logger.info).toHaveBeenCalledWith("テスト情報メッセージ");
+  it("Can output messages with logger", () => {
+    logger.info("Test info message");
+    expect(logger.info).toHaveBeenCalledWith("Test info message");
 
-    logger.error("テストエラーメッセージ");
-    expect(logger.error).toHaveBeenCalledWith("テストエラーメッセージ");
+    logger.error("Test error message");
+    expect(logger.error).toHaveBeenCalledWith("Test error message");
   });
 });

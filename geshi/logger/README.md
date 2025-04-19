@@ -1,69 +1,69 @@
 # Logger
 
-pino を使用したロギングモジュール。
+A logging module using pino.
 
-## インストール
+## Installation
 
-このパッケージは geshi ワークスペースの一部として提供されています。
+This package is provided as part of the geshi workspace.
 
-## 使用方法
+## Usage
 
-### 基本的な使用方法
+### Basic Usage
 
 ```typescript
 import { logger } from 'logger';
 
-logger.info('情報メッセージ');
-logger.error('エラーメッセージ');
+logger.info('Information message');
+logger.error('Error message');
 ```
 
-### モジュール固有のロガーの作成
+### Creating Module-Specific Loggers
 
 ```typescript
 import { createModuleLogger } from 'logger';
 
 const moduleLogger = createModuleLogger('my-module');
-moduleLogger.info('モジュール固有のログメッセージ');
+moduleLogger.info('Module-specific log message');
 ```
 
-### サービス固有のロガーの作成
+### Creating Service-Specific Loggers
 
 ```typescript
 import { createServiceLogger } from 'logger';
 
 const serviceLogger = createServiceLogger('api-service');
-serviceLogger.info('サービス固有のログメッセージ');
+serviceLogger.info('Service-specific log message');
 ```
 
-### カスタムロガーの作成
+### Creating Custom Loggers
 
 ```typescript
 import { createLogger } from 'logger';
 
 const customLogger = createLogger('custom-namespace', {
-  // カスタムオプション
+  // Custom options
 });
-customLogger.info('カスタムログメッセージ');
+customLogger.info('Custom log message');
 ```
 
-### ログレベルの設定
+### Setting Log Level
 
-環境変数 `LOG_LEVEL` を使用してログレベルを設定できます。または、プログラムで設定することもできます：
+You can set the log level using the `LOG_LEVEL` environment variable, or programmatically:
 
 ```typescript
 import { setLogLevel } from 'logger';
 
-setLogLevel('debug'); // 'trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent' のいずれか
+setLogLevel('debug'); // One of 'trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'
 ```
 
-## ログレベル
+## Log Levels
 
-以下のログレベルがサポートされています（低いものから高いものへ）：
+The following log levels are supported (from lowest to highest):
 
-- `trace`: 最も詳細なデバッグ情報
-- `debug`: デバッグ情報
-- `info`: 一般的な情報メッセージ（デフォルト）
-- `warn`: 警告メッセージ
-- `error`: エラーメッセージ
-- `fatal`: 致命的なエラーメッセージ
-- `silent`: すべてのログを無効化
+- `trace`: Most detailed debug information
+- `debug`: Debug information
+- `info`: General information messages (default)
+- `warn`: Warning messages
+- `error`: Error messages
+- `fatal`: Fatal error messages
+- `silent`: Disables all logging

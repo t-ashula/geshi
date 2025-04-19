@@ -1,7 +1,7 @@
 import pino from "pino";
 
 /**
- * ロガーのデフォルト設定
+ * Default logger options
  */
 const defaultOptions: pino.LoggerOptions = {
   level: process.env.LOG_LEVEL || "info",
@@ -16,15 +16,15 @@ const defaultOptions: pino.LoggerOptions = {
 };
 
 /**
- * デフォルト設定で作成されたロガーインスタンス
+ * Logger instance created with default options
  */
 export const logger = pino(defaultOptions);
 
 /**
- * カスタム名前空間付きのロガーを作成する
- * @param namespace - ロガーの名前空間
- * @param options - カスタムロガーオプション（オプション）
- * @returns 設定されたロガーインスタンス
+ * Create a logger with a custom namespace
+ * @param namespace - Logger namespace
+ * @param options - Custom logger options (optional)
+ * @returns Configured logger instance
  */
 export function createLogger(
   namespace: string,
@@ -37,26 +37,26 @@ export function createLogger(
 }
 
 /**
- * 特定のモジュール用のロガーを作成する
- * @param moduleName - モジュール名
- * @returns モジュール用に設定されたロガーインスタンス
+ * Create a logger for a specific module
+ * @param moduleName - Module name
+ * @returns Logger instance configured for the module
  */
 export function createModuleLogger(moduleName: string): pino.Logger {
   return createLogger(`module:${moduleName}`);
 }
 
 /**
- * 特定のサービス用のロガーを作成する
- * @param serviceName - サービス名
- * @returns サービス用に設定されたロガーインスタンス
+ * Create a logger for a specific service
+ * @param serviceName - Service name
+ * @returns Logger instance configured for the service
  */
 export function createServiceLogger(serviceName: string): pino.Logger {
   return createLogger(`service:${serviceName}`);
 }
 
 /**
- * ログレベルを設定する
- * @param level - 設定するログレベル
+ * Set the log level
+ * @param level - Log level to set
  */
 export function setLogLevel(level: pino.LevelWithSilent): void {
   logger.level = level;
