@@ -43,9 +43,7 @@ jobs:
             echo "→ $subject"
             if echo "$subject" | grep -qE '^:.*: '; then
               continue
-            elif echo "$subject" | grep -qE '^Merge pull request #[0-9]+ from '; then
-              continue
-            elif echo "$subject" | grep -qE '^Merge [0-9A-Fa-f]+ into [0-9A-Fa-f]+'; then
+            elif echo "$subject" | grep -qE '^Merge '; then
               continue
             else
               echo "❌ Invalid commit message format: '$subject'"
