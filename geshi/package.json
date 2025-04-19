@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": [
     "crawler",
+    "logger",
     "model",
     "scribe",
     "ui"
@@ -26,5 +27,9 @@
     "prettier": "^3.2.5",
     "typescript": "^5.3.3",
     "vitest": "^3.1.1"
+  },
+  "dependencies": {
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0"
   }
 }
