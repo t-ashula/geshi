@@ -11,39 +11,39 @@ This package is provided as part of the geshi workspace.
 ### Basic Usage
 
 ```typescript
-import { logger } from 'logger';
+import { logger } from "logger";
 
-logger.info('Information message');
-logger.error('Error message');
+logger.info("Information message");
+logger.error("Error message");
 ```
 
 ### Creating Module-Specific Loggers
 
 ```typescript
-import { createModuleLogger } from 'logger';
+import { createModuleLogger } from "logger";
 
-const moduleLogger = createModuleLogger('my-module');
-moduleLogger.info('Module-specific log message');
+const moduleLogger = createModuleLogger("my-module");
+moduleLogger.info("Module-specific log message");
 ```
 
 ### Creating Service-Specific Loggers
 
 ```typescript
-import { createServiceLogger } from 'logger';
+import { createServiceLogger } from "logger";
 
-const serviceLogger = createServiceLogger('api-service');
-serviceLogger.info('Service-specific log message');
+const serviceLogger = createServiceLogger("api-service");
+serviceLogger.info("Service-specific log message");
 ```
 
 ### Creating Custom Loggers
 
 ```typescript
-import { createLogger } from 'logger';
+import { createLogger } from "logger";
 
-const customLogger = createLogger('custom-namespace', {
+const customLogger = createLogger("custom-namespace", {
   // Custom options
 });
-customLogger.info('Custom log message');
+customLogger.info("Custom log message");
 ```
 
 ### Setting Log Level
@@ -51,9 +51,9 @@ customLogger.info('Custom log message');
 You can set the log level using the `LOG_LEVEL` environment variable, or programmatically:
 
 ```typescript
-import { setLogLevel } from 'logger';
+import { setLogLevel } from "logger";
 
-setLogLevel('debug'); // One of 'trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'
+setLogLevel("debug"); // One of 'trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'
 ```
 
 ## Log Levels

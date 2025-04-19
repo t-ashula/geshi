@@ -1,20 +1,13 @@
 {
-    "name": "@geshi/logger",
-    "version": "0.1.0",
-    "private": true,
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
-    "scripts": {
-        "build": "tsc",
-        "test": "vitest run",
-        "test:watch": "vitest"
-    },
-    "dependencies": {
-        "pino": "^9.6.0",
-        "pino-pretty": "^13.0.0"
-    },
-    "devDependencies": {
-        "typescript": "^5.3.3",
-        "vitest": "^3.1.1"
-    }
+  "name": "@geshi/logger",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint ./src/**/*.ts ./test/**/*.ts",
+    "format": "prettier --write .",
+    "test": "vitest run"
+  }
 }

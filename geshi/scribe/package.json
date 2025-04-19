@@ -1,24 +1,13 @@
 {
   "name": "@geshi/scribe",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint .",
-    "format": "prettier --write ."
-  },
-  "dependencies": {
-    "@geshi/model": "0.1.0",
-    "@types/node": "^20.11.0",
-    "axios": "^1.6.7",
-    "form-data": "^4.0.0",
-    "typescript": "^5.3.3"
-  },
-  "devDependencies": {
-    "vitest": "^3.1.1"
+    "lint": "eslint ./src/**/*.ts ./test/**/*.ts",
+    "format": "prettier --write .",
+    "test": "vitest run"
   }
 }
