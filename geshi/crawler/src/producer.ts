@@ -4,8 +4,8 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
+// eslint-disable-next-line import/no-unresolved
 import { PrismaClient, Channel, Episode } from "@geshi/model";
-// @ts-ignore - モジュール解決の問題を一時的に無視
 import { crawlQueue, downloadQueue, recordReserveQueue } from "./bull";
 import {
   CrawlJobPayload,

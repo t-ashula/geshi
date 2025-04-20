@@ -5,6 +5,7 @@
 
 import { Worker } from "bullmq";
 import dotenv from "dotenv";
+// eslint-disable-next-line import/no-unresolved
 import { PrismaClient } from "@geshi/model";
 import { QUEUE_NAMES } from "./bull";
 import { UpdateJobMessage, JobType, JobStatus } from "./types";
@@ -15,8 +16,6 @@ dotenv.config();
 // ワーカーの並行処理数
 const CONCURRENCY = parseInt(process.env.UPDATE_CONCURRENCY || "10", 10);
 
-// Prismaクライアントの初期化
-// @ts-ignore - モジュール解決の問題を一時的に無視
 const prisma = new PrismaClient();
 
 /**
@@ -82,7 +81,7 @@ async function applyCrawlResult(jobId: string, result: any): Promise<void> {
           }
         } catch (error) {
           console.warn(
-            `Invalid date format: ${episode.pubDate}, using current date`,
+            `Invalid date format: ${episode.pubDate}, using current date, ${error}`,
           );
         }
 

@@ -7,6 +7,7 @@ import { Worker } from "bullmq";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import dotenv from "dotenv";
+// eslint-disable-next-line import/no-unresolved
 import { PrismaClient } from "@geshi/model";
 import { updateQueue, recordQueue, QUEUE_NAMES } from "./bull";
 import {
@@ -31,7 +32,6 @@ const RECORD_OUTPUT_DIR =
   process.env.RECORD_OUTPUT_DIR || path.join(process.cwd(), "recordings");
 
 // Prismaクライアントの初期化
-// @ts-ignore - モジュール解決の問題を一時的に無視
 const prisma = new PrismaClient();
 
 /**
