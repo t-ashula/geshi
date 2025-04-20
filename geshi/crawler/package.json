@@ -9,5 +9,8 @@
     "lint": "eslint ./src/**/*.ts ./test/**/*.ts",
     "format": "prettier --write .",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@geshi/logger": "^1.0.0"
   }
 }

@@ -9,5 +9,12 @@
     "lint": "eslint ./src/**/*.ts ./test/**/*.ts",
     "format": "prettier --write .",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.6.0",
+    "pg": "^8.14.1"
+  },
+  "devDependencies": {
+    "prisma": "^6.6.0"
   }
 }

@@ -9,5 +9,10 @@
     "lint": "eslint ./src/**/*.ts ./test/**/*.ts",
     "format": "prettier --write .",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@geshi/logger": "^1.0.0",
+    "axios": "^1.8.4",
+    "form-data": "^4.0.2"
   }
 }
