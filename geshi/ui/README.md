@@ -1,42 +1,38 @@
-# @geshi/ui
+# sv
 
-Webユーザーインターフェースモジュール
+Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
 
-## 概要
+## Creating a project
 
-このモジュールは、geshiプロジェクトのWebユーザーインターフェースを提供します。React + Viteを使用して構築されています。
-
-## 使用方法
+If you're seeing this, you've probably already done this step. Congrats!
 
 ```bash
-# 開発サーバーの起動
+# create a new project in the current directory
+npx sv create
+
+# create a new project in my-app
+npx sv create my-app
+```
+
+## Developing
+
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+
+```bash
 npm run dev
 
-# ビルド
-npm run build
-
-# ビルドされたアプリのプレビュー
-npm run preview
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
 ```
 
-## 機能
+## Building
 
-- 文字起こしの表示と管理
-- 要約の表示と管理
-- クローラーの設定と実行
-
-## 開発
+To create a production version of your app:
 
 ```bash
-# 依存関係のインストール
-npm install
-
-# テストの実行
-npm test
-
-# リンターの実行
-npm run lint
-
-# コードのフォーマット
-npm run format
+npm run build
 ```
+
+You can preview the production build with `npm run preview`.
+
+> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
