@@ -15,6 +15,10 @@ import {
   JobType,
 } from "./types";
 
+// eslint-disable-next-line import/no-unresolved
+import { createModuleLogger } from "@geshi/logger";
+const logger = createModuleLogger("crawler");
+
 // Prismaクライアントの初期化
 const prisma = new PrismaClient();
 
@@ -73,7 +77,7 @@ export async function produceCrawlJobs(channels: Channel[]): Promise<void> {
     // キューにジョブを追加
     await crawlQueue.add(`crawl-${jobId}`, payload);
 
-    console.log(
+    logger.info(
       `Crawl job created for channel: ${channel.title} (${channel.id})`,
     );
   }
@@ -114,7 +118,7 @@ export async function produceDownloadJobs(episodes: Episode[]): Promise<void> {
     // キューにジョブを追加
     await downloadQueue.add(`download-${jobId}`, payload);
 
-    console.log(
+    logger.info(
       `Download job created for episode: ${episode.title} (${episode.id})`,
     );
   }
@@ -166,7 +170,7 @@ export async function produceRecordReserveJobs(
     // キューにジョブを追加
     await recordReserveQueue.add(`record-reserve-${jobId}`, payload);
 
-    console.log(
+    logger.info(
       `Record reserve job created for episode: ${episode.title} (${episode.id})`,
     );
   }
@@ -192,9 +196,9 @@ export async function produceAllJobs(): Promise<void> {
     // 録画予約ジョブを生成
     await produceRecordReserveJobs(episodes);
 
-    console.log("All jobs produced successfully");
+    logger.info("All jobs produced successfully");
   } catch (error) {
-    console.error("Error producing jobs:", error);
+    logger.error("Error producing jobs:", error);
     throw error;
   } finally {
     await prisma.$disconnect();

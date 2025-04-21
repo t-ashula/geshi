@@ -17,6 +17,9 @@ import {
   JobType,
   JobStatus,
 } from "./types";
+// eslint-disable-next-line import/no-unresolved
+import { createModuleLogger } from "@geshi/logger";
+const logger = createModuleLogger("crawler");
 
 // 環境変数の読み込み
 dotenv.config();
@@ -54,7 +57,7 @@ function scheduleRecordJob(startTime: string): number {
 const recordReserveWorker = new Worker<RecordReserveJobPayload, any>(
   QUEUE_NAMES.RECORD_RESERVE,
   async (job) => {
-    console.log(`Processing record reserve job: ${job.id}`);
+    logger.info(`Processing record reserve job: ${job.id}`);
     const { jobId, episodeId, streamUrl, startTime, options } = job.data;
 
     try {
@@ -113,12 +116,12 @@ const recordReserveWorker = new Worker<RecordReserveJobPayload, any>(
 
       await updateQueue.add(`update-record-reserve-${jobId}`, updateMessage);
 
-      console.log(
+      logger.info(
         `Record reserve job completed: ${job.id}, scheduled for: ${new Date(Date.now() + delay).toISOString()}`,
       );
       return result;
     } catch (error) {
-      console.error(`Record reserve job failed: ${job.id}`, error);
+      logger.error(`Record reserve job failed: ${job.id}`, error);
 
       // エラー結果を生成
       const errorResult = {
@@ -157,11 +160,11 @@ const recordReserveWorker = new Worker<RecordReserveJobPayload, any>(
 
 // イベントハンドラの設定
 recordReserveWorker.on("completed", (job) => {
-  console.log(`Record reserve job ${job.id} has completed successfully`);
+  logger.info(`Record reserve job ${job.id} has completed successfully`);
 });
 
 recordReserveWorker.on("failed", (job, error) => {
-  console.error(`Record reserve job ${job?.id} has failed with error:`, error);
+  logger.error(`Record reserve job ${job?.id} has failed with error:`, error);
 });
 
 // 終了時にPrismaクライアントを切断
@@ -175,6 +178,6 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-console.log(`Record reserve worker started with concurrency: ${CONCURRENCY}`);
+logger.info(`Record reserve worker started with concurrency: ${CONCURRENCY}`);
 
 export default recordReserveWorker;
