@@ -19,7 +19,7 @@ module.exports = {
     es6: true,
   },
   rules: {
-    "no-console": "warn",
+    "no-console": "error",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "@typescript-eslint/no-explicit-any": "warn",
     "import/no-unresolved": "error",
@@ -36,19 +36,6 @@ module.exports = {
       files: ["**/*.test.ts", "**/*.test.tsx"],
       env: {
         jest: true,
-      },
-    },
-    {
-      files: ["**/ui/**/*.ts", "**/ui/**/*.tsx"],
-      extends: ["plugin:react/recommended", "plugin:react-hooks/recommended"],
-      rules: {
-        "react/prop-types": "off",
-        "react/react-in-jsx-scope": "off",
-      },
-      settings: {
-        react: {
-          version: "detect",
-        },
       },
     },
   ],

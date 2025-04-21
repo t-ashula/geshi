@@ -10,6 +10,10 @@ import dotenv from "dotenv";
 import { updateQueue, QUEUE_NAMES } from "./bull";
 import { CrawlJobPayload, UpdateJobMessage, JobType } from "./types";
 
+// eslint-disable-next-line import/no-unresolved
+import { createModuleLogger } from "@geshi/logger";
+const logger = createModuleLogger("crawler");
+
 // 環境変数の読み込み
 dotenv.config();
 
@@ -38,7 +42,7 @@ async function fetchRss(rssUrl: string): Promise<any> {
 
     return result;
   } catch (error) {
-    console.error(`Error fetching RSS from ${rssUrl}:`, error);
+    logger.error(`Error fetching RSS from ${rssUrl}:`, error);
     throw error;
   }
 }
@@ -89,10 +93,10 @@ function extractEpisodes(rssData: any): any[] {
     }
 
     // その他のフォーマットの場合は空配列を返す
-    console.warn("Unknown RSS format:", Object.keys(rssData));
+    logger.warn(`Unknown RSS format:${Object.keys(rssData)}`);
     return [];
   } catch (error) {
-    console.error("Error extracting episodes:", error);
+    logger.error(`Error extracting episodes: ${error}`);
     return [];
   }
 }
@@ -101,7 +105,7 @@ function extractEpisodes(rssData: any): any[] {
 const crawlWorker = new Worker<CrawlJobPayload, any>(
   QUEUE_NAMES.CRAWL,
   async (job) => {
-    console.log(`Processing crawl job: ${job.id}`);
+    logger.info(`Processing crawl job: ${job.id}`);
     const { jobId, channelId, rssUrl } = job.data;
 
     try {
@@ -129,12 +133,12 @@ const crawlWorker = new Worker<CrawlJobPayload, any>(
 
       await updateQueue.add(`update-crawl-${jobId}`, updateMessage);
 
-      console.log(
+      logger.info(
         `Crawl job completed: ${job.id}, found ${episodes.length} episodes`,
       );
       return result;
     } catch (error) {
-      console.error(`Crawl job failed: ${job.id}`, error);
+      logger.error(`Crawl job failed: ${job.id}`, error);
 
       // エラー結果を生成
       const errorResult = {
@@ -173,13 +177,13 @@ const crawlWorker = new Worker<CrawlJobPayload, any>(
 
 // イベントハンドラの設定
 crawlWorker.on("completed", (job) => {
-  console.log(`Crawl job ${job.id} has completed successfully`);
+  logger.info(`Crawl job ${job.id} has completed successfully`);
 });
 
 crawlWorker.on("failed", (job, error) => {
-  console.error(`Crawl job ${job?.id} has failed with error:`, error);
+  logger.error(`Crawl job ${job?.id} has failed with error:`, error);
 });
 
-console.log(`Crawl worker started with concurrency: ${CONCURRENCY}`);
+logger.info(`Crawl worker started with concurrency: ${CONCURRENCY}`);
 
 export default crawlWorker;

@@ -11,6 +11,9 @@ import { promisify } from "util";
 import dotenv from "dotenv";
 import { updateQueue, QUEUE_NAMES } from "./bull";
 import { DownloadJobPayload, UpdateJobMessage, JobType } from "./types";
+// eslint-disable-next-line import/no-unresolved
+import { createModuleLogger } from "@geshi/logger";
+const logger = createModuleLogger("crawler");
 
 // 環境変数の読み込み
 dotenv.config();
@@ -65,7 +68,7 @@ async function downloadFile(
       });
     });
   } catch (error) {
-    console.error(`Error downloading file from ${url}:`, error);
+    logger.error(`Error downloading file from ${url}:`, error);
     // エラー時はファイルを削除（存在する場合）
     if (fs.existsSync(outputPath)) {
       fs.unlinkSync(outputPath);
@@ -78,7 +81,7 @@ async function downloadFile(
 const downloadWorker = new Worker<DownloadJobPayload, any>(
   QUEUE_NAMES.DOWNLOAD,
   async (job) => {
-    console.log(`Processing download job: ${job.id}`);
+    logger.info(`Processing download job: ${job.id}`);
     const { jobId, episodeId, mediaUrl } = job.data;
 
     try {
@@ -111,12 +114,12 @@ const downloadWorker = new Worker<DownloadJobPayload, any>(
 
       await updateQueue.add(`update-download-${jobId}`, updateMessage);
 
-      console.log(
+      logger.info(
         `Download job completed: ${job.id}, size: ${downloadResult.size} bytes`,
       );
       return result;
     } catch (error) {
-      console.error(`Download job failed: ${job.id}`, error);
+      logger.error(`Download job failed: ${job.id}`, error);
 
       // エラー結果を生成
       const errorResult = {
@@ -155,13 +158,13 @@ const downloadWorker = new Worker<DownloadJobPayload, any>(
 
 // イベントハンドラの設定
 downloadWorker.on("completed", (job) => {
-  console.log(`Download job ${job.id} has completed successfully`);
+  logger.info(`Download job ${job.id} has completed successfully`);
 });
 
 downloadWorker.on("failed", (job, error) => {
-  console.error(`Download job ${job?.id} has failed with error:`, error);
+  logger.error(`Download job ${job?.id} has failed with error:`, error);
 });
 
-console.log(`Download worker started with concurrency: ${CONCURRENCY}`);
+logger.info(`Download worker started with concurrency: ${CONCURRENCY}`);
 
 export default downloadWorker;

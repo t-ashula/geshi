@@ -8,8 +8,12 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+// eslint-disable-next-line import/no-unresolved
+import { createModuleLogger } from "@geshi/logger";
 import { updateQueue, QUEUE_NAMES } from "./bull";
 import { RecordJobPayload, UpdateJobMessage, JobType } from "./types";
+
+const logger = createModuleLogger("crawler");
 
 // 環境変数の読み込み
 dotenv.config();
@@ -55,19 +59,19 @@ function recordHLS(
       outputPath,
     ];
 
-    console.log(`Starting FFmpeg recording: ffmpeg ${args.join(" ")}`);
+    logger.info(`Starting FFmpeg recording: ffmpeg ${args.join(" ")}`);
 
     // FFmpegプロセスを起動
     const ffmpeg = spawn("ffmpeg", args);
 
     // 標準出力のログ
     ffmpeg.stdout.on("data", (data) => {
-      console.log(`FFmpeg stdout: ${data}`);
+      logger.info(`FFmpeg stdout: ${data}`);
     });
 
     // 標準エラー出力のログ
     ffmpeg.stderr.on("data", (data) => {
-      console.log(`FFmpeg stderr: ${data}`);
+      logger.info(`FFmpeg stderr: ${data}`);
     });
 
     // プロセス終了時の処理
@@ -78,18 +82,18 @@ function recordHLS(
           const stats = fs.statSync(outputPath);
           resolve({ success: true, size: stats.size });
         } catch (error) {
-          console.error(`Error getting file stats: ${error}`);
+          logger.error(`Error getting file stats: ${error}`);
           reject(error);
         }
       } else {
-        console.error(`FFmpeg process exited with code ${code}`);
+        logger.error(`FFmpeg process exited with code ${code}`);
         reject(new Error(`FFmpeg process exited with code ${code}`));
       }
     });
 
     // エラー発生時の処理
     ffmpeg.on("error", (error) => {
-      console.error(`FFmpeg process error: ${error}`);
+      logger.error(`FFmpeg process error: ${error}`);
       reject(error);
     });
 
@@ -98,7 +102,7 @@ function recordHLS(
       try {
         ffmpeg.kill("SIGTERM");
       } catch (error) {
-        console.error(`Error killing FFmpeg process: ${error}`);
+        logger.error(`Error killing FFmpeg process: ${error}`);
       }
     };
 
@@ -112,7 +116,7 @@ function recordHLS(
 const recordWorker = new Worker<RecordJobPayload, any>(
   QUEUE_NAMES.RECORD,
   async (job) => {
-    console.log(`Processing record job: ${job.id}`);
+    logger.info(`Processing record job: ${job.id}`);
     const { jobId, episodeId, streamUrl, outputPath } = job.data;
 
     try {
@@ -138,19 +142,19 @@ const recordWorker = new Worker<RecordJobPayload, any>(
 
       await updateQueue.add(`update-record-${jobId}`, updateMessage);
 
-      console.log(
+      logger.info(
         `Record job completed: ${job.id}, size: ${recordResult.size} bytes`,
       );
 
       // 録画ジョブ完了後にプロセスを終了
       setTimeout(() => {
-        console.log("Record job worker exiting...");
+        logger.info("Record job worker exiting...");
         process.exit(0);
       }, 1000);
 
       return result;
     } catch (error) {
-      console.error(`Record job failed: ${job.id}`, error);
+      logger.error(`Record job failed: ${job.id}`, error);
 
       // エラー結果を生成
       const errorResult = {
@@ -173,7 +177,7 @@ const recordWorker = new Worker<RecordJobPayload, any>(
 
       // エラー発生時にプロセスを終了（エラーコード1）
       setTimeout(() => {
-        console.error("Record job worker exiting with error...");
+        logger.error("Record job worker exiting with error...");
         process.exit(1);
       }, 1000);
 
@@ -191,13 +195,13 @@ const recordWorker = new Worker<RecordJobPayload, any>(
 
 // イベントハンドラの設定
 recordWorker.on("completed", (job) => {
-  console.log(`Record job ${job.id} has completed successfully`);
+  logger.info(`Record job ${job.id} has completed successfully`);
 });
 
 recordWorker.on("failed", (job, error) => {
-  console.error(`Record job ${job?.id} has failed with error:`, error);
+  logger.error(`Record job ${job?.id} has failed with error:`, error);
 });
 
-console.log(`Record worker started with concurrency: ${CONCURRENCY}`);
+logger.info(`Record worker started with concurrency: ${CONCURRENCY}`);
 
 export default recordWorker;

@@ -6,9 +6,12 @@
 import { Worker } from "bullmq";
 import dotenv from "dotenv";
 // eslint-disable-next-line import/no-unresolved
+import { createModuleLogger } from "@geshi/logger";
+// eslint-disable-next-line import/no-unresolved
 import { PrismaClient } from "@geshi/model";
 import { QUEUE_NAMES } from "./bull";
 import { UpdateJobMessage, JobType, JobStatus } from "./types";
+const logger = createModuleLogger("crawler");
 
 // 環境変数の読み込み
 dotenv.config();
@@ -24,7 +27,7 @@ const prisma = new PrismaClient();
  * @param result クロール結果
  */
 async function applyCrawlResult(jobId: string, result: any): Promise<void> {
-  console.log(`Applying crawl result for job: ${jobId}`);
+  logger.info(`Applying crawl result for job: ${jobId}`);
 
   try {
     // ジョブを完了状態に更新
@@ -56,7 +59,7 @@ async function applyCrawlResult(jobId: string, result: any): Promise<void> {
         const episodeIdentifier = episode.guid || episode.link;
 
         if (!episodeIdentifier) {
-          console.warn("Episode without identifier, skipping:", episode.title);
+          logger.warn("Episode without identifier, skipping:", episode.title);
           continue;
         }
 
@@ -69,7 +72,7 @@ async function applyCrawlResult(jobId: string, result: any): Promise<void> {
         });
 
         if (existingEpisode) {
-          console.log(`Episode already exists: ${episode.title}`);
+          logger.info(`Episode already exists: ${episode.title}`);
           continue;
         }
 
@@ -80,7 +83,7 @@ async function applyCrawlResult(jobId: string, result: any): Promise<void> {
             publishedAt = new Date(episode.pubDate);
           }
         } catch (error) {
-          console.warn(
+          logger.warn(
             `Invalid date format: ${episode.pubDate}, using current date, ${error}`,
           );
         }
@@ -105,11 +108,11 @@ async function applyCrawlResult(jobId: string, result: any): Promise<void> {
           },
         });
 
-        console.log(`Created new episode: ${episode.title}`);
+        logger.info(`Created new episode: ${episode.title}`);
       }
     }
   } catch (error) {
-    console.error(`Error applying crawl result for job ${jobId}:`, error);
+    logger.error(`Error applying crawl result for job ${jobId}:`, error);
     throw error;
   }
 }
@@ -120,7 +123,7 @@ async function applyCrawlResult(jobId: string, result: any): Promise<void> {
  * @param result ダウンロード結果
  */
 async function applyDownloadResult(jobId: string, result: any): Promise<void> {
-  console.log(`Applying download result for job: ${jobId}`);
+  logger.info(`Applying download result for job: ${jobId}`);
 
   try {
     // ジョブを完了状態に更新
@@ -143,12 +146,12 @@ async function applyDownloadResult(jobId: string, result: any): Promise<void> {
         },
       });
 
-      console.log(
+      logger.info(
         `Updated episode size: ${result.episodeId}, size: ${result.sizeBytes} bytes`,
       );
     }
   } catch (error) {
-    console.error(`Error applying download result for job ${jobId}:`, error);
+    logger.error(`Error applying download result for job ${jobId}:`, error);
     throw error;
   }
 }
@@ -162,7 +165,7 @@ async function applyRecordReserveResult(
   jobId: string,
   result: any,
 ): Promise<void> {
-  console.log(`Applying record reserve result for job: ${jobId}`);
+  logger.info(`Applying record reserve result for job: ${jobId}`);
 
   try {
     // ジョブを完了状態に更新
@@ -178,7 +181,7 @@ async function applyRecordReserveResult(
     // 特に追加のデータベース更新は不要
     // 録画ジョブは既に作成済み
   } catch (error) {
-    console.error(
+    logger.error(
       `Error applying record reserve result for job ${jobId}:`,
       error,
     );
@@ -192,7 +195,7 @@ async function applyRecordReserveResult(
  * @param result 録画結果
  */
 async function applyRecordResult(jobId: string, result: any): Promise<void> {
-  console.log(`Applying record result for job: ${jobId}`);
+  logger.info(`Applying record result for job: ${jobId}`);
 
   try {
     // ジョブを完了状態に更新
@@ -215,12 +218,12 @@ async function applyRecordResult(jobId: string, result: any): Promise<void> {
         },
       });
 
-      console.log(
+      logger.info(
         `Updated episode size: ${result.episodeId}, size: ${result.sizeBytes} bytes`,
       );
     }
   } catch (error) {
-    console.error(`Error applying record result for job ${jobId}:`, error);
+    logger.error(`Error applying record result for job ${jobId}:`, error);
     throw error;
   }
 }
@@ -229,7 +232,7 @@ async function applyRecordResult(jobId: string, result: any): Promise<void> {
 const updateWorker = new Worker<UpdateJobMessage, void>(
   QUEUE_NAMES.UPDATE,
   async (job) => {
-    console.log(`Processing update job: ${job.id}`);
+    logger.info(`Processing update job: ${job.id}`);
     const { jobType, jobId, result } = job.data;
 
     try {
@@ -251,9 +254,9 @@ const updateWorker = new Worker<UpdateJobMessage, void>(
           throw new Error(`Unknown job type: ${jobType}`);
       }
 
-      console.log(`Update job completed: ${job.id}`);
+      logger.info(`Update job completed: ${job.id}`);
     } catch (error) {
-      console.error(`Update job failed: ${job.id}`, error);
+      logger.error(`Update job failed: ${job.id}`, error);
       throw error;
     }
   },
@@ -268,11 +271,11 @@ const updateWorker = new Worker<UpdateJobMessage, void>(
 
 // イベントハンドラの設定
 updateWorker.on("completed", (job) => {
-  console.log(`Update job ${job.id} has completed successfully`);
+  logger.info(`Update job ${job.id} has completed successfully`);
 });
 
 updateWorker.on("failed", (job, error) => {
-  console.error(`Update job ${job?.id} has failed with error:`, error);
+  logger.error(`Update job ${job?.id} has failed with error:`, error);
 });
 
 // 終了時にPrismaクライアントを切断
@@ -286,6 +289,6 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-console.log(`Update worker started with concurrency: ${CONCURRENCY}`);
+logger.info(`Update worker started with concurrency: ${CONCURRENCY}`);
 
 export default updateWorker;
