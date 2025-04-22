@@ -1,11 +1,11 @@
 import prettier from 'eslint-config-prettier';
 import js from '@eslint/js';
 import { includeIgnoreFile } from '@eslint/compat';
-import svelte from 'eslint-plugin-svelte';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript-eslint';
-import svelteConfig from './svelte.config.js';
 
 const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 
@@ -13,24 +13,27 @@ export default ts.config(
 	includeIgnoreFile(gitignorePath),
 	js.configs.recommended,
 	...ts.configs.recommended,
-	...svelte.configs.recommended,
-	prettier,
-	...svelte.configs.prettier,
 	{
-		languageOptions: {
-			globals: { ...globals.browser, ...globals.node }
+		files: ['**/*.jsx', '**/*.tsx', '**/*.js', '**/*.ts'],
+		plugins: {
+			react: reactPlugin,
+			'react-hooks': reactHooks
 		},
-		rules: { 'no-undef': 'off' }
-	},
-	{
-		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 		languageOptions: {
+			globals: { ...globals.browser, ...globals.node },
 			parserOptions: {
-				projectService: true,
-				extraFileExtensions: ['.svelte'],
-				parser: ts.parser,
-				svelteConfig
+				ecmaFeatures: {
+					jsx: true
+				}
 			}
+		},
+		rules: {
+			'no-undef': 'off',
+			'react/jsx-uses-react': 'error',
+			'react/jsx-uses-vars': 'error',
+			'react-hooks/rules-of-hooks': 'error',
+			'react-hooks/exhaustive-deps': 'warn'
 		}
-	}
+	},
+	prettier
 );
