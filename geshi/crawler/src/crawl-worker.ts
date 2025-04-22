@@ -9,8 +9,6 @@ import { parseStringPromise } from "xml2js";
 import dotenv from "dotenv";
 import { updateQueue, QUEUE_NAMES } from "./bull";
 import { CrawlJobPayload, UpdateJobMessage, JobType } from "./types";
-
-// eslint-disable-next-line import/no-unresolved
 import { createModuleLogger } from "@geshi/logger";
 const logger = createModuleLogger("crawler");
 

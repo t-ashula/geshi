@@ -4,7 +4,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
-// eslint-disable-next-line import/no-unresolved
+
 import { PrismaClient, Channel, Episode } from "@geshi/model";
 import { crawlQueue, downloadQueue, recordReserveQueue } from "./bull";
 import {
@@ -15,7 +15,6 @@ import {
   JobType,
 } from "./types";
 
-// eslint-disable-next-line import/no-unresolved
 import { createModuleLogger } from "@geshi/logger";
 const logger = createModuleLogger("crawler");
 

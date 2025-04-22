@@ -6,6 +6,7 @@ import {
   createServiceLogger,
   setLogLevel,
 } from "../src/index";
+import { LevelWithSilent } from "pino";
 
 describe("Logger", () => {
   // Setup mocks
@@ -66,7 +67,7 @@ describe("Logger", () => {
     expect(logger.level).toBe("error");
 
     // Restore original level
-    setLogLevel(originalLevel as any);
+    setLogLevel(originalLevel as LevelWithSilent);
   });
 
   it("Can output messages with logger", () => {

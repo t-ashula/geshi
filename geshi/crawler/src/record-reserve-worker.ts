@@ -7,7 +7,7 @@ import { Worker } from "bullmq";
 import { v4 as uuidv4 } from "uuid";
 import path from "path";
 import dotenv from "dotenv";
-// eslint-disable-next-line import/no-unresolved
+
 import { PrismaClient } from "@geshi/model";
 import { updateQueue, recordQueue, QUEUE_NAMES } from "./bull";
 import {
@@ -17,7 +17,7 @@ import {
   JobType,
   JobStatus,
 } from "./types";
-// eslint-disable-next-line import/no-unresolved
+
 import { createModuleLogger } from "@geshi/logger";
 const logger = createModuleLogger("crawler");
 

@@ -8,7 +8,6 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
-// eslint-disable-next-line import/no-unresolved
 import { createModuleLogger } from "@geshi/logger";
 import { updateQueue, QUEUE_NAMES } from "./bull";
 import { RecordJobPayload, UpdateJobMessage, JobType } from "./types";
@@ -75,7 +74,7 @@ function recordHLS(
     });
 
     // プロセス終了時の処理
-    ffmpeg.on("close", async (code) => {
+    ffmpeg.on("close", (code) => {
       if (code === 0) {
         try {
           // ファイルサイズを取得
