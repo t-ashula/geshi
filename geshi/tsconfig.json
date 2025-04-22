@@ -8,12 +8,12 @@
     "strict": true,
     "skipLibCheck": true,
     "declaration": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": ".",
-    "paths": {
-      "@geshi/*": ["./*/src"]
-    }
+    "sourceMap": true,    "removeComments": false,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "exclude": ["node_modules", "dist"]
 }

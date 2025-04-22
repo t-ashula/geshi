@@ -5,9 +5,7 @@
 
 import { Worker } from "bullmq";
 import dotenv from "dotenv";
-// eslint-disable-next-line import/no-unresolved
 import { createModuleLogger } from "@geshi/logger";
-// eslint-disable-next-line import/no-unresolved
 import { PrismaClient } from "@geshi/model";
 import { QUEUE_NAMES } from "./bull";
 import { UpdateJobMessage, JobType, JobStatus } from "./types";
