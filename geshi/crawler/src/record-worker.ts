@@ -8,7 +8,6 @@ import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
-// eslint-disable-next-line import/no-unresolved
 import { createModuleLogger } from "@geshi/logger";
 import { updateQueue, QUEUE_NAMES } from "./bull";
 import { RecordJobPayload, UpdateJobMessage, JobType } from "./types";
