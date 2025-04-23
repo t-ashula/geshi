@@ -29,6 +29,9 @@ module.exports = {
       node: {
         extensions: [".js", ".jsx", ".ts", ".tsx"],
       },
+      typescript: {
+        project: ["./tsconfig.json"]
+      }
     },
   },
   overrides: [
@@ -38,5 +41,17 @@ module.exports = {
         jest: true,
       },
     },
+    {
+      files: ["crawler/src/**/*.ts", "model/src/**/*.ts", "logger/src/**/*.ts", "ui/src/**/*.ts"],
+      parserOptions: {
+        project: [
+          "./tsconfig.json",
+          "./crawler/tsconfig.json",
+          "./model/tsconfig.json",
+          "./logger/tsconfig.json",
+          "./ui/tsconfig.json"
+        ]
+      }
+    }
   ],
 };
