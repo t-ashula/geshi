@@ -5,11 +5,11 @@
 
 import { Worker } from "bullmq";
 import dotenv from "dotenv";
-import { createModuleLogger } from "@geshi/logger";
+
 import { PrismaClient } from "@geshi/model";
-import { QUEUE_NAMES } from "./bull";
-import { UpdateJobMessage, JobType, JobStatus } from "./types";
-const logger = createModuleLogger("crawler");
+import { QUEUE_NAMES } from "../bull";
+import { UpdateJobMessage, JobType, JobStatus } from "../types";
+import logger from "../logger";
 
 // 環境変数の読み込み
 dotenv.config();

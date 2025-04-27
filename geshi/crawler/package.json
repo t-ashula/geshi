@@ -21,7 +21,10 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "@bull-board/hono": "^6.9.2",
+    "@hono/node-server": "^1.14.1",
     "@types/uuid": "^10.0.0",
-    "@types/xml2js": "^0.4.14"
+    "@types/xml2js": "^0.4.14",
+    "hono": "^4.7.7"
   }
 }
