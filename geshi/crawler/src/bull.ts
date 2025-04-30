@@ -17,7 +17,7 @@ import {
 dotenv.config();
 
 // Redis接続設定
-const redisConnection = {
+export const defaultConnectionOptions = {
   host: process.env.REDIS_HOST || "localhost",
   port: parseInt(process.env.REDIS_PORT || "6379", 10),
 };
@@ -33,8 +33,8 @@ export const QUEUE_NAMES = {
 };
 
 // BullMQのQueueインスタンス定義
-export const produceQueue = new Queue<any>(QUEUE_NAMES.PRODUCE, {
-  connection: redisConnection,
+export const produceQueue = new Queue<void>(QUEUE_NAMES.PRODUCE, {
+  connection: defaultConnectionOptions,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
@@ -45,7 +45,7 @@ export const produceQueue = new Queue<any>(QUEUE_NAMES.PRODUCE, {
 });
 
 export const crawlQueue = new Queue<CrawlJobPayload>(QUEUE_NAMES.CRAWL, {
-  connection: redisConnection,
+  connection: defaultConnectionOptions,
   defaultJobOptions: {
     attempts: 3,
     backoff: {
@@ -58,7 +58,7 @@ export const crawlQueue = new Queue<CrawlJobPayload>(QUEUE_NAMES.CRAWL, {
 export const downloadQueue = new Queue<DownloadJobPayload>(
   QUEUE_NAMES.DOWNLOAD,
   {
-    connection: redisConnection,
+    connection: defaultConnectionOptions,
     defaultJobOptions: {
       attempts: 3,
       backoff: {
@@ -72,7 +72,7 @@ export const downloadQueue = new Queue<DownloadJobPayload>(
 export const recordReserveQueue = new Queue<RecordReserveJobPayload>(
   QUEUE_NAMES.RECORD_RESERVE,
   {
-    connection: redisConnection,
+    connection: defaultConnectionOptions,
     defaultJobOptions: {
       attempts: 3,
       backoff: {
@@ -84,14 +84,14 @@ export const recordReserveQueue = new Queue<RecordReserveJobPayload>(
 );
 
 export const recordQueue = new Queue<RecordJobPayload>(QUEUE_NAMES.RECORD, {
-  connection: redisConnection,
+  connection: defaultConnectionOptions,
   defaultJobOptions: {
     attempts: 1, // 録画は再試行しない
   },
 });
 
 export const updateQueue = new Queue<UpdateJobMessage>(QUEUE_NAMES.UPDATE, {
-  connection: redisConnection,
+  connection: defaultConnectionOptions,
   defaultJobOptions: {
     attempts: 5, // 更新は重要なので再試行回数を多めに
     backoff: {
@@ -101,7 +101,6 @@ export const updateQueue = new Queue<UpdateJobMessage>(QUEUE_NAMES.UPDATE, {
   },
 });
 
-// すべてのキューをエクスポート
 export const queues = {
   produceQueue,
   crawlQueue,
@@ -110,5 +109,3 @@ export const queues = {
   recordQueue,
   updateQueue,
 };
-
-export default queues;

@@ -18,31 +18,21 @@ export {
   QUEUE_NAMES,
 } from "./bull";
 
-// プロデューサーのエクスポート
-export {
-  listChannels,
-  listEpisodes,
-  produceCrawlJobs,
-  produceDownloadJobs,
-  produceRecordReserveJobs,
-  produceAllJobs,
-} from "./producer";
-
 // ワーカーのエクスポート
-export { default as crawlWorker } from "./crawl-worker";
-export { default as downloadWorker } from "./download-worker";
-export { default as recordReserveWorker } from "./record-reserve-worker";
-export { default as recordWorker } from "./record-worker";
-export { default as updateWorker } from "./update-worker";
+export { default as crawlWorker } from "./workers/crawl-worker";
+export { default as downloadWorker } from "./workers/download-worker";
+export { default as recordReserveWorker } from "./workers/record-reserve-worker";
+export { default as recordWorker } from "./workers/record-worker";
+export { default as updateWorker } from "./workers/update-worker";
 
 // デフォルトエクスポート
 import * as bull from "./bull";
-import * as producer from "./producer";
-import crawlWorker from "./crawl-worker";
-import downloadWorker from "./download-worker";
-import recordReserveWorker from "./record-reserve-worker";
-import recordWorker from "./record-worker";
-import updateWorker from "./update-worker";
+import * as producer from "./workers/producer-scheduler";
+import crawlWorker from "./workers/crawl-worker";
+import downloadWorker from "./workers/download-worker";
+import recordReserveWorker from "./workers/record-reserve-worker";
+import recordWorker from "./workers/record-worker";
+import updateWorker from "./workers/update-worker";
 
 export default {
   bull,
