@@ -15,18 +15,20 @@ export interface CrawlJobPayload {
 export interface CrawlJobResult {
   result: CrawlerResult;
   spent: number;
+  success: boolean;
 }
 
 export enum CrawlType {
   RSS = "rss",
 }
 
+// TODO: more gcm type
 export type CrawledEpisode = {
   title: string;
   link: string;
   description: string;
   pubDate: string;
-  enclosure: string;
+  enclosure?: string | { url: string; length: number };
   guid: string;
   duration?: number;
 };
@@ -46,6 +48,7 @@ export interface DownloadJobPayload {
 export interface DownloadJobResult {
   result: DownloaderResult;
   spent: number;
+  success: boolean;
 }
 
 export type DownloaderResult = {
@@ -63,6 +66,7 @@ export interface RecordReserveJobPayload {
 }
 
 export interface RecordReserveJobResult {
+  success: boolean;
   result: RecordReserverResult;
   spent: number;
 }
@@ -83,6 +87,7 @@ export interface RecordJobPayload {
 }
 
 export interface RecordJobResult {
+  success: boolean;
   spent: number;
   result: RecorderResult;
 }
@@ -104,7 +109,6 @@ export type RecorderOptions = {
 export interface UpdateJobMessage {
   jobType: "crawl" | "download" | "record-reserve" | "record";
   jobId: string;
-  success: boolean;
   result?:
     | CrawlJobResult
     | DownloadJobResult
@@ -131,4 +135,6 @@ export enum JobType {
   DOWNLOAD = "download",
   RECORD_RESERVE = "record-reserve",
   RECORD = "record",
+  UPDATE = "update",
+  PRODUCE = "produce",
 }

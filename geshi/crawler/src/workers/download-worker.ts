@@ -33,11 +33,15 @@ const processor = async (
     const spent = Date.now() - startAt;
 
     // 更新キューにメッセージを追加
+    const jobResult: DownloadJobResult = {
+      result,
+      spent,
+      success: true,
+    };
     const updateMessage: UpdateJobMessage = {
       jobType: JobType.DOWNLOAD,
       jobId,
-      success: true,
-      result: { spent, result },
+      result: jobResult,
     };
 
     await updateQueue.add(`update-download-${jobId}`, updateMessage);
@@ -47,7 +51,7 @@ const processor = async (
       jobId,
       result,
     });
-    return { spent, result };
+    return jobResult;
   } catch (error) {
     logger.error(`failed`, { jobId, error });
 
@@ -56,7 +60,6 @@ const processor = async (
       jobType: JobType.DOWNLOAD,
       jobId,
       error: error instanceof Error ? error.message : String(error),
-      success: false,
     };
 
     await updateQueue.add(`update-download-error-${jobId}`, updateMessage);

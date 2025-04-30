@@ -38,11 +38,11 @@ const processor = async (
     const spent = Date.now() - startAt;
 
     // 更新キューにメッセージを追加
+    const jobResult = { result, spent, success: true };
     const updateMessage: UpdateJobMessage = {
       jobType: JobType.RECORD,
       jobId,
-      success: result.success,
-      result: { result, spent },
+      result: jobResult,
     };
 
     await updateQueue.add(`update-record-${jobId}`, updateMessage);
@@ -54,7 +54,7 @@ const processor = async (
       logger.info("Record job worker exiting...");
       process.exit(0);
     }, 1000);
-    return { result, spent };
+    return jobResult;
   } catch (error) {
     logger.error(`Record job failed: ${job.id}`, error);
 
@@ -63,7 +63,6 @@ const processor = async (
       jobType: JobType.RECORD,
       jobId,
       error: error instanceof Error ? error.message : String(error),
-      success: false,
     };
 
     await updateQueue.add(`update-record-error-${jobId}`, updateMessage);

@@ -27,7 +27,7 @@ export { default as updateWorker } from "./workers/update-worker";
 
 // デフォルトエクスポート
 import * as bull from "./bull";
-import * as producer from "./workers/producer";
+import * as producer from "./workers/producer-scheduler";
 import crawlWorker from "./workers/crawl-worker";
 import downloadWorker from "./workers/download-worker";
 import recordReserveWorker from "./workers/record-reserve-worker";

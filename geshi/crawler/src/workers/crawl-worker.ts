@@ -28,14 +28,17 @@ const processor = async (
   try {
     // TODO: crawl return Either<Error, CrawlerResult>
     const result = await crawl(targetUrl, crawlType);
-
     const spent = Date.now() - startAt;
     // 更新キューにメッセージを追加
+    const jobResult: CrawlJobResult = {
+      result,
+      spent,
+      success: true,
+    };
     const updateMessage: UpdateJobMessage = {
       jobType: JobType.CRAWL,
       jobId,
-      result: { result, spent },
-      success: true,
+      result: jobResult,
     };
 
     await updateQueue.add(`update-crawl-${jobId}`, updateMessage);
@@ -45,7 +48,7 @@ const processor = async (
       jobId,
       count: result.episodes.length,
     });
-    return { result, spent };
+    return jobResult;
   } catch (error) {
     logger.error(`failed. error=${error}`, { jobId, error });
 
@@ -54,7 +57,6 @@ const processor = async (
       jobType: JobType.CRAWL,
       jobId,
       error: error instanceof Error ? error.message : String(error),
-      success: false,
     };
 
     await updateQueue.add(`update-crawl-error-${jobId}`, updateMessage);

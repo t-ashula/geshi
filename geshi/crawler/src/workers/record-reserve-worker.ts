@@ -89,19 +89,22 @@ const processor = async (
     const result: RecordReserverResult = {
       jobId: recordJobId,
     };
-
+    const jobResult: RecordReserveJobResult = {
+      result,
+      success: true,
+      spent,
+    };
     // 更新キューにメッセージを追加
     const updateMessage: UpdateJobMessage = {
       jobType: JobType.RECORD_RESERVE,
       jobId,
-      success: true,
-      result: { result, spent },
+      result: jobResult,
     };
 
     await updateQueue.add(`update-record-reserve-${jobId}`, updateMessage);
 
     logger.info(`completed`, { jobId, recordJobId });
-    return { result, spent };
+    return jobResult;
   } catch (error) {
     logger.error(`failed`, { jobId, error });
 
@@ -109,7 +112,6 @@ const processor = async (
     const updateMessage: UpdateJobMessage = {
       jobType: JobType.RECORD_RESERVE,
       jobId,
-      success: false,
       error: error instanceof Error ? error.message : String(error),
     };
 
@@ -128,11 +130,10 @@ const workerOptions = {
   concurrency: CONCURRENCY,
 };
 // 録画予約ワーカーの作成
-const recordReserveWorker = new Worker<RecordReserveJobPayload, any>(
-  QUEUE_NAMES.RECORD_RESERVE,
-  processor,
-  workerOptions,
-);
+const recordReserveWorker = new Worker<
+  RecordReserveJobPayload,
+  RecordReserveJobResult
+>(QUEUE_NAMES.RECORD_RESERVE, processor, workerOptions);
 
 // イベントハンドラの設定
 // recordReserveWorker.on("completed", (job) => {});
