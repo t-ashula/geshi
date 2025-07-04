@@ -1,4 +1,5 @@
 version: 2
+# Consolidated configuration for all workspaces
 updates:
   # geshi ディレクトリの npm パッケージ（全ワークスペースを含む）
   - package-ecosystem: "npm"
