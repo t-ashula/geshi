@@ -1,14 +1,6 @@
 version: 2
 updates:
-  # npm パッケージの更新設定
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: ":up:"
-
-  # geshi ディレクトリの npm パッケージ
+  # geshi ディレクトリの npm パッケージ（全ワークスペースを含む）
   - package-ecosystem: "npm"
     directory: "/geshi"
     schedule:
@@ -16,57 +8,9 @@ updates:
     commit-message:
       prefix: ":up:"
 
-  # geshi/crawler ディレクトリの npm パッケージ
-  - package-ecosystem: "npm"
-    directory: "/geshi/crawler"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: ":up:"
-
-  # geshi/model ディレクトリの npm パッケージ
-  - package-ecosystem: "npm"
-    directory: "/geshi/model"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: ":up:"
-
-  # geshi/summarizer ディレクトリの npm パッケージ
-  - package-ecosystem: "npm"
-    directory: "/geshi/summarizer"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: ":up:"
-
-  # geshi/transcriber ディレクトリの npm パッケージ
-  - package-ecosystem: "npm"
-    directory: "/geshi/transcriber"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: ":up:"
-
-  # geshi/ui ディレクトリの npm パッケージ
-  - package-ecosystem: "npm"
-    directory: "/geshi/ui"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: ":up:"
-
-  # Python パッケージの更新設定（summarizer）
+  # Python パッケージの更新設定（scribe）
   - package-ecosystem: "pip"
-    directory: "/summarizer"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: ":up:"
-
-  # Python パッケージの更新設定（transcriber）
-  - package-ecosystem: "pip"
-    directory: "/transcriber"
+    directory: "/scribe"
     schedule:
       interval: "weekly"
     commit-message:
