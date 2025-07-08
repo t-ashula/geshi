@@ -24,7 +24,7 @@ punctuators = "^0.0.7"
 stable-ts = "^2.19.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.3.5"
+pytest = "^8.4.1"
 black = "^25.1.0"
 isort = "^6.0.1"
 mypy = "^1.8.0"
