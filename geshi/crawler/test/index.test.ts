@@ -38,7 +38,7 @@ describe("download function", () => {
     
     process.env.DOWNLOAD_DIR = TEST_DOWNLOAD_DIR;
     
-    vi.mocked(uuidv4).mockReturnValue(TEST_UUID as any);
+    vi.mocked(uuidv4).mockReturnValue(TEST_UUID as ReturnType<typeof uuidv4>);
     
     mockWriteStream = {
       on: vi.fn().mockImplementation(function(event, callback) {
@@ -64,10 +64,10 @@ describe("download function", () => {
     });
     
     vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
-    vi.mocked(fs.createWriteStream).mockReturnValue(mockWriteStream as any);
-    vi.mocked(fs.unlink).mockImplementation((path, callback: any) => {
+    vi.mocked(fs.createWriteStream).mockReturnValue(mockWriteStream as fs.WriteStream);
+    vi.mocked(fs.unlink).mockImplementation((path, callback) => {
       if (callback) callback(null);
-      return undefined as any;
+      return undefined;
     });
     vi.mocked(fs.unlinkSync).mockImplementation(() => undefined);
     
