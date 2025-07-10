@@ -16,9 +16,10 @@ import { DownloaderResult } from "../types";
 // 環境変数の読み込み
 dotenv.config();
 
-//  テンポラリダウンロード先ディレクトリ
-const DOWNLOAD_DIR =
-  process.env.DOWNLOAD_DIR || path.join(process.cwd(), "downloads");
+//  テンポラリダウンロード先ディレクトリを取得する関数
+function getDownloadDir(): string {
+  return process.env.DOWNLOAD_DIR || path.join(process.cwd(), "downloads");
+}
 
 // TODO: remove episodeId. download function should not know episode things.
 /**
@@ -29,11 +30,12 @@ const DOWNLOAD_DIR =
  */
 async function download(mediaUrl: string): Promise<DownloaderResult> {
   // 出力先パスを生成
+  const DOWNLOAD_DIR = getDownloadDir();
   const fileName = uuidv4().toString();
   const outputPath = path.join(DOWNLOAD_DIR, fileName);
   // ディレクトリが存在しない場合は作成
-  if (!path.dirname(outputPath)) {
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  if (!fs.existsSync(DOWNLOAD_DIR)) {
+    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
   }
 
   try {
