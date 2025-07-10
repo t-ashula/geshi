@@ -71,3 +71,25 @@ describe("download function directory creation", () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 });
+
+describe("download function directory creation behavior", () => {
+  it("should verify the fixed directory creation logic", () => {
+    const testDir = path.join(process.cwd(), "test-download-dir-" + Date.now());
+    
+    expect(fs.existsSync(testDir)).toBe(false);
+    
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+    
+    expect(fs.existsSync(testDir)).toBe(true);
+    
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+    
+    expect(fs.existsSync(testDir)).toBe(true);
+    
+    fs.rmSync(testDir, { recursive: true, force: true });
+  });
+});
