@@ -42,7 +42,9 @@ describe("download function", () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
     if (fs.existsSync(testDownloadDir)) {
       fs.rmSync(testDownloadDir, { recursive: true, force: true });
     }
