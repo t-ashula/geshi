@@ -32,8 +32,8 @@ async function download(mediaUrl: string): Promise<DownloaderResult> {
   const fileName = uuidv4().toString();
   const outputPath = path.join(DOWNLOAD_DIR, fileName);
   // ディレクトリが存在しない場合は作成
-  if (!path.dirname(outputPath)) {
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  if (!fs.existsSync(DOWNLOAD_DIR)) {
+    fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
   }
 
   try {
