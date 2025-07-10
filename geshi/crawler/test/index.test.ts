@@ -1,17 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
-
-vi.mock("../src/logger", () => ({
-  default: {
-    error: vi.fn(),
-    info: vi.fn(),
-  },
-}));
-
-vi.mock("axios");
-import axios from "axios";
-const mockedAxios = vi.mocked(axios);
 
 describe("Crawler", () => {
   it("should pass", () => {
