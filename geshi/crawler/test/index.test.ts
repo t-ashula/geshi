@@ -2,9 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import axios from "axios";
 import { Readable } from "stream";
-import { download } from "../src/funcs/download";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
+
+const TEST_DOWNLOAD_DIR = "/test/downloads";
+const TEST_UUID = "test-uuid-123";
+const TEST_FILE_PATH = path.join(TEST_DOWNLOAD_DIR, TEST_UUID);
+const TEST_URL = "https://geshi.test/test.mp3";
 
 vi.mock("axios");
+vi.mock("uuid");
+vi.mock("fs");
+
 vi.mock("../src/logger", () => ({
   default: {
     error: vi.fn(),
@@ -12,79 +21,83 @@ vi.mock("../src/logger", () => ({
   },
 }));
 
-const mockedAxios = vi.mocked(axios);
-
-class MockReadableStream extends Readable {
-  private data: string;
-  private sent: boolean = false;
-
-  constructor(data: string) {
-    super();
-    this.data = data;
-  }
-
-  _read() {
-    if (!this.sent) {
-      this.push(this.data);
-      this.push(null);
-      this.sent = true;
-    }
-  }
-}
+vi.mock("util", () => {
+  return {
+    promisify: vi.fn(() => {
+      return vi.fn().mockResolvedValue({ size: 1024 });
+    }),
+  };
+});
 
 describe("download function", () => {
+  let mockWriteStream;
+  let mockStream;
+  
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it("should successfully download a file when directory exists", async () => {
-    const testUrl = "https://geshi.test/test.mp3";
-    const mockData = "test file content";
-    const mockStream = new MockReadableStream(mockData);
-
-    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
     
-    const mockWriter = {
-      on: vi.fn((event, callback) => {
+    process.env.DOWNLOAD_DIR = TEST_DOWNLOAD_DIR;
+    
+    vi.mocked(uuidv4).mockReturnValue(TEST_UUID as any);
+    
+    mockWriteStream = {
+      on: vi.fn().mockImplementation(function(event, callback) {
         if (event === 'finish') {
           setTimeout(() => callback(), 10);
         }
-        return mockWriter;
+        return this;
       }),
       write: vi.fn(),
       end: vi.fn(),
     };
     
-    vi.spyOn(fs, 'createWriteStream').mockReturnValue(mockWriter as any);
-    vi.spyOn(fs, 'stat').mockImplementation((path, callback) => {
-      (callback as any)(null, { size: mockData.length });
+    mockStream = new Readable();
+    mockStream.push("test data");
+    mockStream.push(null);
+    mockStream.pipe = vi.fn().mockReturnValue(mockWriteStream);
+    
+    vi.mocked(fs.existsSync).mockImplementation((path) => {
+      if (String(path) === TEST_DOWNLOAD_DIR) {
+        return true; // Default behavior, will be overridden in tests
+      }
+      return false;
     });
-
-    mockStream.pipe = vi.fn((dest) => {
-      setTimeout(() => {
-        const finishCallback = mockWriter.on.mock.calls.find(call => call[0] === 'finish')?.[1];
-        if (finishCallback) finishCallback();
-      }, 10);
-      return dest;
+    
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(fs.createWriteStream).mockReturnValue(mockWriteStream as any);
+    vi.mocked(fs.unlink).mockImplementation((path, callback: any) => {
+      if (callback) callback(null);
+      return undefined as any;
     });
-
-    mockedAxios.mockResolvedValue({
+    vi.mocked(fs.unlinkSync).mockImplementation(() => undefined);
+    
+    vi.mocked(axios).mockResolvedValue({
       data: mockStream,
     });
-
-    const result = await download(testUrl);
-
-    expect(result.success).toBe(true);
-    expect(result.size).toBe(mockData.length);
-    expect(fs.existsSync).toHaveBeenCalled();
+  });
+  
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.DOWNLOAD_DIR;
+  });
+  
+  it("should successfully download a file when directory exists", async () => {
+    vi.mocked(fs.existsSync).mockReturnValueOnce(true);
     
-    expect(mockedAxios).toHaveBeenCalledWith({
+    const { download } = await import("../src/funcs/download");
+    
+    const result = await download(TEST_URL);
+    
+    expect(result).toMatchObject({
+      success: true,
+      size: 1024,
+      outputPath: TEST_FILE_PATH,
+    });
+    expect(fs.existsSync).toHaveBeenCalledWith(TEST_DOWNLOAD_DIR);
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    expect(axios).toHaveBeenCalledWith({
       method: "GET",
-      url: testUrl,
+      url: TEST_URL,
       responseType: "stream",
       headers: {
         "User-Agent": "Geshi-Crawler/1.0",
@@ -92,57 +105,29 @@ describe("download function", () => {
       timeout: 30000,
     });
   });
-
+  
   it("should create download directory when it doesn't exist", async () => {
-    const testUrl = "https://geshi.test/test.mp3";
-    const mockData = "test file content";
-    const mockStream = new MockReadableStream(mockData);
-
-    vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-    const mkdirSyncSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => undefined);
+    vi.mocked(fs.existsSync).mockReturnValueOnce(false);
     
-    const mockWriter = {
-      on: vi.fn((event, callback) => {
-        if (event === 'finish') {
-          setTimeout(() => callback(), 10);
-        }
-        return mockWriter;
-      }),
-      write: vi.fn(),
-      end: vi.fn(),
-    };
+    const { download } = await import("../src/funcs/download");
     
-    vi.spyOn(fs, 'createWriteStream').mockReturnValue(mockWriter as any);
-    vi.spyOn(fs, 'stat').mockImplementation((path, callback) => {
-      (callback as any)(null, { size: mockData.length });
+    const result = await download(TEST_URL);
+    
+    expect(result).toMatchObject({
+      success: true,
+      size: 1024,
+      outputPath: TEST_FILE_PATH,
     });
-
-    mockStream.pipe = vi.fn((dest) => {
-      setTimeout(() => {
-        const finishCallback = mockWriter.on.mock.calls.find(call => call[0] === 'finish')?.[1];
-        if (finishCallback) finishCallback();
-      }, 10);
-      return dest;
-    });
-
-    mockedAxios.mockResolvedValue({
-      data: mockStream,
-    });
-
-    const result = await download(testUrl);
-
-    expect(result.success).toBe(true);
-    expect(fs.existsSync).toHaveBeenCalled();
-    expect(mkdirSyncSpy).toHaveBeenCalledWith(expect.any(String), { recursive: true });
+    expect(fs.existsSync).toHaveBeenCalledWith(TEST_DOWNLOAD_DIR);
+    expect(fs.mkdirSync).toHaveBeenCalledWith(TEST_DOWNLOAD_DIR, { recursive: true });
   });
-
+  
   it("should handle network errors gracefully", async () => {
-    const testUrl = "https://geshi.test/test.mp3";
     const networkError = new Error("Network error");
-
-    mockedAxios.mockRejectedValue(networkError);
-
-    await expect(download(testUrl)).rejects.toThrow("Network error");
+    vi.mocked(axios).mockRejectedValueOnce(networkError);
+    
+    const { download } = await import("../src/funcs/download");
+    
+    await expect(download(TEST_URL)).rejects.toThrow("Network error");
   });
-
 });
