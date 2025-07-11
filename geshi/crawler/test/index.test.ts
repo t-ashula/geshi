@@ -48,10 +48,10 @@ describe("Crawler", () => {
         }),
         kill: vi.fn(),
       };
-      mockSpawn.mockReturnValue(mockProcess as any);
+      mockSpawn.mockReturnValue(mockProcess as unknown as ReturnType<typeof spawn>);
       
       const mockStatSync = vi.mocked(fs.statSync);
-      mockStatSync.mockReturnValue({ size: 1024 } as any);
+      mockStatSync.mockReturnValue({ size: 1024 } as ReturnType<typeof fs.statSync>);
 
       const promise = recordHLS("http://example.com/stream.m3u8", { duration: 10 });
       
@@ -80,10 +80,10 @@ describe("Crawler", () => {
         }),
         kill: vi.fn(),
       };
-      mockSpawn.mockReturnValue(mockProcess as any);
+      mockSpawn.mockReturnValue(mockProcess as unknown as ReturnType<typeof spawn>);
       
       const mockStatSync = vi.mocked(fs.statSync);
-      mockStatSync.mockReturnValue({ size: 1024 } as any);
+      mockStatSync.mockReturnValue({ size: 1024 } as ReturnType<typeof fs.statSync>);
 
       const promise = recordHLS("http://example.com/stream.m3u8", { duration: 10 });
       await promise;
