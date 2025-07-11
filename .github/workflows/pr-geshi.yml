@@ -28,6 +28,10 @@ jobs:
         working-directory: geshi
         run: npm run format:check || npm run format -- --check
 
+      - name: Build
+        working-directory: geshi
+        run: npm run build
+
       - name: Lint
         working-directory: geshi
         run: npm run lint
