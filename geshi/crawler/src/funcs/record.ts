@@ -30,7 +30,7 @@ function recordHLS(
   const fileName = uuidv4();
   const outputPath = path.join(RECORDING_DIR, fileName);
   // ディレクトリが存在しない場合は作成
-  if (!path.dirname(outputPath)) {
+  if (!fs.existsSync(path.dirname(outputPath))) {
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   }
 
