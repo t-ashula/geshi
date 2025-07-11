@@ -66,7 +66,7 @@ describe("Logger", () => {
     expect(logger.level).toBe("error");
 
     // Restore original level
-    setLogLevel(originalLevel as any);
+    setLogLevel(originalLevel as "trace" | "debug" | "info" | "warn" | "error" | "fatal");
   });
 
   it("Can output messages with logger", () => {
