@@ -33,7 +33,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: scribe
-        run: uv sync
+        run: uv sync --extra dev
 
       - name: Format check with black
         working-directory: scribe
