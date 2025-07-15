@@ -26,27 +26,27 @@ jobs:
         with:
           python-version: "3.12.7"
 
-      - name: Install Poetry
-        uses: snok/install-poetry@76e04a911780d5b312d89783f7b1cd627778900a # v1.4.1
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
         with:
-          version: "2.1.2"
+          version: "latest"
 
       - name: Install dependencies
         working-directory: scribe
-        run: poetry install
+        run: uv sync
 
       - name: Format check with black
         working-directory: scribe
-        run: poetry run black --check .
+        run: uv run black --check .
 
       - name: Format check with isort
         working-directory: scribe
-        run: poetry run isort --check .
+        run: uv run isort --check .
 
       - name: Type check with mypy
         working-directory: scribe
-        run: poetry run mypy .
+        run: uv run mypy .
 
       - name: Run tests
         working-directory: scribe
-        run: poetry run pytest
+        run: uv run pytest

@@ -14,7 +14,7 @@ Geshi は音声ファイルの文字起こしとテキストの要約機能を�
   - `logger/`: 集約ログユーティリティ
   - `scribe/`: TypeScript サービス層
   - `ui/`: SvelteKit Web インターフェース
-- **scribe/**: Python ML サービス (Poetry)
+- **scribe/**: Python ML サービス (uv)
   - FastAPI アプリケーション
   - 音声文字起こしとテキスト要約
 
@@ -24,7 +24,7 @@ Geshi は音声ファイルの文字起こしとテキストの要約機能を�
 
 - Node.js 18+ 
 - Python 3.12+
-- Poetry
+- uv
 - PostgreSQL
 - Redis
 - Docker と Docker Compose (オプション)
@@ -64,7 +64,7 @@ npm install
 
 # Python サービスの依存関係インストール
 cd ../scribe
-poetry install
+uv sync
 ```
 
 #### 2. 環境変数の設定
@@ -106,15 +106,15 @@ npx prisma migrate dev
 ```bash
 # Scribe API サーバー
 cd scribe
-poetry run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+uv run uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 
 # Scribe ワーカー
 cd scribe
-poetry run python -m src.worker
+uv run python -m src.worker
 
 # Scribe スケジューラー
 cd scribe
-poetry run python -m src.scheduler
+uv run python -m src.scheduler
 
 # UI (開発サーバー)
 cd geshi/ui
@@ -147,10 +147,10 @@ npm run format
 cd scribe
 
 # テストの実行
-poetry run pytest
+uv run pytest
 
 # リンターの実行
-poetry run isort . && poetry run black .
+uv run isort . && uv run black .
 ```
 
 ## API エンドポイント
