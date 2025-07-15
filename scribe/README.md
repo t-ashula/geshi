@@ -48,7 +48,7 @@ Scribe は以下のコンポーネントで構成されています：
 ### 前提条件
 
 - Python 3.12 以上
-- Poetry
+- Poetry 2.1.2 (推奨)
 - Redis
 - Docker と Docker Compose (オプション)
 
