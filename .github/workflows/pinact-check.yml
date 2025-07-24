@@ -1,0 +1,48 @@
+name: "pinact: GitHub Actions version fix check"
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/**
+      - .github/actions/**
+      - .github/workflows/pinact-check.yml
+    branches:
+      - master
+      - release/**
+      - development
+  push:
+    branches:
+      - development
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-pinact-check
+  cancel-in-progress: true
+
+jobs:
+  pinact-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Install pinact
+        run: |
+          mkdir -p ~/bin
+          curl -sSfL https://github.com/suzuki-shunsuke/pinact/releases/download/v3.1.2/pinact_linux_amd64.tar.gz -o pinact.tar.gz
+          tar -xzf pinact.tar.gz -C ~/bin
+          rm pinact.tar.gz
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Check GitHub Actions versions are pinned
+        run: |
+          pinact run --check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "check github action version fixation use `pinact run`"
+          exit 1
