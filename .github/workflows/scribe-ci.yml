@@ -35,13 +35,11 @@ jobs:
         working-directory: scribe
         run: uv sync --extra dev
 
-      - name: Format check with black
+      - name: Lint and format check with ruff
         working-directory: scribe
-        run: uv run black --check .
-
-      - name: Format check with isort
-        working-directory: scribe
-        run: uv run isort --check .
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
 
       - name: Type check with mypy
         working-directory: scribe
