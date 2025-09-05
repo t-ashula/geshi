@@ -19,9 +19,28 @@ jobs:
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
+      - name: Wait for CI checks to complete
+        if: steps.metadata.outputs.update-type == 'version-update:semver-minor' || steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        run: |
+          echo "Waiting for CI checks to complete..."
+          gh pr checks "$PR_URL" --watch
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Enable auto-merge for minor and patch updates
         if: steps.metadata.outputs.update-type == 'version-update:semver-minor' || steps.metadata.outputs.update-type == 'version-update:semver-patch'
-        run: gh pr merge --auto --merge "$PR_URL"
+        run: |
+          # Check if all required checks have passed
+          CHECK_STATUS=$(gh pr checks "$PR_URL" --json state --jq '.[] | select(.name != "dependabot") | .state' | grep -v "SUCCESS" | wc -l)
+          if [ "$CHECK_STATUS" -eq 0 ]; then
+            echo "All CI checks passed. Enabling auto-merge..."
+            gh pr merge --auto --merge "$PR_URL"
+          else
+            echo "CI checks have not all passed. Skipping auto-merge."
+            gh pr checks "$PR_URL"
+            exit 1
+          fi
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
