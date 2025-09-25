@@ -24,20 +24,15 @@
 		"@tailwindcss/vite": "^4.1.11",
 		"@testing-library/jest-dom": "^6.6.3",
 		"@testing-library/svelte": "^5.2.8",
-		"eslint": "^9.18.0",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.9.1",
 		"globals": "^16.3.0",
 		"jsdom": "^26.0.0",
-		"prettier": "^3.6.2",
 		"prettier-plugin-svelte": "^3.4.0",
 		"prettier-plugin-tailwindcss": "^0.6.14",
 		"svelte": "^5.38.1",
 		"svelte-check": "^4.3.1",
 		"tailwindcss": "^4.1.10",
-		"typescript": "^5.0.0",
-		"typescript-eslint": "^8.39.1",
-		"vite": "^7.1.7",
-		"vitest": "^3.2.4"
+		"vite": "^7.1.7"
 	}
 }
