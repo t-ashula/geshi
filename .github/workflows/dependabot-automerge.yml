@@ -21,45 +21,7 @@ jobs:
 
       - name: Enable auto-merge for minor and patch updates
         if: steps.metadata.outputs.update-type == 'version-update:semver-minor' || steps.metadata.outputs.update-type == 'version-update:semver-patch'
-        run: |
-          echo "Checking CI status before enabling auto-merge..."
-          
-          # Wait for other CI checks to complete (excluding this workflow)
-          max_attempts=30
-          attempt=0
-          
-          while [ $attempt -lt $max_attempts ]; do
-            # Get status of all checks except this workflow
-            pending_checks=$(gh pr checks "$PR_URL" --json name,state --jq '.[] | select(.name != "Dependabot Auto-merge" and .name != "dependabot") | select(.state == "PENDING" or .state == "IN_PROGRESS") | .name' | wc -l)
-            
-            if [ "$pending_checks" -eq 0 ]; then
-              echo "All other CI checks completed. Checking final status..."
-              break
-            fi
-            
-            echo "Waiting for $pending_checks CI checks to complete... (attempt $((attempt + 1))/$max_attempts)"
-            sleep 10
-            attempt=$((attempt + 1))
-          done
-          
-          if [ $attempt -eq $max_attempts ]; then
-            echo "Timeout waiting for CI checks. Current status:"
-            gh pr checks "$PR_URL"
-            exit 1
-          fi
-          
-          # Check if all required checks have passed
-          failed_checks=$(gh pr checks "$PR_URL" --json name,state --jq '.[] | select(.name != "Dependabot Auto-merge" and .name != "dependabot") | select(.state != "SUCCESS") | .name' | wc -l)
-          
-          if [ "$failed_checks" -eq 0 ]; then
-            echo "All CI checks passed. Enabling auto-merge..."
-            gh pr merge --auto --merge "$PR_URL"
-          else
-            echo "Some CI checks failed. Skipping auto-merge."
-            echo "Failed checks:"
-            gh pr checks "$PR_URL" --json name,state --jq '.[] | select(.name != "Dependabot Auto-merge" and .name != "dependabot") | select(.state != "SUCCESS") | .name'
-            exit 1
-          fi
+        run: gh pr merge --auto --merge "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
