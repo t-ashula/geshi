@@ -32,6 +32,6 @@
 		"svelte": "^5.41.1",
 		"svelte-check": "^4.3.2",
 		"tailwindcss": "^4.1.10",
-		"vite": "^7.1.11"
+		"vite": "^7.1.12"
 	}
 }
