@@ -23,7 +23,7 @@
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
 		"@tailwindcss/vite": "^4.1.18",
 		"@testing-library/jest-dom": "^6.9.1",
-		"@testing-library/svelte": "^5.2.10",
+		"@testing-library/svelte": "^5.3.1",
 		"eslint-plugin-svelte": "^3.14.0",
 		"globals": "^16.5.0",
 		"jsdom": "^27.3.0",
