@@ -9,11 +9,11 @@ updates:
     commit-message:
       prefix: ":up:"
 
-  # Python パッケージの更新設定（scribe）
-  - package-ecosystem: "uv"
-    directory: "/scribe"
+  # submodule (scribe) の参照先更新
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     commit-message:
       prefix: ":up:"
 
