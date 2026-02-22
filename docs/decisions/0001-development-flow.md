@@ -4,28 +4,35 @@
 
 決定
 
+## 範囲
+
+全体
+
 ## コンテキスト
 
 - 開発フローの整理が必要
-  - コミットメッセージを一定強制したい
-  - squash することでコミットの履歴を消したくない
-  - ごく小規模での開発として妥当なブランチのメンテナンス負荷
+  - コミットメッセージを一定程度強制したい
+  - squash によってコミット履歴を失いたくない
+  - 小規模開発におけるブランチ運用コストを抑えたい
 
 ## 決定
 
-- trunk base workflow を採用する
-- git のブランチとして master をデフォルトプロテクトブランチとして用意する
-- 開発ブランチとして master から feature ブランチを作り PR とする
-- master へのマージはマージコミットを残す `--no-ff` とする
-- master へのマージの際は，コミットメッセージのフォーマットチェックをいれる
+- trunk-based workflow を採用する
+- `master` をデフォルトの保護ブランチとする
+- 開発時は `master` から feature ブランチを作成し、PR で統合する
+- `master` へのマージは履歴を残すため `--no-ff` を前提とする
+- `master` マージ時にコミットメッセージのフォーマットチェックを行う
 
 ## 影響
 
-- メンテナンス対象が master だけですむ
-- squash merge のブランチを経ないことで履歴が残る
-- feature ブランチの削除がラク
+- メンテナンス対象ブランチを `master` に集約できる
+- squash merge を前提にしないため、コミット履歴を保持しやすい
+- feature ブランチのライフサイクルが明確になり、削除判断が容易になる
 
-## 備考
+## 参考資料
 
-- [GithubでのWeb上からのマージの仕方3種とその使いどころ](https://qiita.com/ko-he-8/items/94e872f2154829c868df)
-- [What Are the Best Git Branching Strategies](https://www.abtasty.com/blog/git-branching-strategies/)
+- [github-web-merge] GithubでのWeb上からのマージの仕方3種とその使いどころ
+- [git-branching-strategies] What Are the Best Git Branching Strategies
+
+[github-web-merge]: https://qiita.com/ko-he-8/items/94e872f2154829c868df
+[git-branching-strategies]: https://www.abtasty.com/blog/git-branching-strategies/
