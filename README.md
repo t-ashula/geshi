@@ -4,7 +4,7 @@
 
 ## 概要
 
-Geshi は音声ファイルの文字起こしとテキストの要約機能を提供する統合プラットフォームです。TypeScript monorepo (geshi/) と Python サービス (scribe/) で構成されており、RSS フィードからのポッドキャスト取得、音声ダウンロード、文字起こし、要約までの一連の処理を自動化します。
+Geshi は音声ファイルの文字起こしとテキストの要約機能を提供する統合プラットフォームです。TypeScript monorepo (geshi/) と Python サービス (scribe submodule) で構成されており、RSS フィードからのポッドキャスト取得、音声ダウンロード、文字起こし、要約までの一連の処理を自動化します。
 
 ## アーキテクチャ
 
@@ -14,7 +14,7 @@ Geshi は音声ファイルの文字起こしとテキストの要約機能を�
   - `logger/`: 集約ログユーティリティ
   - `scribe/`: TypeScript サービス層
   - `ui/`: SvelteKit Web インターフェース
-- **scribe/**: Python ML サービス (uv)
+- **scribe/**: Python ML サービス (Git submodule, uv)
   - FastAPI アプリケーション
   - 音声文字起こしとテキスト要約
 
@@ -22,7 +22,7 @@ Geshi は音声ファイルの文字起こしとテキストの要約機能を�
 
 ### 前提条件
 
-- Node.js 18+ 
+- Node.js 18+
 - Python 3.12+
 - uv
 - PostgreSQL
@@ -35,6 +35,7 @@ Geshi は音声ファイルの文字起こしとテキストの要約機能を�
 # リポジトリのクローン
 git clone https://github.com/t-ashula/geshi.git
 cd geshi
+git submodule update --init --recursive
 
 # Docker Compose でサービスを起動
 docker-compose up -d
@@ -44,8 +45,9 @@ docker-compose ps
 ```
 
 サービスは以下のポートで利用可能になります：
-- UI: http://localhost:3000
-- Scribe API: http://localhost:8002
+
+- UI: <http://localhost:3000>
+- Scribe API: <http://localhost:8002>
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
@@ -57,6 +59,7 @@ docker-compose ps
 # リポジトリのクローン
 git clone https://github.com/t-ashula/geshi.git
 cd geshi
+git submodule update --init --recursive
 
 # TypeScript monorepo の依存関係インストール
 cd geshi
@@ -156,10 +159,12 @@ uv run isort . && uv run black .
 ## API エンドポイント
 
 ### 文字起こし
+
 - `POST /transcribe`: 音声ファイルをアップロードして文字起こしジョブを登録
 - `GET /transcribe/{request_id}`: 文字起こし結果の取得
 
 ### 要約
+
 - `POST /summarize`: テキストを送信して要約ジョブを登録
 - `GET /summarize/{request_id}`: 要約結果の取得
 
