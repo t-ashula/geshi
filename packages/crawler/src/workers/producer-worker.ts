@@ -119,7 +119,10 @@ export async function produceDownloadJobs(episodes: Episode[]): Promise<void> {
     // キューにジョブを追加
     await downloadQueue.add(`download-${jobId}`, payload);
 
-    logger.info({ id: episode.id, title: episode.title }, "Download job created");
+    logger.info(
+      { id: episode.id, title: episode.title },
+      "Download job created",
+    );
   }
 }
 /**

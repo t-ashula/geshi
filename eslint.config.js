@@ -1,7 +1,10 @@
-const tseslint = require("typescript-eslint");
-const importPlugin = require("eslint-plugin-import");
+import tseslint from "typescript-eslint";
+import importPlugin from "eslint-plugin-import";
+import { fileURLToPath } from "node:url";
 
-module.exports = [
+const tsconfigRootDir = fileURLToPath(new URL(".", import.meta.url));
+
+export default [
   {
     ignores: ["**/dist/**", "**/node_modules/**", "**/coverage/**"],
   },
@@ -13,13 +16,14 @@ module.exports = [
     },
     languageOptions: {
       parserOptions: {
-        tsconfigRootDir: __dirname,
+        tsconfigRootDir,
         projectService: {
           allowDefaultProject: [
             "packages/crawler/test/*.ts",
             "packages/logger/test/*.ts",
             "packages/model/test/*.ts",
             "packages/scribe-client/test/*.ts",
+            "packages/model/prisma.config.ts",
           ],
         },
       },
