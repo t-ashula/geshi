@@ -1,9 +1,9 @@
 version: 2
 # Consolidated configuration for all workspaces
 updates:
-  # geshi ディレクトリの npm パッケージ（全ワークスペースを含む）
+  # ルート npm workspace の更新
   - package-ecosystem: "npm"
-    directory: "/geshi"
+    directory: "/"
     schedule:
       interval: "weekly"
     commit-message:

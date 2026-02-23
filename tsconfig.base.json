@@ -9,11 +9,11 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@geshi/logger": ["logger/src"],
-      "@geshi/crawler": ["crawler/src"],
-      "@geshi/scribe": ["scribe/src"],
-      "@geshi/model": ["model/src"],
-      "@geshi/ui": ["ui/src/*"]
+      "@geshi/logger": ["packages/logger/src"],
+      "@geshi/crawler": ["packages/crawler/src"],
+      "@geshi/scribe": ["packages/scribe-client/src"],
+      "@geshi/model": ["packages/model/src"],
+      "@geshi/ui": ["packages/ui/src/*"]
     }
   }
 }

@@ -4,16 +4,16 @@
 
 ## 概要
 
-Geshi は音声ファイルの文字起こしとテキストの要約機能を提供する統合プラットフォームです。TypeScript monorepo (geshi/) と Python サービス (scribe submodule) で構成されており、RSS フィードからのポッドキャスト取得、音声ダウンロード、文字起こし、要約までの一連の処理を自動化します。
+Geshi は音声ファイルの文字起こしとテキストの要約機能を提供する統合プラットフォームです。TypeScript npm workspaces (`packages/*`) と Python サービス (scribe submodule) で構成されており、RSS フィードからのポッドキャスト取得、音声ダウンロード、文字起こし、要約までの一連の処理を自動化します。
 
 ## アーキテクチャ
 
-- **geshi/**: TypeScript monorepo (npm workspaces)
-  - `crawler/`: RSS クローリングとメディアダウンロード
-  - `model/`: データベーススキーマと Prisma クライアント
-  - `logger/`: 集約ログユーティリティ
-  - `scribe/`: TypeScript サービス層
-  - `ui/`: SvelteKit Web インターフェース
+- **packages/**: TypeScript workspaces
+  - `packages/crawler/`: RSS クローリングとメディアダウンロード
+  - `packages/model/`: データベーススキーマと Prisma クライアント
+  - `packages/logger/`: 集約ログユーティリティ
+  - `packages/scribe-client/`: TypeScript Scribe API クライアント
+  - `packages/ui/`: SvelteKit Web インターフェース
 - **scribe/**: Python ML サービス (Git submodule, uv)
   - FastAPI アプリケーション
   - 音声文字起こしとテキスト要約
@@ -61,12 +61,11 @@ git clone https://github.com/t-ashula/geshi.git
 cd geshi
 git submodule update --init --recursive
 
-# TypeScript monorepo の依存関係インストール
-cd geshi
+# TypeScript workspaces の依存関係インストール
 npm install
 
 # Python サービスの依存関係インストール
-cd ../scribe
+cd scribe
 uv sync
 ```
 
@@ -98,7 +97,7 @@ docker run -d --name geshi-redis -p 6379:6379 redis:alpine
 #### 4. データベースマイグレーション
 
 ```bash
-cd geshi/model
+cd packages/model
 npx prisma migrate dev
 ```
 
@@ -120,17 +119,15 @@ cd scribe
 uv run python -m src.scheduler
 
 # UI (開発サーバー)
-cd geshi/ui
+cd packages/ui
 npm run dev
 ```
 
 ## 開発コマンド
 
-### TypeScript monorepo (geshi/)
+### TypeScript workspaces (packages/*)
 
 ```bash
-cd geshi
-
 # 全ワークスペースのビルド
 npm run build
 

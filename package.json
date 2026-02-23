@@ -2,13 +2,7 @@
   "name": "geshi",
   "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "crawler",
-    "logger",
-    "model",
-    "scribe",
-    "ui"
-  ],
+  "workspaces": ["packages/*"],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",

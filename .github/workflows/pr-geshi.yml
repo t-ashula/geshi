@@ -21,7 +21,7 @@ jobs:
           base_sha="${{ github.event.pull_request.base.sha }}"
           head_sha="${{ github.event.pull_request.head.sha }}"
 
-          if git diff --name-only "$base_sha" "$head_sha" | grep -E '^geshi/'; then
+          if git diff --name-only "$base_sha" "$head_sha" | grep -E '^(packages/|package.json|package-lock.json|tsconfig.json|tsconfig.base.json|eslint.config.js|docker-compose.yml|README.md|docs/decisions/)'; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
             echo "relevant=false" >> "$GITHUB_OUTPUT"
@@ -40,20 +40,16 @@ jobs:
         with:
           node-version: "22.14.0"
           cache: "npm"
-          cache-dependency-path: "geshi/package-lock.json"
+          cache-dependency-path: "package-lock.json"
 
       - name: Install dependencies
-        working-directory: geshi
         run: npm ci
 
       - name: Format check
-        working-directory: geshi
         run: npm run format:check || npm run format -- --check
 
       - name: Lint
-        working-directory: geshi
         run: npm run lint
 
       - name: Test
-        working-directory: geshi
         run: npm run test

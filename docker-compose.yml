@@ -1,12 +1,12 @@
 services:
   ui:
     build:
-      context: ./geshi/ui
+      context: ./packages/ui
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
     volumes:
-      - ./geshi/ui:/app
+      - ./packages/ui:/app
     depends_on:
       - scribe-api
     command: npm start

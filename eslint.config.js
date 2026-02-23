@@ -16,10 +16,10 @@ module.exports = [
         tsconfigRootDir: __dirname,
         projectService: {
           allowDefaultProject: [
-            "crawler/test/*.ts",
-            "logger/test/*.ts",
-            "model/test/*.ts",
-            "scribe/test/*.ts",
+            "packages/crawler/test/*.ts",
+            "packages/logger/test/*.ts",
+            "packages/model/test/*.ts",
+            "packages/scribe-client/test/*.ts",
           ],
         },
       },
@@ -30,7 +30,7 @@ module.exports = [
           extensions: [".js", ".jsx", ".ts", ".tsx"],
         },
         typescript: {
-          project: ["./tsconfig.json", "./*/tsconfig.json"],
+          project: ["./tsconfig.json", "./packages/*/tsconfig.json"],
         },
       },
     },
