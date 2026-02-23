@@ -26,7 +26,7 @@ const processor = async (
   const startAt = Date.now();
   const { jobId, targetUrl } = job.data;
 
-  logger.info(`start`, { worker: JobType.DOWNLOAD, jobId });
+  logger.info({ worker: JobType.DOWNLOAD, jobId }, "start");
 
   try {
     const result = await download(targetUrl);
@@ -46,14 +46,10 @@ const processor = async (
 
     await updateQueue.add(`update-download-${jobId}`, updateMessage);
 
-    logger.info(`completed`, {
-      worker: JobType.DOWNLOAD,
-      jobId,
-      result,
-    });
+    logger.info({ worker: JobType.DOWNLOAD, jobId, result }, "completed");
     return jobResult;
   } catch (error) {
-    logger.error(`failed`, { jobId, error });
+    logger.error({ jobId, error }, "failed");
 
     // 更新キューにエラーメッセージを追加
     const updateMessage: UpdateJobMessage = {

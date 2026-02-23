@@ -8,6 +8,7 @@ import { PrismaClient } from "@prisma/client";
 // Prisma クライアントとモデルの型情報をエクスポート
 export { PrismaClient } from "@prisma/client";
 export {
+  Prisma,
   Channel,
   Episode,
   Job,

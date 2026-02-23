@@ -7,7 +7,7 @@ import { spawn } from "child_process";
 import { Job, Worker } from "bullmq";
 import { v4 as uuidv4 } from "uuid";
 import dotenv from "dotenv";
-import { PrismaClient } from "@geshi/model";
+import { PrismaClient, Prisma } from "@geshi/model";
 import {
   updateQueue,
   recordQueue,
@@ -19,6 +19,7 @@ import {
   RecordJobPayload,
   UpdateJobMessage,
   JobType,
+  JobStatus,
   RecordReserverResult,
   RecordReserveJobResult,
 } from "../types";
@@ -55,7 +56,7 @@ const processor = async (
   const startAt = Date.now();
   const { jobId, recordJobParams } = job.data;
 
-  logger.info(`start`, { worker: JobType.RECORD_RESERVE, jobId });
+  logger.info({ worker: JobType.RECORD_RESERVE, jobId }, "start");
 
   try {
     // 録画ジョブのIDを生成
@@ -72,7 +73,8 @@ const processor = async (
       data: {
         id: recordJobId,
         type: JobType.RECORD,
-        payload: recordPayload,
+        status: JobStatus.PENDING,
+        payload: recordPayload as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -103,10 +105,10 @@ const processor = async (
 
     await updateQueue.add(`update-record-reserve-${jobId}`, updateMessage);
 
-    logger.info(`completed`, { jobId, recordJobId });
+    logger.info({ jobId, recordJobId }, "completed");
     return jobResult;
   } catch (error) {
-    logger.error(`failed`, { jobId, error });
+    logger.error({ jobId, error }, "failed");
 
     // 更新キューにエラーメッセージを追加
     const updateMessage: UpdateJobMessage = {

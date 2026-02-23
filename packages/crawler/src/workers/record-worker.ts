@@ -28,7 +28,7 @@ const processor = async (
   const startAt = Date.now();
   const { jobId, streamUrl, duration } = job.data;
 
-  logger.info(`start`, { jobId });
+  logger.info({ jobId }, "start");
 
   try {
     // HLS録画を実行
@@ -47,7 +47,7 @@ const processor = async (
 
     await updateQueue.add(`update-record-${jobId}`, updateMessage);
 
-    logger.info(`completed`, { jobId, size: result.size });
+    logger.info({ jobId, size: result.size }, "completed");
 
     // 録画ジョブ完了後にプロセスを終了
     setTimeout(() => {
@@ -56,7 +56,7 @@ const processor = async (
     }, 1000);
     return jobResult;
   } catch (error) {
-    logger.error(`Record job failed: ${job.id}`, error);
+    logger.error({ jobId: job.id, error }, "Record job failed");
 
     // 更新キューにエラーメッセージを追加
     const updateMessage: UpdateJobMessage = {

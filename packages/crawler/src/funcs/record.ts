@@ -46,7 +46,7 @@ function recordHLS(
 
     args.push("-y");
     args.push(outputPath);
-    logger.info(`Starting FFmpeg recording`, { args });
+    logger.info({ args }, "Starting FFmpeg recording");
 
     // FFmpegプロセスを起動
     const ffmpeg = spawn("ffmpeg", args);

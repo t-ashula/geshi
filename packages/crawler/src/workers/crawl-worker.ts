@@ -23,7 +23,7 @@ const processor = async (
 ): Promise<CrawlJobResult> => {
   const startAt = Date.now();
   const { jobId, targetUrl, crawlType } = job.data;
-  logger.info(`start`, { worker: JobType.CRAWL, jobId });
+  logger.info({ worker: JobType.CRAWL, jobId }, "start");
 
   try {
     // TODO: crawl return Either<Error, CrawlerResult>
@@ -43,14 +43,13 @@ const processor = async (
 
     await updateQueue.add(`update-crawl-${jobId}`, updateMessage);
 
-    logger.info(`completed`, {
-      worker: JobType.CRAWL,
-      jobId,
-      count: result.episodes.length,
-    });
+    logger.info(
+      { worker: JobType.CRAWL, jobId, count: result.episodes.length },
+      "completed",
+    );
     return jobResult;
   } catch (error) {
-    logger.error(`failed. error=${error}`, { jobId, error });
+    logger.error({ jobId, error }, "failed");
 
     // 更新キューにエラーメッセージを追加
     const updateMessage: UpdateJobMessage = {

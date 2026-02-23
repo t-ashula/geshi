@@ -60,7 +60,7 @@ async function fetchRss(rssUrl: string): Promise<RssJson> {
 
     return result;
   } catch (error) {
-    logger.error(`Error fetching RSS from ${rssUrl}:`, error);
+    logger.error({ rssUrl, error }, "Error fetching RSS");
     throw error;
   }
 }
@@ -114,7 +114,7 @@ function extractEpisodes(rssObject: RssJson): CrawledEpisode[] {
     logger.warn(`Unknown RSS format:${Object.keys(rssObject)}`);
     return [];
   } catch (error) {
-    logger.error(`Error extracting episodes: ${error}`);
+    logger.error({ error }, "Error extracting episodes");
     return [];
   }
 }

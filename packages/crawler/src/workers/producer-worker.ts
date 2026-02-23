@@ -5,7 +5,7 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { Worker } from "bullmq";
-import { PrismaClient, Channel, Episode } from "@geshi/model";
+import { PrismaClient, Channel, Episode, Prisma } from "@geshi/model";
 import {
   crawlQueue,
   defaultConnectionOptions,
@@ -19,6 +19,7 @@ import {
   DownloadJobPayload,
   RecordReserveJobPayload,
   JobType,
+  JobStatus,
   CrawlType,
   RecordJobPayload,
 } from "../types";
@@ -74,14 +75,15 @@ export async function produceCrawlJobs(channels: Channel[]): Promise<void> {
       data: {
         id: jobId,
         type: JobType.CRAWL,
-        payload: payload,
+        status: JobStatus.PENDING,
+        payload: payload as unknown as Prisma.InputJsonValue,
       },
     });
 
     // キューにジョブを追加
     await crawlQueue.add(`crawl-${jobId}`, payload);
 
-    logger.info(`Crawl job created`, { id: channel.id, title: channel.title });
+    logger.info({ id: channel.id, title: channel.title }, "Crawl job created");
   }
 }
 
@@ -109,17 +111,15 @@ export async function produceDownloadJobs(episodes: Episode[]): Promise<void> {
       data: {
         id: jobId,
         type: JobType.DOWNLOAD,
-        payload: payload,
+        status: JobStatus.PENDING,
+        payload: payload as unknown as Prisma.InputJsonValue,
       },
     });
 
     // キューにジョブを追加
     await downloadQueue.add(`download-${jobId}`, payload);
 
-    logger.info(`Download job created`, {
-      id: episode.id,
-      title: episode.title,
-    });
+    logger.info({ id: episode.id, title: episode.title }, "Download job created");
   }
 }
 /**
@@ -187,7 +187,8 @@ export async function produceRecordReserveJobs(
         id: jobId,
         episodeId: episode.id,
         type: JobType.RECORD_RESERVE,
-        payload: payload,
+        status: JobStatus.PENDING,
+        payload: payload as unknown as Prisma.InputJsonValue,
       },
     });
 
@@ -223,7 +224,7 @@ export async function produceAllJobs(): Promise<void> {
 
     logger.info("All jobs produced successfully");
   } catch (error) {
-    logger.error("Error producing jobs:", error);
+    logger.error({ error }, "Error producing jobs");
     throw error;
   } finally {
     await prisma.$disconnect();

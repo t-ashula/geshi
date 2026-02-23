@@ -64,7 +64,7 @@ async function download(mediaUrl: string): Promise<DownloaderResult> {
       });
     });
   } catch (error) {
-    logger.error(`Error downloading file`, { mediaUrl, error });
+    logger.error({ mediaUrl, error }, "Error downloading file");
     // エラー時はファイルを削除（存在する場合）
     if (fs.existsSync(outputPath)) {
       fs.unlinkSync(outputPath);

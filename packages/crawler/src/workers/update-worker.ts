@@ -57,7 +57,13 @@ async function applyCrawlResult(
       // チャンネル情報を取得
       // TODO: use relation
       const job = await prisma.job.findUnique({ where: { id: jobId } });
+      if (!job) {
+        throw new Error(`Job not found: ${jobId}`);
+      }
       const channelId = job.channelId;
+      if (!channelId) {
+        throw new Error(`Channel id is missing for job: ${jobId}`);
+      }
       const channel = await prisma.channel.findUnique({
         where: { id: channelId },
       });
@@ -72,7 +78,10 @@ async function applyCrawlResult(
         const episodeIdentifier = episode.guid || episode.link;
 
         if (!episodeIdentifier) {
-          logger.warn("Episode without identifier, skipping:", episode.title);
+          logger.warn(
+            { title: episode.title },
+            "Episode without identifier, skipping",
+          );
           continue;
         }
 
@@ -130,7 +139,7 @@ async function applyCrawlResult(
       }
     }
   } catch (error) {
-    logger.error(`Error applying crawl result for job ${jobId}:`, error);
+    logger.error({ jobId, error }, "Error applying crawl result");
     throw error;
   }
 }
@@ -162,6 +171,9 @@ async function applyDownloadResult(
     // 成功した場合のみエピソード更新
     // TODO: save download media file into model/storage
     if (result.success && result.size) {
+      if (!episodeId) {
+        throw new Error(`Episode id is missing for job: ${jobId}`);
+      }
       // エピソードのサイズを更新
       await prisma.episode.update({
         where: { id: episodeId },
@@ -175,7 +187,7 @@ async function applyDownloadResult(
       );
     }
   } catch (error) {
-    logger.error(`Error applying download result for job ${jobId}:`, error);
+    logger.error({ jobId, error }, "Error applying download result");
     throw error;
   }
 }
@@ -206,10 +218,7 @@ async function applyRecordReserveResult(
     // 特に追加のデータベース更新は不要
     // 録画ジョブは既に作成済み
   } catch (error) {
-    logger.error(
-      `Error applying record reserve result for job ${jobId}:`,
-      error,
-    );
+    logger.error({ jobId, error }, "Error applying record reserve result");
     throw error;
   }
 }
@@ -240,6 +249,9 @@ async function applyRecordResult(
     // 成功した場合のみエピソード更新
     // TODO: save download media file into model/storage
     if (result.success && result.size) {
+      if (!job.episodeId) {
+        throw new Error(`Episode id is missing for job: ${jobId}`);
+      }
       await prisma.episode.update({
         where: { id: job.episodeId },
         data: {
@@ -252,7 +264,7 @@ async function applyRecordResult(
       );
     }
   } catch (error) {
-    logger.error(`Error applying record result for job ${jobId}:`, error);
+    logger.error({ jobId, error }, "Error applying record result");
     throw error;
   }
 }
@@ -263,7 +275,7 @@ const updateWorker = new Worker<UpdateJobMessage, void>(
   async (job) => {
     const { jobId, jobType, result } = job.data;
 
-    logger.info(`start`, { worker: JobType.UPDATE, jobId });
+    logger.info({ worker: JobType.UPDATE, jobId }, "start");
 
     try {
       // ジョブタイプに応じた処理を実行
@@ -290,7 +302,7 @@ const updateWorker = new Worker<UpdateJobMessage, void>(
 
       logger.info(`Update job completed: ${job.id}`);
     } catch (error) {
-      logger.error(`Update job failed: ${job.id}`, error);
+      logger.error({ jobId: job.id, error }, "Update job failed");
       throw error;
     }
   },
