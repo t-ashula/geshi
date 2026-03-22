@@ -50,3 +50,35 @@
 - 録画のワーカー
   - HLS にのみ対応
 - targetUrl : string,
+
+## Worker 関係図
+
+```mermaid
+flowchart LR
+    Scheduler["producer-scheduler<br/>(scheduleProduceAllJobs)"]
+    QProduce["Queue: produce"]
+    Producer["producer-worker"]
+
+    QCrawl["Queue: crawl"]
+    QDownload["Queue: download"]
+    QRecordReserve["Queue: record-reserve"]
+    QRecord["Queue: record"]
+    QUpdate["Queue: update"]
+
+    Crawl["crawl-worker"]
+    Download["download-worker"]
+    RecordReserve["record-reserve-worker"]
+    Record["record-worker"]
+    Update["update-worker<br/>(prisma update)"]
+
+    Scheduler --> QProduce --> Producer
+    Producer --> QCrawl --> Crawl --> QUpdate
+    Producer --> QDownload --> Download --> QUpdate
+    Producer --> QRecordReserve --> RecordReserve --> QUpdate
+    RecordReserve --> QRecord --> Record --> QUpdate
+    QUpdate --> Update
+```
+
+- `producer-worker` は `crawl` / `download` / `record-reserve` の各ジョブを作成
+- `record-reserve-worker` は `record` ジョブを作成し、`record-worker` 実行を起動
+- 各 worker の実行結果は `update` キューに集約され、`update-worker` が model/prisma に反映
