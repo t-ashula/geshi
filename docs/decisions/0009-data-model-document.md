@@ -44,8 +44,10 @@
 
 - [adr-0000] ADR-0000 ADR ドキュメントフォーマットと設計ログ
 - [concept] Geshi Concept
+- [design-log-0009] 0009 Data Model Document
 - [models] データモデル
 
 [adr-0000]: ./0000-adr-format.md
 [concept]: ../concept.md
+[design-log-0009]: ../design-log/0009-data-model-document.md
 [models]: ../models.md
