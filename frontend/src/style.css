@@ -6,8 +6,7 @@
     sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  background:
-    radial-gradient(circle at top, #f8efe1 0%, #f4efe8 35%, #ebe6dc 100%);
+  background-color: #f7f4ee;
   color: #1f2937;
 }
 
@@ -21,6 +20,10 @@ body {
   min-height: 100vh;
 }
 
+button {
+  font: inherit;
+}
+
 .app {
   min-height: 100vh;
   display: grid;
@@ -28,13 +31,13 @@ body {
   padding: 24px;
 }
 
-.hero {
-  max-width: 720px;
-  padding: 40px;
+.panel {
+  width: min(100%, 560px);
+  padding: 32px;
   border: 1px solid rgba(31, 41, 55, 0.12);
-  border-radius: 24px;
-  background: rgba(255, 252, 247, 0.84);
-  box-shadow: 0 20px 60px rgba(31, 41, 55, 0.08);
+  border-radius: 20px;
+  background: #fffdf9;
+  box-shadow: 0 16px 40px rgba(31, 41, 55, 0.08);
 }
 
 .eyebrow {
@@ -47,12 +50,21 @@ body {
 
 h1 {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 3.75rem);
+  font-size: clamp(2rem, 5vw, 3rem);
   line-height: 1.05;
 }
 
-.lead {
+.detail {
   margin: 16px 0 0;
-  font-size: 1.05rem;
   color: #4b5563;
+}
+
+.button {
+  margin-top: 20px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: #8b5e3c;
+  color: #fffdf9;
+  cursor: pointer;
 }
