@@ -9,13 +9,6 @@ const JOB_STATUSES = [
   "cancelled",
 ] as const;
 
-export type JobStatus = (typeof JOB_STATUSES)[number];
-
-export type JobTarget = {
-  resourceType: string;
-  resourceId: string;
-};
-
 export type Job = {
   id: string;
   kind: string;
@@ -31,6 +24,13 @@ export type JobEvent = {
   occurredAt: string;
   status: JobStatus;
   note: string;
+};
+
+export type JobStatus = (typeof JOB_STATUSES)[number];
+
+export type JobTarget = {
+  resourceType: string;
+  resourceId: string;
 };
 
 const JOB_STATUS_ORDER: Record<JobStatus, number> = {
@@ -56,61 +56,19 @@ const ALLOWED_JOB_STATUS_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> =
     cancelled: [],
   };
 
-export function isTerminalJobStatus(status: JobStatus): boolean {
-  return (
-    status === "succeeded" || status === "failed" || status === "cancelled"
-  );
-}
-
-export function isJobStatus(value: string): value is JobStatus {
-  return JOB_STATUSES.includes(value as JobStatus);
-}
-
-export function canTransitionJobStatus(
-  from: JobStatus,
-  to: JobStatus,
-): boolean {
-  return ALLOWED_JOB_STATUS_TRANSITIONS[from].includes(to);
-}
-
-export function compareJobStatuses(left: JobStatus, right: JobStatus): number {
-  return JOB_STATUS_ORDER[left] - JOB_STATUS_ORDER[right];
-}
-
-export function compareJobEvents(left: JobEvent, right: JobEvent): number {
-  const statusOrder = compareJobStatuses(left.status, right.status);
-
-  if (statusOrder !== 0) {
-    return statusOrder;
-  }
-
-  const occurredAtOrder = left.occurredAt.localeCompare(right.occurredAt);
-
-  if (occurredAtOrder !== 0) {
-    return occurredAtOrder;
-  }
-
-  return 0;
-}
-
-export function getLatestJobEvent(
+export function appendJobEvent(
   events: readonly JobEvent[],
-): JobEvent | null {
-  if (events.length === 0) {
-    return null;
+  nextEvent: JobEvent,
+): readonly JobEvent[] {
+  if (!canAppendJobEvent(events, nextEvent)) {
+    return events;
   }
 
-  return [...events].sort(compareJobEvents).at(-1) ?? null;
-}
+  if (events.some((event) => isSameJobEvent(event, nextEvent))) {
+    return events;
+  }
 
-function isSameJobEvent(left: JobEvent, right: JobEvent): boolean {
-  return (
-    left.jobId === right.jobId &&
-    left.runtimeJobId === right.runtimeJobId &&
-    left.occurredAt === right.occurredAt &&
-    left.status === right.status &&
-    left.note === right.note
-  );
+  return [...events, nextEvent];
 }
 
 export function canAppendJobEvent(
@@ -151,17 +109,59 @@ export function canAppendJobEvent(
   return true;
 }
 
-export function appendJobEvent(
+export function canTransitionJobStatus(
+  from: JobStatus,
+  to: JobStatus,
+): boolean {
+  return ALLOWED_JOB_STATUS_TRANSITIONS[from].includes(to);
+}
+
+export function compareJobEvents(left: JobEvent, right: JobEvent): number {
+  const statusOrder = compareJobStatuses(left.status, right.status);
+
+  if (statusOrder !== 0) {
+    return statusOrder;
+  }
+
+  const occurredAtOrder = left.occurredAt.localeCompare(right.occurredAt);
+
+  if (occurredAtOrder !== 0) {
+    return occurredAtOrder;
+  }
+
+  return 0;
+}
+
+export function compareJobStatuses(left: JobStatus, right: JobStatus): number {
+  return JOB_STATUS_ORDER[left] - JOB_STATUS_ORDER[right];
+}
+
+export function getLatestJobEvent(
   events: readonly JobEvent[],
-  nextEvent: JobEvent,
-): readonly JobEvent[] {
-  if (!canAppendJobEvent(events, nextEvent)) {
-    return events;
+): JobEvent | null {
+  if (events.length === 0) {
+    return null;
   }
 
-  if (events.some((event) => isSameJobEvent(event, nextEvent))) {
-    return events;
-  }
+  return [...events].sort(compareJobEvents).at(-1) ?? null;
+}
 
-  return [...events, nextEvent];
+export function isJobStatus(value: string): value is JobStatus {
+  return JOB_STATUSES.includes(value as JobStatus);
+}
+
+export function isTerminalJobStatus(status: JobStatus): boolean {
+  return (
+    status === "succeeded" || status === "failed" || status === "cancelled"
+  );
+}
+
+function isSameJobEvent(left: JobEvent, right: JobEvent): boolean {
+  return (
+    left.jobId === right.jobId &&
+    left.runtimeJobId === right.runtimeJobId &&
+    left.occurredAt === right.occurredAt &&
+    left.status === right.status &&
+    left.note === right.note
+  );
 }

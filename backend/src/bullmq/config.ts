@@ -7,6 +7,13 @@ export type RedisConnectionOptions = {
   port: number;
 };
 
+export function resolveRedisConnection(): RedisConnectionOptions {
+  return {
+    host: process.env.REDIS_HOST ?? REDIS_DEFAULT_HOST,
+    port: parsePort(process.env.REDIS_PORT),
+  };
+}
+
 function parsePort(value: string | undefined): number {
   if (value === undefined) {
     return REDIS_DEFAULT_PORT;
@@ -19,11 +26,4 @@ function parsePort(value: string | undefined): number {
   }
 
   return port;
-}
-
-export function resolveRedisConnection(): RedisConnectionOptions {
-  return {
-    host: process.env.REDIS_HOST ?? REDIS_DEFAULT_HOST,
-    port: parsePort(process.env.REDIS_PORT),
-  };
 }

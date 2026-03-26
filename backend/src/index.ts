@@ -5,26 +5,26 @@ import { createApp } from "./app.js";
 const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = "127.0.0.1";
 
-function resolvePort(value: string | undefined): number {
-  if (value === undefined) {
-    return DEFAULT_PORT;
-  }
-
-  const port = Number.parseInt(value, 10);
-
-  if (!Number.isInteger(port) || port <= 0) {
-    throw new Error(`Invalid PORT: ${value}`);
-  }
-
-  return port;
-}
-
 function resolveHost(value: string | undefined): string {
   if (value === undefined || value.length === 0) {
     return DEFAULT_HOST;
   }
 
   return value;
+}
+
+function resolvePort(value: string | undefined): number {
+  const port = Number.parseInt(value ?? "", 10);
+
+  if (value === undefined) {
+    return DEFAULT_PORT;
+  }
+
+  if (!Number.isInteger(port) || port <= 0) {
+    throw new Error(`Invalid PORT: ${value}`);
+  }
+
+  return port;
 }
 
 const host = resolveHost(process.env.HOST);
@@ -38,6 +38,8 @@ serve(
     port,
   },
   (info) => {
-    console.log(`Geshi backend listening on http://${host}:${info.port}`);
+    process.stdout.write(
+      `Geshi backend listening on http://${host}:${info.port}\n`,
+    );
   },
 );

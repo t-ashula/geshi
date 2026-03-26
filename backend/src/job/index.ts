@@ -1,3 +1,4 @@
+export type { Job, JobEvent, JobStatus, JobTarget } from "./model.js";
 export {
   appendJobEvent,
   canAppendJobEvent,
@@ -7,5 +8,3 @@ export {
   getLatestJobEvent,
   isTerminalJobStatus,
 } from "./model.js";
-
-export type { Job, JobEvent, JobStatus, JobTarget } from "./model.js";

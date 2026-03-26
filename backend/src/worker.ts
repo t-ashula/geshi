@@ -1,7 +1,7 @@
-import { createPingWorker } from "./bullmq/worker.js";
+import { createPingWorker } from "./bullmq/index.js";
 
 const worker = createPingWorker();
 
 worker.on("ready", () => {
-  console.log("Geshi BullMQ worker is ready");
+  process.stdout.write("Geshi BullMQ worker is ready\n");
 });

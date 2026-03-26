@@ -21,11 +21,13 @@ export function createPingWorker(): Worker {
   );
 
   worker.on("completed", (job) => {
-    console.log(`Ping job completed: ${job.id ?? "unknown"}`);
+    process.stdout.write(`Ping job completed: ${job.id ?? "unknown"}\n`);
   });
 
   worker.on("failed", (job, error) => {
-    console.error(`Ping job failed: ${job?.id ?? "unknown"}`, error);
+    process.stderr.write(
+      `Ping job failed: ${job?.id ?? "unknown"} ${String(error)}\n`,
+    );
   });
 
   return worker;

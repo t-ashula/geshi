@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 
-import { createPingQueue } from "../bullmq/queues.js";
+import { createPingQueue } from "../bullmq/index.js";
 
 export function registerJobRoutes(app: Hono): void {
   app.post("/dev/jobs/ping", async (context) => {

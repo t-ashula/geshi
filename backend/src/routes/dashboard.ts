@@ -4,7 +4,7 @@ import { HonoAdapter } from "@bull-board/hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Hono } from "hono";
 
-import { createPingQueue } from "../bullmq/queues.js";
+import { createPingQueue } from "../bullmq/index.js";
 
 export function registerDashboardRoute(app: Hono): void {
   const serverAdapter = new HonoAdapter(serveStatic);
