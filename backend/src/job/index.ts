@@ -1,5 +1,4 @@
 export {
-  JOB_STATUSES,
   appendJobEvent,
   canAppendJobEvent,
   canTransitionJobStatus,

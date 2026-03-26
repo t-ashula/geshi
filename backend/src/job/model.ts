@@ -1,4 +1,4 @@
-export const JOB_STATUSES = [
+const JOB_STATUSES = [
   "registered",
   "scheduled",
   "queued",
@@ -26,8 +26,8 @@ export type Job = {
 };
 
 export type JobEvent = {
-  geshiId: string;
-  bullId: string | null;
+  jobId: string;
+  runtimeJobId: string | null;
   occurredAt: string;
   status: JobStatus;
   note: string;
@@ -44,19 +44,26 @@ const JOB_STATUS_ORDER: Record<JobStatus, number> = {
   cancelled: 5,
 };
 
-const ALLOWED_JOB_STATUS_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> = {
-  registered: ["queued", "scheduled", "failed", "cancelled", "cancelling"],
-  scheduled: ["queued", "failed", "cancelled", "cancelling"],
-  queued: ["running", "failed", "cancelled", "cancelling"],
-  running: ["succeeded", "failed", "cancelled", "cancelling"],
-  cancelling: ["succeeded", "failed", "cancelled"],
-  succeeded: [],
-  failed: [],
-  cancelled: [],
-};
+const ALLOWED_JOB_STATUS_TRANSITIONS: Record<JobStatus, readonly JobStatus[]> =
+  {
+    registered: ["queued", "scheduled", "failed", "cancelled", "cancelling"],
+    scheduled: ["queued", "failed", "cancelled", "cancelling"],
+    queued: ["running", "failed", "cancelled", "cancelling"],
+    running: ["succeeded", "failed", "cancelled", "cancelling"],
+    cancelling: ["succeeded", "failed", "cancelled"],
+    succeeded: [],
+    failed: [],
+    cancelled: [],
+  };
 
 export function isTerminalJobStatus(status: JobStatus): boolean {
-  return status === "succeeded" || status === "failed" || status === "cancelled";
+  return (
+    status === "succeeded" || status === "failed" || status === "cancelled"
+  );
+}
+
+export function isJobStatus(value: string): value is JobStatus {
+  return JOB_STATUSES.includes(value as JobStatus);
 }
 
 export function canTransitionJobStatus(
@@ -66,10 +73,7 @@ export function canTransitionJobStatus(
   return ALLOWED_JOB_STATUS_TRANSITIONS[from].includes(to);
 }
 
-export function compareJobStatuses(
-  left: JobStatus,
-  right: JobStatus,
-): number {
+export function compareJobStatuses(left: JobStatus, right: JobStatus): number {
   return JOB_STATUS_ORDER[left] - JOB_STATUS_ORDER[right];
 }
 
@@ -86,16 +90,12 @@ export function compareJobEvents(left: JobEvent, right: JobEvent): number {
     return occurredAtOrder;
   }
 
-  const bullIdOrder = (left.bullId ?? "").localeCompare(right.bullId ?? "");
-
-  if (bullIdOrder !== 0) {
-    return bullIdOrder;
-  }
-
-  return left.note.localeCompare(right.note);
+  return 0;
 }
 
-export function getLatestJobEvent(events: readonly JobEvent[]): JobEvent | null {
+export function getLatestJobEvent(
+  events: readonly JobEvent[],
+): JobEvent | null {
   if (events.length === 0) {
     return null;
   }
@@ -105,8 +105,8 @@ export function getLatestJobEvent(events: readonly JobEvent[]): JobEvent | null 
 
 function isSameJobEvent(left: JobEvent, right: JobEvent): boolean {
   return (
-    left.geshiId === right.geshiId &&
-    left.bullId === right.bullId &&
+    left.jobId === right.jobId &&
+    left.runtimeJobId === right.runtimeJobId &&
     left.occurredAt === right.occurredAt &&
     left.status === right.status &&
     left.note === right.note
@@ -118,7 +118,7 @@ export function canAppendJobEvent(
   nextEvent: JobEvent,
 ): boolean {
   const latestEvent = getLatestJobEvent(
-    events.filter((event) => event.geshiId === nextEvent.geshiId),
+    events.filter((event) => event.jobId === nextEvent.jobId),
   );
 
   if (latestEvent === null) {
