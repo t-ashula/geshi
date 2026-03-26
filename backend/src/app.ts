@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 
-import { registerDashboardRoute } from "./routes/dashboard.js";
-import { registerHealthRoute } from "./routes/health.js";
-import { registerJobRoutes } from "./routes/jobs.js";
+import {
+  registerDashboardRoute,
+  registerHealthRoute,
+  registerJobRoutes,
+} from "./routes/index.js";
 
 export function createApp(): Hono {
   const app = new Hono();

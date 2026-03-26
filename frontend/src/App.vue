@@ -56,10 +56,20 @@ onMounted(() => {
 <template>
   <main class="app">
     <section class="panel">
-      <p class="eyebrow">Geshi Frontend</p>
+      <p class="eyebrow">
+        Geshi Frontend
+      </p>
       <h1>{{ headline }}</h1>
-      <p class="detail">{{ detail }}</p>
-      <button class="button" type="button" @click="checkHealth">Retry</button>
+      <p class="detail">
+        {{ detail }}
+      </p>
+      <button
+        class="button"
+        type="button"
+        @click="checkHealth"
+      >
+        Retry
+      </button>
     </section>
   </main>
 </template>
