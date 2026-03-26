@@ -1,8 +1,13 @@
 import { Worker } from "bullmq";
 
+import { createLogger } from "../logger/index.js";
 import { PING_QUEUE_NAME, resolveRedisConnection } from "./config.js";
 
 export function createPingWorker(): Worker {
+  const logger = createLogger({
+    component: "ping-worker",
+    queue: PING_QUEUE_NAME,
+  });
   const worker = new Worker(
     PING_QUEUE_NAME,
     async (job) => {
@@ -21,13 +26,14 @@ export function createPingWorker(): Worker {
   );
 
   worker.on("completed", (job) => {
-    process.stdout.write(`Ping job completed: ${job.id ?? "unknown"}\n`);
+    logger.info("ping job completed.", { runtimeJobId: job.id ?? null });
   });
 
   worker.on("failed", (job, error) => {
-    process.stderr.write(
-      `Ping job failed: ${job?.id ?? "unknown"} ${String(error)}\n`,
-    );
+    logger.error("ping job failed.", {
+      error,
+      runtimeJobId: job?.id ?? null,
+    });
   });
 
   return worker;

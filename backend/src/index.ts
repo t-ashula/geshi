@@ -1,6 +1,7 @@
 import { serve } from "@hono/node-server";
 
 import { createApp } from "./app.js";
+import { createLogger } from "./logger/index.js";
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = "127.0.0.1";
@@ -30,6 +31,7 @@ function resolvePort(value: string | undefined): number {
 const host = resolveHost(process.env.HOST);
 const port = resolvePort(process.env.PORT);
 const app = createApp();
+const logger = createLogger({ component: "backend-server" });
 
 serve(
   {
@@ -38,8 +40,10 @@ serve(
     port,
   },
   (info) => {
-    process.stdout.write(
-      `Geshi backend listening on http://${host}:${info.port}\n`,
-    );
+    logger.info("backend server started.", {
+      host,
+      port: info.port,
+      url: `http://${host}:${info.port}`,
+    });
   },
 );
