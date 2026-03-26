@@ -17,6 +17,8 @@
     "redis:down": "docker compose down",
     "build": "npm run typecheck && vite build --config frontend/vite.config.ts",
     "preview": "vite preview --config frontend/vite.config.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "vue-tsc --noEmit -p frontend/tsconfig.json && tsc --noEmit -p backend/tsconfig.json && tsc --noEmit -p cli/tsconfig.json",
     "lint": "eslint frontend backend cli",
     "lint:fix": "npm run -s lint -- --fix"
@@ -45,6 +47,7 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.1",
     "vite": "^8.0.1",
+    "vitest": "^4.1.1",
     "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^3.2.6"
   }
