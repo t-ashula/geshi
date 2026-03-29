@@ -57,7 +57,18 @@ npm run backend:worker:dev
 
 `dbmate` は `npm run` 経由で使える．
 
+- migration ファイルは `backend/db/migrations/` に置く
+- 接続先は `DATABASE_URL` で渡す
+- schema 定義の source of truth は migration SQL とする
+- schema dump は `backend/db/schema.sql` に出力する
+
 例:
+
+```bash
+export DATABASE_URL=postgres://geshi:geshi@127.0.0.1:5432/geshi
+```
+
+dbmate 自体の help:
 
 ```bash
 npm run dbmate -- --help
@@ -71,8 +82,6 @@ npm run db:migrate:up
 npm run db:migrate:down
 npm run db:migrate:new -- create_example_table
 ```
-
-現時点では migration の配置や適用手順までは未確定であり，詳細は後続 ADR で整理する．
 
 ## frontend
 
