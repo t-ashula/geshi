@@ -31,10 +31,13 @@ Geshi 側 `job` は，少なくとも次のような定義情報を持つ．
 
 - `id`
 - `kind`
-- `target`
 - `payload`
 - `createdAt`
 - `runAfter`
+
+`payload` は，その job の実行入力を表す JSON 文字列とする．
+
+どのような shape の JSON かは，`kind` に対応する job 実装側で解釈する．
 
 ### `job event`
 
@@ -44,9 +47,17 @@ Geshi 側 `job` は，少なくとも次のような定義情報を持つ．
 - `runtimeJobId`
 - `occurredAt`
 - `status`
+- `failureStage`
 - `note`
 
 `runtimeJobId` は実行基盤側で付与される識別子であり，未割当の段階では `null` を取りうる．
+
+`failureStage` は，失敗がどの段階で起きたかを表すための欄であり，通常は `null` を取りうる．
+
+少なくとも次のような値を取りうる．
+
+- `runtime`
+- `import`
 
 `note` は短い補足情報のための欄とし，
 
@@ -77,10 +88,9 @@ Geshi 側 `job` は，少なくとも次の状態を持つ．
 - `scheduled`
 - `queued`
 - `running`
-- `cancelling`
+- `importing`
 - `succeeded`
 - `failed`
-- `cancelled`
 
 ## 状態遷移
 
@@ -89,25 +99,13 @@ Geshi 側 `job` の状態遷移は，少なくとも次に限定する．
 - `registered -> queued`
 - `registered -> scheduled`
 - `registered -> failed`
-- `registered -> cancelled`
 - `scheduled -> queued`
-- `scheduled -> failed`
-- `scheduled -> cancelled`
 - `queued -> running`
-- `queued -> failed`
-- `queued -> cancelled`
-- `registered -> cancelling`
-- `scheduled -> cancelling`
-- `queued -> cancelling`
-- `running -> cancelling`
-- `cancelling -> succeeded`
-- `cancelling -> failed`
-- `cancelling -> cancelled`
-- `running -> succeeded`
-- `running -> failed`
-- `running -> cancelled`
+- `running -> importing`
+- `importing -> succeeded`
+- `importing -> failed`
 
-`succeeded / failed / cancelled` は終端状態とし，終端状態から他状態へは遷移させない．
+`succeeded / failed` は終端状態とし，終端状態から他状態へは遷移させない．
 
 ```mermaid
 stateDiagram-v2
@@ -116,31 +114,18 @@ stateDiagram-v2
   registered --> queued
   registered --> scheduled
   registered --> failed
-  registered --> cancelled
-  registered --> cancelling
 
   scheduled --> queued
-  scheduled --> failed
-  scheduled --> cancelled
-  scheduled --> cancelling
 
   queued --> running
-  queued --> failed
-  queued --> cancelled
-  queued --> cancelling
 
-  running --> succeeded
-  running --> failed
-  running --> cancelled
-  running --> cancelling
+  running --> importing
 
-  cancelling --> succeeded
-  cancelling --> failed
-  cancelling --> cancelled
+  importing --> succeeded
+  importing --> failed
 
   succeeded --> [*]
   failed --> [*]
-  cancelled --> [*]
 ```
 
 ## 処理段階
@@ -157,10 +142,23 @@ stateDiagram-v2
 - 即時実行できる job なら，実行用 BullMQ job を enqueue する
 - 実行開始条件をまだ満たさない job なら，Geshi 側 `job` を `scheduled` に更新する
 
+BullMQ 側へ渡す raw data は，少なくとも次の形とする．
+
+```ts
+{
+  context: {
+    geshiJobId: string,
+  },
+  payload: unknown,
+}
+```
+
+ここで `payload` は，`JSON.parse(job.payload)` した実行入力である．
+
 ### 3. 実行開始条件を満たした job を拾う
 
-- `scheduled` の Geshi 側 `job` を監視する常駐処理を別に持つ
-- この `scheduler job` が，worker 数の調整と実行用 BullMQ job の enqueue を行う
+- `scheduled` の Geshi 側 `job` は，`export job` が実行開始条件を満たした時点で再度拾う
+- `export job` が，worker 数の調整と実行用 BullMQ job の enqueue を行う
 
 ### 4. 実行中状態と progress を反映する
 
@@ -172,19 +170,73 @@ stateDiagram-v2
 - 実行用 BullMQ job は，Geshi 側 `job` とは切り離して扱う
 - 実行結果は，終端状態専用の `import job` によって Geshi 側 `job` へ反映する
 
-### 6. キャンセルを反映する
+runtime worker の戻りは，少なくとも次の形とする．
 
-- backend が cancel 要求を受けたときは，Geshi 側 `job` を `cancelling` に更新する
-- その後，BullMQ 側へ cancel 要求を出す `cancel job` を enqueue する
-- `cancel job` は waiting / delayed の job を除去し，active の job には cancellation を要求する
-- その結果は `import job` によって Geshi 側 `job` へ反映する
-- `cancelling` は，最終的に `cancelled` だけでなく `succeeded` や `failed` に着地しうる
+```ts
+interface ImportInstruction {
+  operation: string
+  payload: string
+}
+
+interface RuntimeJobResult {
+  geshiJobId: string
+  jobStatus: string
+}
+
+interface ImportJobInput {
+  result: RuntimeJobResult
+  importInstructions: ImportInstruction[] | null
+}
+```
+
+- runtime worker が完了し，`import job` を積んだ時点で，対象の `job` は `importing` へ遷移する
+- 終端状態の確定は `import job` 経由でのみ行う
+- `import job` は，その後 `result.geshiJobId` と `result.jobStatus` にもとづいて Geshi 側 `job` の終端状態を更新する
+- その後，`importInstructions` にもとづいて backend の write API を順に呼ぶ
+- backend DB 障害のように `import job` 自体が結果反映できない場合は，`import job` を破棄せず無限リトライする
+- その間，対象の `job` は `importing` に留まりうる
+
+ここでの `succeeded / failed` は，Geshi 側 `job` の終端状態である．
+
+したがって，
+
+- runtime worker の正常終了は，そのまま `succeeded` を意味しない
+- `succeeded` は，`import job` が必要な backend write API 呼び出しまで完了した時点で確定する
+- runtime worker が正常終了しても，`import job` や backend write API 呼び出しが失敗した場合は，Geshi 側 `job` は `failed` になりうる
+- その場合，Geshi 側 `job` は必ず `failed` にし，失敗段階も残す
+
+`queued` は，すでに BullMQ 側へ投入済みであることを意味する．
+
+したがって `scheduled` や `queued` 以降は，Geshi 側だけで直接 `failed` に更新するのではなく，
+
+- 実行開始であれば `running`
+- import 段階へ入るなら `importing`
+
+を経由して最終状態へ進める．
 
 ## 備考
 
 - ここで定める状態語彙は Geshi 側 `job` model のものであり，BullMQ 側 state と同一ではない
 - `job event` の順序は，まず状態遷移順を優先し，同じ状態内では発生時刻で比較する
 - `failed` には，実処理失敗だけでなく，橋渡し処理や投入処理が回復不能に終わった場合も含める
+- `importing` は，runtime worker は完了したが，Geshi 側の終端状態はまだ確定していない段階を表す
 - 同じ橋渡し用 job や event が複数回来ても，Geshi 側 `job` の状態や対応情報を壊さないようにする
 - 終端状態への更新は，古い event や重複 event によって巻き戻さないようにする
+- `target` は持たず，実行入力は `payload` に寄せる
+- retry は，同じ意味の別 job を再投入する上位層の方針として扱い，この文書の `job` model や `job event` では持たない
+- キャンセルは将来課題とし，この文書では扱わない
 - progress，親子 job，worker 数調整の具体実装は後続で詰める
+
+## 各ジョブの説明
+
+### 観察ジョブ
+
+Channelの観察対象に対して，新規のエントリーを収集するジョブ
+
+### 取得ジョブ
+
+新規のエントリーに対して，その実リソースを取得するジョブ
+
+### 投入ジョブ
+
+Channel にたいする観察ジョブを定期的に投入するジョブ
