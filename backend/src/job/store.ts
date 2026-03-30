@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from "pg";
 
+import { createUuidV7 } from "./id.js";
 import type { Job, JobEvent, JobStatus } from "./type.js";
 
 export type AppendJobEventInput = {
@@ -27,7 +28,7 @@ export interface JobStore {
 }
 
 type DbJobEventRow = {
-  id: number;
+  id: string;
   job_id: string;
   runtime_job_id: string | null;
   occurred_at: Date;
@@ -83,6 +84,7 @@ export class PgJobStore implements JobStore {
     const result = await this.pool.query<DbJobEventRow>(
       `
         insert into job_events (
+          id,
           job_id,
           runtime_job_id,
           occurred_at,
@@ -90,7 +92,7 @@ export class PgJobStore implements JobStore {
           failure_stage,
           note
         )
-        values ($1, $2, $3, $4, $5, $6)
+        values ($1, $2, $3, $4, $5, $6, $7)
         returning
           id,
           job_id,
@@ -101,6 +103,7 @@ export class PgJobStore implements JobStore {
           note
       `,
       [
+        createUuidV7(),
         input.jobId,
         input.runtimeJobId,
         input.occurredAt,
@@ -218,6 +221,7 @@ export class PgJobStore implements JobStore {
     const result = await client.query<DbJobEventRow>(
       `
         insert into job_events (
+          id,
           job_id,
           runtime_job_id,
           occurred_at,
@@ -225,7 +229,7 @@ export class PgJobStore implements JobStore {
           failure_stage,
           note
         )
-        values ($1, $2, $3, $4, $5, $6)
+        values ($1, $2, $3, $4, $5, $6, $7)
         returning
           id,
           job_id,
@@ -236,6 +240,7 @@ export class PgJobStore implements JobStore {
           note
       `,
       [
+        createUuidV7(),
         input.jobId,
         input.runtimeJobId,
         input.occurredAt,

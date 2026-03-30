@@ -17,6 +17,7 @@
 ## 決めたこと
 
 - `job.id` は UUID v7 とする
+- `job_event.id` も UUID v7 とする
 - `job_event.job_id` は `job.id` を参照する UUID とする
 - `job.kind` は `text` とし，index を付ける
 - `job.payload` は PostgreSQL では `jsonb` で持つ
@@ -26,7 +27,7 @@
 - `job_event.failure_stage` は nullable `text` とする
 - `job_event.note` は長さ制限なしの `text` とする
 - `job` の current status は table に持たず，`job_event` 集約だけで扱う
-- `job_event` には順序の tie-break 用に surrogate key を持たせる
+- `job_event.id` は順序の tie-break 用 surrogate key も兼ねる
   - ただし，これはイベント本来の発生順序そのものではなく，DB 内の安定した並びのために使う
 - 最低限の index は次を持つ
   - `jobs(kind)`

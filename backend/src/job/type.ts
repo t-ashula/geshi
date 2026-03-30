@@ -11,7 +11,7 @@ export type Job = {
 };
 
 export type JobEvent = {
-  id: number;
+  id: string;
   jobId: string;
   runtimeJobId: string | null;
   occurredAt: string;

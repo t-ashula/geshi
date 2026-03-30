@@ -11,7 +11,7 @@ create index idx_jobs_kind on jobs (kind);
 create index idx_jobs_run_after on jobs (run_after);
 
 create table job_events (
-  id bigserial primary key,
+  id uuid primary key,
   job_id uuid not null references jobs (id) on delete cascade,
   runtime_job_id text null,
   occurred_at timestamptz not null default now(),

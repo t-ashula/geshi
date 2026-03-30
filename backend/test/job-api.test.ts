@@ -125,7 +125,7 @@ describe("JobApi", () => {
   it("appends an event", async () => {
     store.appendJobEvent.mockResolvedValue({
       failureStage: null,
-      id: 1,
+      id: "0195e3e0-0000-7000-8000-000000000101",
       jobId: "job-1",
       note: null,
       occurredAt: "2026-03-30T00:00:01.000Z",
