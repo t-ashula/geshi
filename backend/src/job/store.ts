@@ -1,4 +1,5 @@
-import type { Pool, PoolClient } from "pg";
+import type { PoolClient } from "pg";
+import { Pool } from "pg";
 
 import { createUuidV7 } from "./id.js";
 import type { Job, JobEvent, JobStatus } from "./type.js";
@@ -18,6 +19,14 @@ export type CreateJobInput = {
   payload: unknown;
   createdAt: string;
   runAfter: string | null;
+};
+
+export type CreateJobStoreInput = {
+  kind: "pg";
+  options?: {
+    databaseUrl?: string;
+    searchPath?: string;
+  };
 };
 
 export interface JobStore {
@@ -52,7 +61,9 @@ type DbJobWithStateRow = DbJobRow & {
   current_note: string | null;
 };
 
-export class PgJobStore implements JobStore {
+let defaultJobStore: JobStore | null = null;
+
+class PgJobStore implements JobStore {
   public constructor(private readonly pool: Pool) {}
 
   public async createJob(input: CreateJobInput): Promise<Job> {
@@ -254,6 +265,53 @@ export class PgJobStore implements JobStore {
   }
 }
 
+export function createJobStore(input: CreateJobStoreInput): JobStore {
+  if (input.kind !== "pg") {
+    throw new Error(`Unsupported job store kind: ${String(input)}`);
+  }
+
+  const options = input.options;
+
+  if (options === undefined) {
+    if (defaultJobStore !== null) {
+      return defaultJobStore;
+    }
+
+    defaultJobStore = new PgJobStore(createPgPool({}));
+
+    return defaultJobStore;
+  }
+
+  return new PgJobStore(createPgPool(options));
+}
+
+function createPgPool(options: {
+  databaseUrl?: string;
+  searchPath?: string;
+}): Pool {
+  return new Pool({
+    connectionString: resolveDatabaseUrl(options.databaseUrl),
+    options:
+      options.searchPath === undefined
+        ? undefined
+        : `-c search_path=${options.searchPath}`,
+  });
+}
+
+function resolveDatabaseUrl(value?: string): string {
+  if (value !== undefined && value.length > 0) {
+    return value;
+  }
+
+  const environmentValue = process.env.DATABASE_URL;
+
+  if (environmentValue === undefined || environmentValue.length === 0) {
+    throw new Error("DATABASE_URL is required.");
+  }
+
+  return environmentValue;
+}
+
 function toJob(row: DbJobRow): Job {
   return {
     createdAt: row.created_at.toISOString(),
@@ -293,11 +351,11 @@ function toJobWithCurrentState(row: DbJobWithStateRow): Job {
 function withCurrentState(
   job: Job,
   row: {
-  failureStage: string | null;
-  note: string | null;
-  occurredAt: string;
-  status: JobStatus;
-},
+    failureStage: string | null;
+    note: string | null;
+    occurredAt: string;
+    status: JobStatus;
+  },
 ): Job {
   return {
     ...job,

@@ -1,19 +1,38 @@
-import { getPool } from "./db/index.js";
+import { Queue } from "bullmq";
+
+import { resolveRedisConnection } from "./bullmq/index.js";
 import {
   createExportJobWorker,
-  createFunctionalJobQueue,
   createImportJobWorker,
   createJobApi,
+  createJobRuntime,
   createJobStore,
   createNoopImportInstructionHandler,
   createUpdateJobWorker,
 } from "./job/index.js";
 import { createLogger } from "./logger/index.js";
 
-const api = createJobApi(createJobStore(getPool()));
-const exportWorker = createExportJobWorker(api, createFunctionalJobQueue());
+const redisConnection = resolveRedisConnection();
+const api = createJobApi(
+  createJobStore({ kind: "pg" }),
+  createJobRuntime({
+    kind: "bullmq",
+    options: {
+      connection: redisConnection,
+    },
+  }),
+);
+const exportWorker = createExportJobWorker(
+  api,
+  new Queue("job-functional", {
+    connection: redisConnection,
+  }),
+);
 const updateWorker = createUpdateJobWorker(api);
-const importWorker = createImportJobWorker(api, createNoopImportInstructionHandler());
+const importWorker = createImportJobWorker(
+  api,
+  createNoopImportInstructionHandler(),
+);
 const logger = createLogger({ component: "job-runtime-worker" });
 
 exportWorker.on("ready", () => {

@@ -2,61 +2,36 @@ import { Worker } from "bullmq";
 
 import { resolveRedisConnection } from "../../../bullmq/index.js";
 import type { JobApi } from "../../api.js";
-import type { FunctionalJobData, FunctionalJobOutput, ImportJobInput } from "../type.js";
-import {
-  EXPORT_JOB_QUEUE_NAME,
-  FUNCTIONAL_JOB_QUEUE_NAME,
-  IMPORT_JOB_QUEUE_NAME,
-  UPDATE_JOB_QUEUE_NAME,
-} from "./queues.js";
+import type {
+  FunctionalJobData,
+  FunctionalJobOutput,
+  ImportJobInput,
+  JobRuntime,
+} from "../type.js";
+import { EXPORT_JOB_QUEUE_NAME, IMPORT_JOB_QUEUE_NAME, UPDATE_JOB_QUEUE_NAME } from "./queues.js";
 
 export type ImportInstructionHandler = (
   operation: string,
   payload: string,
 ) => Promise<void>;
 
-type ImportJobQueue = {
-  add(name: string, data: ImportJobInput): Promise<unknown>;
-};
-
 type RuntimeJobQueue = {
   add(name: string, data: FunctionalJobData): Promise<{ id?: string }>;
-};
-
-type UpdateJobQueue = {
-  add(name: string, data: {
-    jobId: string;
-    runtimeJobId: string | null;
-    occurredAt: string;
-    status: "running" | "scheduled" | "queued";
-    failureStage: string | null;
-    note: string | null;
-  }): Promise<unknown>;
 };
 
 export function createExportJobWorker(
   api: JobApi,
   runtimeQueue: RuntimeJobQueue,
 ): Worker<{ jobId: string }> {
+  const connection = resolveRedisConnection();
+
   return new Worker(
     EXPORT_JOB_QUEUE_NAME,
     async (job) => {
       await runExportJob(api, runtimeQueue, job.data);
     },
     {
-      connection: resolveRedisConnection(),
-    },
-  );
-}
-
-export function createFunctionalWorkerPlaceholder() {
-  return new Worker(
-    FUNCTIONAL_JOB_QUEUE_NAME,
-    async () => {
-      throw new Error("functional worker is not implemented yet.");
-    },
-    {
-      connection: resolveRedisConnection(),
+      connection,
     },
   );
 }
@@ -65,13 +40,15 @@ export function createImportJobWorker(
   api: JobApi,
   applyInstruction: ImportInstructionHandler,
 ): Worker<ImportJobInput> {
+  const connection = resolveRedisConnection();
+
   return new Worker(
     IMPORT_JOB_QUEUE_NAME,
     async (job) => {
       await runImportJob(api, applyInstruction, job.data);
     },
     {
-      connection: resolveRedisConnection(),
+      connection,
     },
   );
 }
@@ -88,13 +65,15 @@ export function createUpdateJobWorker(api: JobApi): Worker<{
   failureStage: string | null;
   note: string | null;
 }> {
+  const connection = resolveRedisConnection();
+
   return new Worker(
     UPDATE_JOB_QUEUE_NAME,
     async (job) => {
       await runUpdateJob(api, job.data);
     },
     {
-      connection: resolveRedisConnection(),
+      connection,
     },
   );
 }
@@ -193,8 +172,7 @@ export function wrapFunctionalJobWorker<TPayload>(
     context: { jobId: string },
     payload: TPayload,
   ) => Promise<FunctionalJobOutput>,
-  updateQueue: UpdateJobQueue,
-  importQueue: ImportJobQueue,
+  runtime: JobRuntime,
 ) {
   return async (job: {
     id?: string;
@@ -202,37 +180,46 @@ export function wrapFunctionalJobWorker<TPayload>(
   }): Promise<FunctionalJobOutput> => {
     const occurredAt = new Date().toISOString();
 
-    await updateQueue.add("update", {
-      failureStage: null,
-      jobId: job.data.context.jobId,
-      note: null,
-      occurredAt,
-      runtimeJobId: job.id ?? null,
-      status: "running",
+    await runtime.addJob({
+      kind: "update",
+      payload: {
+        failureStage: null,
+        jobId: job.data.context.jobId,
+        note: null,
+        occurredAt,
+        runtimeJobId: job.id ?? null,
+        status: "running",
+      },
     });
 
     try {
       const output = await realWorker(job.data.context, job.data.payload);
 
-      await importQueue.add("import", {
-        importInstructions: output.importInstructions,
-        result: {
-          failureStage: null,
-          jobId: job.data.context.jobId,
-          jobStatus: "succeeded",
-          note: output.note ?? null,
+      await runtime.addJob({
+        kind: "import",
+        payload: {
+          importInstructions: output.importInstructions,
+          result: {
+            failureStage: null,
+            jobId: job.data.context.jobId,
+            jobStatus: "succeeded",
+            note: output.note ?? null,
+          },
         },
       });
 
       return output;
     } catch (error) {
-      await importQueue.add("import", {
-        importInstructions: null,
-        result: {
-          failureStage: "runtime",
-          jobId: job.data.context.jobId,
-          jobStatus: "failed",
-          note: error instanceof Error ? error.message : null,
+      await runtime.addJob({
+        kind: "import",
+        payload: {
+          importInstructions: null,
+          result: {
+            failureStage: "runtime",
+            jobId: job.data.context.jobId,
+            jobStatus: "failed",
+            note: error instanceof Error ? error.message : null,
+          },
         },
       });
 

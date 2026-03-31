@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Job, JobEvent } from "../../../src/job/index.js";
+import type { Job, JobEvent, JobRuntime } from "../../../src/job/index.js";
 import {
   createJobApi,
   JobApiValidationError,
@@ -26,6 +26,9 @@ describe("JobApi", () => {
     getJob: vi.fn(),
     listJobs: vi.fn(),
   };
+  const runtime: JobRuntime = {
+    addJob: vi.fn(),
+  };
 
   beforeEach(() => {
     createUuidV7Mock.mockReset();
@@ -33,6 +36,7 @@ describe("JobApi", () => {
     store.createJob.mockReset();
     store.getJob.mockReset();
     store.listJobs.mockReset();
+    vi.mocked(runtime.addJob).mockReset();
   });
 
   it("creates a job with generated uuid v7", async () => {
@@ -49,7 +53,7 @@ describe("JobApi", () => {
       status: "registered",
     } satisfies Job);
 
-    const api = createJobApi(store);
+    const api = createJobApi(store, runtime);
     const job = await api.createJob({
       kind: "observeChannel",
       payload: { channelId: "channel-1", force: false },
@@ -63,10 +67,16 @@ describe("JobApi", () => {
       payload: { channelId: "channel-1", force: false },
       runAfter: null,
     });
+    expect(runtime.addJob).toHaveBeenCalledWith({
+      kind: "export",
+      payload: {
+        jobId: "018f0f2e-18ef-7000-8000-000000000001",
+      },
+    });
   });
 
   it("rejects invalid create payload", async () => {
-    const api = createJobApi(store);
+    const api = createJobApi(store, runtime);
 
     await expect(api.createJob({ payload: {} })).rejects.toThrow(
       JobApiValidationError,
@@ -86,7 +96,7 @@ describe("JobApi", () => {
       status: "registered",
     } satisfies Job);
 
-    const api = createJobApi(store);
+    const api = createJobApi(store, runtime);
     const job = await api.getJob("job-1");
 
     expect(job.id).toBe("job-1");
@@ -95,7 +105,7 @@ describe("JobApi", () => {
   it("raises not found on missing job", async () => {
     store.getJob.mockResolvedValue(null);
 
-    const api = createJobApi(store);
+    const api = createJobApi(store, runtime);
 
     await expect(api.getJob("missing")).rejects.toThrow(JobNotFoundError);
   });
@@ -115,7 +125,7 @@ describe("JobApi", () => {
       } satisfies Job,
     ]);
 
-    const api = createJobApi(store);
+    const api = createJobApi(store, runtime);
     const jobs = await api.listJobs();
 
     expect(jobs).toHaveLength(1);
@@ -133,7 +143,7 @@ describe("JobApi", () => {
       status: "running",
     } satisfies JobEvent);
 
-    const api = createJobApi(store);
+    const api = createJobApi(store, runtime);
     const event = await api.appendJobEvent("job-1", {
       runtimeJobId: "runtime-1",
       status: "running",
@@ -153,7 +163,7 @@ describe("JobApi", () => {
   it("maps foreign key failure to not found", async () => {
     store.appendJobEvent.mockRejectedValue({ code: "23503" });
 
-    const api = createJobApi(store);
+    const api = createJobApi(store, runtime);
 
     await expect(
       api.appendJobEvent("missing", { status: "failed" }),

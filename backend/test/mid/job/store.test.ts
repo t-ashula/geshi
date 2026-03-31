@@ -53,7 +53,13 @@ describe("PgJobStore (mid)", () => {
   });
 
   it("creates a job with registered current state", async () => {
-    const store = createJobStore(storePool!);
+    const store = createJobStore({
+      kind: "pg",
+      options: {
+        databaseUrl: baseDatabaseUrl,
+        searchPath: schemaName,
+      },
+    });
 
     const job = await store.createJob({
       createdAt: "2026-03-31T00:00:00.000Z",
@@ -76,7 +82,13 @@ describe("PgJobStore (mid)", () => {
   });
 
   it("appends an event and reflects latest state in getJob/listJobs", async () => {
-    const store = createJobStore(storePool!);
+    const store = createJobStore({
+      kind: "pg",
+      options: {
+        databaseUrl: baseDatabaseUrl,
+        searchPath: schemaName,
+      },
+    });
 
     await store.createJob({
       createdAt: "2026-03-31T00:00:00.000Z",
