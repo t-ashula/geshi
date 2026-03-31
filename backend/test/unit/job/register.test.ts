@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { Job, JobApi } from "../src/job/index.js";
-import { registerJob } from "../src/job/index.js";
+import type { Job, JobApi } from "../../../src/job/index.js";
+import { registerJob } from "../../../src/job/index.js";
 
 describe("registerJob", () => {
   it("creates a job and enqueues export", async () => {

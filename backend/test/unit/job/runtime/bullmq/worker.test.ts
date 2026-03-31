@@ -4,13 +4,13 @@ import type {
   FunctionalJobOutput,
   Job,
   JobApi,
-} from "../src/job/index.js";
+} from "../../../../../src/job/index.js";
 import {
   runExportJob,
   runImportJob,
   runUpdateJob,
   wrapFunctionalJobWorker,
-} from "../src/job/index.js";
+} from "../../../../../src/job/index.js";
 
 function createApiStub(overrides: Partial<JobApi> = {}): JobApi {
   return {

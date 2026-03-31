@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Job, JobEvent } from "../src/job/index.js";
+import type { Job, JobEvent } from "../../../src/job/index.js";
 import {
   createJobApi,
   JobApiValidationError,
   JobNotFoundError,
-} from "../src/job/index.js";
+} from "../../../src/job/index.js";
 
 const { createUuidV7Mock } = vi.hoisted(() => {
   return {
@@ -13,7 +13,7 @@ const { createUuidV7Mock } = vi.hoisted(() => {
   };
 });
 
-vi.mock("../src/job/id.js", () => {
+vi.mock("../../../src/job/id.js", () => {
   return {
     createUuidV7: createUuidV7Mock,
   };
