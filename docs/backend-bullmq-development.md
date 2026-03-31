@@ -32,12 +32,6 @@
 
 ## 動作確認
 
-- queue へ ping job を追加する
-
-```sh
-curl -X POST http://127.0.0.1:3000/dev/jobs/ping
-```
-
 - Bull dashboard を開く
 
 ```text
@@ -50,17 +44,17 @@ http://127.0.0.1:3000/admin/queues
   - Redis
 - `backend/src/bullmq/config.ts`
   - Redis 接続設定
-- `backend/src/bullmq/queues.ts`
+- `backend/src/job/runtime/bullmq/queues.ts`
   - queue 定義
-- `backend/src/bullmq/worker.ts`
+- `backend/src/job/runtime/bullmq/worker.ts`
   - worker 定義
 - `backend/src/worker.ts`
   - worker 起動エントリ
 - `backend/src/routes/jobs.ts`
-  - 最小 enqueue route
+  - job 登録 route
 - `backend/src/routes/dashboard.ts`
   - `bull-board` の Hono 組み込み
 
 ## 備考
 
-- これは BullMQ bootstrap 用の最小構成であり，Geshi 側 `job` モデルとの統合はまだ含まない
+- scheduler job や functional job 本体はまだ未実装である

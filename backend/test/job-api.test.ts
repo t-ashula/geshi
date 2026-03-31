@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Job, JobEvent } from "../src/job/index.js";
 import {
-  JobApi,
+  createJobApi,
   JobApiValidationError,
   JobNotFoundError,
 } from "../src/job/index.js";
@@ -49,7 +49,7 @@ describe("JobApi", () => {
       status: "registered",
     } satisfies Job);
 
-    const api = new JobApi(store);
+    const api = createJobApi(store);
     const job = await api.createJob({
       kind: "observeChannel",
       payload: { channelId: "channel-1", force: false },
@@ -66,7 +66,7 @@ describe("JobApi", () => {
   });
 
   it("rejects invalid create payload", async () => {
-    const api = new JobApi(store);
+    const api = createJobApi(store);
 
     await expect(api.createJob({ payload: {} })).rejects.toThrow(
       JobApiValidationError,
@@ -86,7 +86,7 @@ describe("JobApi", () => {
       status: "registered",
     } satisfies Job);
 
-    const api = new JobApi(store);
+    const api = createJobApi(store);
     const job = await api.getJob("job-1");
 
     expect(job.id).toBe("job-1");
@@ -95,7 +95,7 @@ describe("JobApi", () => {
   it("raises not found on missing job", async () => {
     store.getJob.mockResolvedValue(null);
 
-    const api = new JobApi(store);
+    const api = createJobApi(store);
 
     await expect(api.getJob("missing")).rejects.toThrow(JobNotFoundError);
   });
@@ -115,7 +115,7 @@ describe("JobApi", () => {
       } satisfies Job,
     ]);
 
-    const api = new JobApi(store);
+    const api = createJobApi(store);
     const jobs = await api.listJobs();
 
     expect(jobs).toHaveLength(1);
@@ -133,7 +133,7 @@ describe("JobApi", () => {
       status: "running",
     } satisfies JobEvent);
 
-    const api = new JobApi(store);
+    const api = createJobApi(store);
     const event = await api.appendJobEvent("job-1", {
       runtimeJobId: "runtime-1",
       status: "running",
@@ -153,7 +153,7 @@ describe("JobApi", () => {
   it("maps foreign key failure to not found", async () => {
     store.appendJobEvent.mockRejectedValue({ code: "23503" });
 
-    const api = new JobApi(store);
+    const api = createJobApi(store);
 
     await expect(
       api.appendJobEvent("missing", { status: "failed" }),
