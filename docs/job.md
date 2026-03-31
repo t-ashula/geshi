@@ -2,7 +2,7 @@
 
 ## 概要
 
-この文書は，Geshi における `job` model の仕様を表したものである．
+この文書は，Geshi における `job` の仕様を表したものである．
 
 Geshi 側 `job` の状態語彙，状態遷移，実行基盤（BullMQ）側との関係を，ここで規定する．
 
@@ -130,6 +130,57 @@ stateDiagram-v2
 
 ## 処理段階
 
+```mermaid
+sequenceDiagram
+  participant B as backend (Geshi)
+  participant R as runtime (BullMQ)
+  participant E as export job
+  participant S as scheduler job
+  participant F as functional job
+  participant U as update job
+  participant I as import job
+
+  B->>B: createJob<br>job + initial job_event を保存
+  B->>R: export job(geshiJobId) を enqueue
+  R->>E: export job(geshiJobId) を即実行
+  E->>B: getJob(geshiJobId)
+  alt 実行開始条件をまだ満たさない
+    E->>B: scheduled の job_event を記録する
+  else 実行開始条件を満たした
+    E->>R: functional job を enqueue
+    R-->>E: runtimeJobId
+    E->>B: queued の job_event を runtimeJobId 付きで記録する
+  end
+
+  loop 定期的に実行される scheduler
+    R->>S: scheduler job を定期起動
+    S->>B: current status が scheduled の job を取得する
+    alt 対象 job がまだ見つからない
+      S->>S: 次回まで何もしない
+    else 実行開始条件をまだ満たさない
+      S->>S: 次回まで何もしない
+    else 実行開始条件を満たした
+      S->>S: 必要な functional job の worker 数を調整する
+      S->>R: functional job を enqueue
+      R-->>S: runtimeJobId
+      S->>B: queued の job_event を runtimeJobId 付きで記録する
+    end
+  end
+
+  R->>F: observe / acquire などを実行
+  F->>F: worker wrapper が running を通知する
+  F->>U: running / progress を通知しうる
+  U->>B: job_event を追記
+  alt 正常終了
+    F->>I: result + importInstructions
+  else 例外終了
+    F->>I: jobStatus=failed<br>failureStage=runtime
+  end
+  I->>B: importing を反映
+  I->>B: backend write API を呼ぶ
+  I->>B: succeeded / failed を反映
+```
+
 ### 1. job を登録する
 
 - backend で job を作成したときは，まず Geshi 側 `job` を永続化する
@@ -139,36 +190,33 @@ stateDiagram-v2
 
 `export job` は，Geshi 側 `job` を読んで次を判断する．
 
-- 即時実行できる job なら，実行用 BullMQ job を enqueue する
-- 実行開始条件をまだ満たさない job なら，Geshi 側 `job` を `scheduled` に更新する
+- 即時実行できる job なら，実行用 BullMQ job を enqueue し，`queued` の `job event` を `runtimeJobId` 付きで記録する
+- 実行開始条件をまだ満たさない job なら，`scheduled` の `job event` を記録する
 
-BullMQ 側へ渡す raw data は，少なくとも次の形とする．
-
-```ts
-{
-  context: {
-    geshiJobId: string,
-  },
-  payload: unknown,
-}
-```
-
-ここで `payload` は，`JSON.parse(job.payload)` した実行入力である．
+ここで `export job` が扱うのは，初回判定としての `registered` job である．
 
 ### 3. 実行開始条件を満たした job を拾う
 
-- `scheduled` の Geshi 側 `job` は，`export job` が実行開始条件を満たした時点で再度拾う
-- `export job` が，worker 数の調整と実行用 BullMQ job の enqueue を行う
+- `scheduler job` は，定期的に起動されるものとして扱う
+- `scheduler job` は，current status が `scheduled` の Geshi 側 `job` を対象にする
+- `scheduled` の Geshi 側 `job` は，`scheduler job` が実行開始条件を満たした時点で再度拾う
+- `scheduler job` は，必要な worker 数を調整したうえで実行用 BullMQ job を enqueue する
+- `scheduler job` は，その結果得た `runtimeJobId` を含めて `queued` の `job event` を記録する
 
 ### 4. 実行中状態と progress を反映する
 
-- BullMQ 側の実行開始や progress 変化は，`update job` によって Geshi 側 `job` へ反映する
-- `queued -> running` は，BullMQ 側の実行開始を受けた `update job` によって確定する
+- `update job` は，functional job の worker wrapper から明示的に呼ばれるものとして扱う
+- `update job` は，running / progress の変化を Geshi 側 `job event` に追記する
+- `queued -> running` は，worker wrapper から呼ばれた `update job` によって確定する
 
 ### 5. 実行結果を書き戻す
 
 - 実行用 BullMQ job は，Geshi 側 `job` とは切り離して扱う
 - 実行結果は，終端状態専用の `import job` によって Geshi 側 `job` へ反映する
+- functional job の worker wrapper は
+  - 実行開始時に `update job` へ `running` を渡す
+  - 正常終了時に `import job` へ `result + importInstructions` を渡す
+  - 例外終了時に `import job` へ `jobStatus = failed` と `failureStage = runtime` を渡す
 
 runtime worker の戻りは，少なくとも次の形とする．
 

@@ -1,18 +1,23 @@
 export type Job = {
   id: string;
   kind: string;
-  target: JobTarget | null;
   payload: unknown;
   createdAt: string;
   runAfter: string | null;
+  status: JobStatus | null;
+  failureStage: string | null;
+  occurredAt: string | null;
+  note: string | null;
 };
 
 export type JobEvent = {
+  id: string;
   jobId: string;
   runtimeJobId: string | null;
   occurredAt: string;
   status: JobStatus;
-  note: string;
+  failureStage: string | null;
+  note: string | null;
 };
 
 export type JobStatus =
@@ -20,12 +25,6 @@ export type JobStatus =
   | "scheduled"
   | "queued"
   | "running"
-  | "cancelling"
+  | "importing"
   | "succeeded"
-  | "failed"
-  | "cancelled";
-
-export type JobTarget = {
-  resourceType: string;
-  resourceId: string;
-};
+  | "failed";

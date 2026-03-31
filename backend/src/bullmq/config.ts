@@ -1,6 +1,5 @@
 export const REDIS_DEFAULT_HOST = "127.0.0.1";
 export const REDIS_DEFAULT_PORT = 6379;
-export const PING_QUEUE_NAME = "ping";
 
 export type RedisConnectionOptions = {
   host: string;
