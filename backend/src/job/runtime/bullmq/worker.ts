@@ -22,9 +22,8 @@ type RuntimeJobQueue = {
 export function createExportJobWorker(
   api: JobApi,
   runtimeQueue: RuntimeJobQueue,
+  connection = resolveRedisConnection(),
 ): Worker<{ jobId: string }> {
-  const connection = resolveRedisConnection();
-
   return new Worker(
     EXPORT_JOB_QUEUE_NAME,
     async (job) => {
@@ -39,9 +38,8 @@ export function createExportJobWorker(
 export function createImportJobWorker(
   api: JobApi,
   applyInstruction: ImportInstructionHandler,
+  connection = resolveRedisConnection(),
 ): Worker<ImportJobInput> {
-  const connection = resolveRedisConnection();
-
   return new Worker(
     IMPORT_JOB_QUEUE_NAME,
     async (job) => {
@@ -57,7 +55,10 @@ export function createNoopImportInstructionHandler(): ImportInstructionHandler {
   return async () => {};
 }
 
-export function createUpdateJobWorker(api: JobApi): Worker<{
+export function createUpdateJobWorker(
+  api: JobApi,
+  connection = resolveRedisConnection(),
+): Worker<{
   jobId: string;
   runtimeJobId: string | null;
   occurredAt: string;
@@ -65,8 +66,6 @@ export function createUpdateJobWorker(api: JobApi): Worker<{
   failureStage: string | null;
   note: string | null;
 }> {
-  const connection = resolveRedisConnection();
-
   return new Worker(
     UPDATE_JOB_QUEUE_NAME,
     async (job) => {

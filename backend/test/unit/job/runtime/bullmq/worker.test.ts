@@ -62,10 +62,10 @@ describe("job runtime bullmq", () => {
         createdAt: "2026-03-31T00:00:00.000Z",
         failureStage: null,
         id: "job-1",
-        kind: "observeChannel",
+        kind: "healthCheck",
         note: null,
         occurredAt: "2026-03-31T00:00:00.000Z",
-        payload: { channelId: "channel-1" },
+        payload: {},
         runAfter: null,
         status: "registered",
       } satisfies Job),
@@ -81,11 +81,11 @@ describe("job runtime bullmq", () => {
       new Date("2026-03-31T01:00:00.000Z"),
     );
 
-    expect(runtimeQueue.add).toHaveBeenCalledWith("observeChannel", {
+    expect(runtimeQueue.add).toHaveBeenCalledWith("healthCheck", {
       context: {
         jobId: "job-1",
       },
-      payload: { channelId: "channel-1" },
+      payload: {},
     });
     expect(api.appendJobEvent).toHaveBeenCalledWith("job-1", {
       occurredAt: "2026-03-31T01:00:00.000Z",

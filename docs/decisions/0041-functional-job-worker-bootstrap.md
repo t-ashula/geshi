@@ -24,7 +24,7 @@
   - 疎通確認用 worker を起動し，
   - backend の `JobApi` から `createJob()` を行い，
   - `job` / `job_event` / runtime queue / import 反映を観察する形で行う
-- worker は `backend/src/job/workers/` 配下に置き，`healthcheck.ts` と名称とファイル名を揃える
+- worker は `backend/src/job/workers/` 配下に置き，`health-check.ts` と `HealthCheck` の名称を揃える
   - 初期段階では，ワーカーとしては何もせず，info と debug でログにメッセージを残すだけとする
   - 今後の機能実装で必要に応じて，ワーカーで行うことを調整する
 - functional job worker 自体は BullMQ 固有 API に依存させない

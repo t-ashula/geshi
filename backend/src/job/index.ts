@@ -34,3 +34,5 @@ export type {
 } from "./store.js";
 export { createJobStore } from "./store.js";
 export type { Job, JobEvent, JobStatus } from "./type.js";
+export type { HealthCheckJobPayload } from "./workers/index.js";
+export { createHealthCheckWorker } from "./workers/index.js";
