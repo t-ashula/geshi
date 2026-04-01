@@ -4,19 +4,15 @@ import { HonoAdapter } from "@bull-board/hono";
 import { serveStatic } from "@hono/node-server/serve-static";
 import type { Hono } from "hono";
 
-import {
-  createExportJobQueue,
-  createFunctionalJobQueue,
-  createImportJobQueue,
-  createUpdateJobQueue,
-} from "../job/index.js";
+import { resolveRedisConnection } from "../bullmq/index.js";
+import { createQueueForJobKind } from "../job/runtime/bullmq/index.js";
 
 export function registerDashboardRoute(app: Hono): void {
   const serverAdapter = new HonoAdapter(serveStatic);
-  const exportQueue = createExportJobQueue();
-  const updateQueue = createUpdateJobQueue();
-  const importQueue = createImportJobQueue();
-  const functionalQueue = createFunctionalJobQueue();
+  const connection = resolveRedisConnection();
+  const exportQueue = createQueueForJobKind("export", connection);
+  const updateQueue = createQueueForJobKind("update", connection);
+  const importQueue = createQueueForJobKind("import", connection);
 
   serverAdapter.setBasePath("/admin/queues");
 
@@ -25,7 +21,6 @@ export function registerDashboardRoute(app: Hono): void {
       new BullMQAdapter(exportQueue),
       new BullMQAdapter(updateQueue),
       new BullMQAdapter(importQueue),
-      new BullMQAdapter(functionalQueue),
     ],
     serverAdapter,
   });

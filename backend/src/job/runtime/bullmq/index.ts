@@ -1,16 +1,12 @@
 export {
-  createExportJobQueue,
-  createFunctionalJobQueue,
-  createImportJobQueue,
-  createUpdateJobQueue,
+  createQueueForJobKind,
   EXPORT_JOB_QUEUE_NAME,
-  FUNCTIONAL_JOB_QUEUE_NAME,
   IMPORT_JOB_QUEUE_NAME,
   UPDATE_JOB_QUEUE_NAME,
 } from "./queues.js";
+export { createBullmqRuntime } from "./runtime.js";
 export {
   createExportJobWorker,
-  createFunctionalWorkerPlaceholder,
   createImportJobWorker,
   createNoopImportInstructionHandler,
   createUpdateJobWorker,

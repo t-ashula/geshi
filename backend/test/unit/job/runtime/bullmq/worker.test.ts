@@ -4,6 +4,7 @@ import type {
   FunctionalJobOutput,
   Job,
   JobApi,
+  JobRuntime,
 } from "../../../../../src/job/index.js";
 import {
   runExportJob,
@@ -61,10 +62,10 @@ describe("job runtime bullmq", () => {
         createdAt: "2026-03-31T00:00:00.000Z",
         failureStage: null,
         id: "job-1",
-        kind: "observeChannel",
+        kind: "healthCheck",
         note: null,
         occurredAt: "2026-03-31T00:00:00.000Z",
-        payload: { channelId: "channel-1" },
+        payload: {},
         runAfter: null,
         status: "registered",
       } satisfies Job),
@@ -80,11 +81,11 @@ describe("job runtime bullmq", () => {
       new Date("2026-03-31T01:00:00.000Z"),
     );
 
-    expect(runtimeQueue.add).toHaveBeenCalledWith("observeChannel", {
+    expect(runtimeQueue.add).toHaveBeenCalledWith("healthCheck", {
       context: {
         jobId: "job-1",
       },
-      payload: { channelId: "channel-1" },
+      payload: {},
     });
     expect(api.appendJobEvent).toHaveBeenCalledWith("job-1", {
       occurredAt: "2026-03-31T01:00:00.000Z",
@@ -200,21 +201,14 @@ describe("job runtime bullmq", () => {
   });
 
   it("wrapper sends running and success import", async () => {
-    const updateQueue = {
-      add: vi.fn().mockResolvedValue(undefined),
-    };
-    const importQueue = {
-      add: vi.fn().mockResolvedValue(undefined),
-    };
+    const runtime = {
+      addJob: vi.fn().mockResolvedValue(undefined),
+    } satisfies JobRuntime;
     const realWorker = vi.fn().mockResolvedValue({
       importInstructions: null,
     } satisfies FunctionalJobOutput);
 
-    const wrapped = wrapFunctionalJobWorker(
-      realWorker,
-      updateQueue,
-      importQueue,
-    );
+    const wrapped = wrapFunctionalJobWorker(realWorker, runtime);
 
     await wrapped({
       data: {
@@ -224,39 +218,35 @@ describe("job runtime bullmq", () => {
       id: "runtime-1",
     });
 
-    expect(updateQueue.add).toHaveBeenCalledWith(
-      "update",
-      expect.objectContaining({
+    expect(runtime.addJob).toHaveBeenNthCalledWith(1, {
+      kind: "update",
+      payload: expect.objectContaining({
         jobId: "job-1",
         runtimeJobId: "runtime-1",
         status: "running",
       }),
-    );
-    expect(importQueue.add).toHaveBeenCalledWith("import", {
-      importInstructions: null,
-      result: {
-        failureStage: null,
-        jobId: "job-1",
-        jobStatus: "succeeded",
-        note: null,
+    });
+    expect(runtime.addJob).toHaveBeenNthCalledWith(2, {
+      kind: "import",
+      payload: {
+        importInstructions: null,
+        result: {
+          failureStage: null,
+          jobId: "job-1",
+          jobStatus: "succeeded",
+          note: null,
+        },
       },
     });
   });
 
   it("wrapper sends failed import on exception", async () => {
-    const updateQueue = {
-      add: vi.fn().mockResolvedValue(undefined),
-    };
-    const importQueue = {
-      add: vi.fn().mockResolvedValue(undefined),
-    };
+    const runtime = {
+      addJob: vi.fn().mockResolvedValue(undefined),
+    } satisfies JobRuntime;
     const realWorker = vi.fn().mockRejectedValue(new Error("boom"));
 
-    const wrapped = wrapFunctionalJobWorker(
-      realWorker,
-      updateQueue,
-      importQueue,
-    );
+    const wrapped = wrapFunctionalJobWorker(realWorker, runtime);
 
     await expect(
       wrapped({
@@ -268,13 +258,16 @@ describe("job runtime bullmq", () => {
       }),
     ).rejects.toThrow("boom");
 
-    expect(importQueue.add).toHaveBeenCalledWith("import", {
-      importInstructions: null,
-      result: {
-        failureStage: "runtime",
-        jobId: "job-1",
-        jobStatus: "failed",
-        note: "boom",
+    expect(runtime.addJob).toHaveBeenNthCalledWith(2, {
+      kind: "import",
+      payload: {
+        importInstructions: null,
+        result: {
+          failureStage: "runtime",
+          jobId: "job-1",
+          jobStatus: "failed",
+          note: "boom",
+        },
       },
     });
   });

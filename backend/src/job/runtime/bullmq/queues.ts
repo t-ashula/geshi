@@ -1,38 +1,30 @@
 import { Queue } from "bullmq";
 
-import { resolveRedisConnection } from "../../../bullmq/index.js";
-import type {
-  ExportJobInput,
-  FunctionalJobData,
-  ImportJobInput,
-  UpdateJobInput,
-} from "../type.js";
+import type { RedisConnectionOptions } from "../../../bullmq/index.js";
 
 export const EXPORT_JOB_QUEUE_NAME = "job-export";
 export const UPDATE_JOB_QUEUE_NAME = "job-update";
 export const IMPORT_JOB_QUEUE_NAME = "job-import";
-export const FUNCTIONAL_JOB_QUEUE_NAME = "job-functional";
 
-export function createExportJobQueue(): Queue<ExportJobInput> {
-  return new Queue(EXPORT_JOB_QUEUE_NAME, {
-    connection: resolveRedisConnection(),
-  });
+export function createQueueForJobKind(
+  kind: "export" | "import" | "update",
+  connection: RedisConnectionOptions,
+): Queue<unknown> {
+  switch (kind) {
+    case "export":
+      return createQueue(EXPORT_JOB_QUEUE_NAME, connection);
+    case "import":
+      return createQueue(IMPORT_JOB_QUEUE_NAME, connection);
+    case "update":
+      return createQueue(UPDATE_JOB_QUEUE_NAME, connection);
+  }
 }
 
-export function createFunctionalJobQueue(): Queue<FunctionalJobData> {
-  return new Queue(FUNCTIONAL_JOB_QUEUE_NAME, {
-    connection: resolveRedisConnection(),
-  });
-}
-
-export function createImportJobQueue(): Queue<ImportJobInput> {
-  return new Queue(IMPORT_JOB_QUEUE_NAME, {
-    connection: resolveRedisConnection(),
-  });
-}
-
-export function createUpdateJobQueue(): Queue<UpdateJobInput> {
-  return new Queue(UPDATE_JOB_QUEUE_NAME, {
-    connection: resolveRedisConnection(),
+function createQueue<TData>(
+  name: string,
+  connection: RedisConnectionOptions,
+): Queue<TData> {
+  return new Queue(name, {
+    connection,
   });
 }

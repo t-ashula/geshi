@@ -1,4 +1,5 @@
 import { createUuidV7 } from "./id.js";
+import type { JobRuntime } from "./runtime/type.js";
 import type { JobStore } from "./store.js";
 import type { Job, JobEvent, JobStatus } from "./type.js";
 
@@ -27,7 +28,7 @@ export class JobApiValidationError extends Error {}
 
 export class JobNotFoundError extends Error {}
 
-export function createJobApi(store: JobStore): JobApi {
+export function createJobApi(store: JobStore, runtime: JobRuntime): JobApi {
   return {
     async createJob(request) {
       if (typeof request !== "object" || request === null || Array.isArray(request)) {
@@ -47,13 +48,22 @@ export function createJobApi(store: JobStore): JobApi {
         "runAfter must be an ISO-8601 string.",
       );
 
-      return store.createJob({
+      const job = await store.createJob({
         createdAt: new Date().toISOString(),
         id: createUuidV7(),
         kind: request.kind,
         payload: request.payload,
         runAfter,
       });
+
+      await runtime.addJob({
+        kind: "export",
+        payload: {
+          jobId: job.id,
+        },
+      });
+
+      return job;
     },
 
     async getJob(jobId) {

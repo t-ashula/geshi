@@ -1,26 +1,29 @@
 import type { Hono } from "hono";
 
-import { getPool } from "../db/index.js";
-import type { JobApi } from "../job/index.js";
+import { resolveRedisConnection } from "../bullmq/index.js";
 import {
-  createExportJobQueue,
-  createJobApi as createStoreBackedJobApi,
+  createJobApi,
+  createJobRuntime,
   createJobStore,
   JobApiValidationError,
   JobNotFoundError,
-  registerJob,
 } from "../job/index.js";
 
 export function registerJobRoutes(app: Hono): void {
-  app.post("/jobs", async (context) => {
-    const queue = createExportJobQueue();
+  const redisConnection = resolveRedisConnection();
+  const jobApi = createJobApi(
+    createJobStore({ kind: "pg" }),
+    createJobRuntime({
+      kind: "bullmq",
+      options: {
+        connection: redisConnection,
+      },
+    }),
+  );
 
+  app.post("/jobs", async (context) => {
     try {
-      const job = await registerJob(
-        createRouteJobApi(),
-        queue,
-        await context.req.json(),
-      );
+      const job = await jobApi.createJob(await context.req.json());
 
       return context.json(job, 201);
     } catch (error) {
@@ -29,14 +32,12 @@ export function registerJobRoutes(app: Hono): void {
       }
 
       throw error;
-    } finally {
-      await queue.close();
     }
   });
 
   app.get("/jobs/:jobId", async (context) => {
     try {
-      const job = await createRouteJobApi().getJob(context.req.param("jobId"));
+      const job = await jobApi.getJob(context.req.param("jobId"));
 
       return context.json(job);
     } catch (error) {
@@ -49,14 +50,14 @@ export function registerJobRoutes(app: Hono): void {
   });
 
   app.get("/jobs", async (context) => {
-    const jobs = await createRouteJobApi().listJobs();
+    const jobs = await jobApi.listJobs();
 
     return context.json({ jobs });
   });
 
   app.post("/jobs/:jobId/events", async (context) => {
     try {
-      const event = await createRouteJobApi().appendJobEvent(
+      const event = await jobApi.appendJobEvent(
         context.req.param("jobId"),
         await context.req.json(),
       );
@@ -74,8 +75,4 @@ export function registerJobRoutes(app: Hono): void {
       throw error;
     }
   });
-}
-
-function createRouteJobApi(): JobApi {
-  return createStoreBackedJobApi(createJobStore(getPool()));
 }
