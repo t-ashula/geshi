@@ -38,7 +38,7 @@
   "dependencies": {
     "@bull-board/api": "^6.20.6",
     "@bull-board/hono": "^6.20.6",
-    "@hono/node-server": "^1.19.5",
+    "@hono/node-server": "^1.19.12",
     "bullmq": "^5.71.1",
     "hono": "^4.9.7",
     "pg": "^8.20.0",
