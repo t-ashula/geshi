@@ -36,7 +36,7 @@
     "lint:fix": "npm run -s lint -- --fix"
   },
   "dependencies": {
-    "@bull-board/api": "^6.20.6",
+    "@bull-board/api": "^6.21.0",
     "@bull-board/hono": "^6.20.6",
     "@hono/node-server": "^1.19.13",
     "bullmq": "^5.73.3",
