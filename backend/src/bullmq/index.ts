@@ -6,4 +6,5 @@ export {
   resolveRedisConnection,
   resolveTestRedisConnection,
   TEST_REDIS_DEFAULT_DB,
+  TEST_REDIS_DEFAULT_PORT,
 } from "./config.js";

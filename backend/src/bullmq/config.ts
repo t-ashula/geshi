@@ -2,6 +2,7 @@ export const REDIS_DEFAULT_HOST = "127.0.0.1";
 export const REDIS_DEFAULT_PORT = 6379;
 export const REDIS_DEFAULT_DB = 0;
 export const TEST_REDIS_DEFAULT_DB = 15;
+export const TEST_REDIS_DEFAULT_PORT = 16379;
 
 export type RedisConnectionOptions = {
   db: number;
@@ -13,7 +14,7 @@ export function resolveRedisConnection(): RedisConnectionOptions {
   return {
     db: parseDb(process.env.REDIS_DB, REDIS_DEFAULT_DB, "REDIS_DB"),
     host: process.env.REDIS_HOST ?? REDIS_DEFAULT_HOST,
-    port: parsePort(process.env.REDIS_PORT),
+    port: parsePort(process.env.REDIS_PORT, REDIS_DEFAULT_PORT),
   };
 }
 
@@ -25,7 +26,10 @@ export function resolveTestRedisConnection(): RedisConnectionOptions {
       "TEST_REDIS_DB",
     ),
     host: process.env.TEST_REDIS_HOST ?? process.env.REDIS_HOST ?? REDIS_DEFAULT_HOST,
-    port: parsePort(process.env.TEST_REDIS_PORT ?? process.env.REDIS_PORT),
+    port: parsePort(
+      process.env.TEST_REDIS_PORT ?? process.env.REDIS_PORT,
+      TEST_REDIS_DEFAULT_PORT,
+    ),
   };
 }
 
@@ -47,9 +51,9 @@ function parseDb(
   return db;
 }
 
-function parsePort(value: string | undefined): number {
+function parsePort(value: string | undefined, fallback: number): number {
   if (value === undefined) {
-    return REDIS_DEFAULT_PORT;
+    return fallback;
   }
 
   const port = Number.parseInt(value, 10);

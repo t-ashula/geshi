@@ -1,6 +1,7 @@
-import type { PoolClient } from "pg";
+import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 
+import type { GeshiDatabase } from "../db/types.js";
 import { createUuidV7 } from "./id.js";
 import type { Job, JobEvent, JobStatus } from "./type.js";
 
@@ -63,16 +64,15 @@ type DbJobWithStateRow = DbJobRow & {
 
 let defaultJobStore: JobStore | null = null;
 
+type QueryExecutor = Kysely<GeshiDatabase>;
+
 class PgJobStore implements JobStore {
-  public constructor(private readonly pool: Pool) {}
+  public constructor(private readonly db: Kysely<GeshiDatabase>) {}
 
   public async createJob(input: CreateJobInput): Promise<Job> {
-    const client = await this.pool.connect();
-
-    try {
-      await client.query("begin");
-      const job = await this.insertJob(client, input);
-      const event = await this.insertJobEvent(client, {
+    return this.db.transaction().execute(async (trx) => {
+      const job = await this.insertJob(trx, input);
+      const event = await this.insertJobEvent(trx, {
         failureStage: null,
         jobId: input.id,
         note: null,
@@ -80,84 +80,19 @@ class PgJobStore implements JobStore {
         runtimeJobId: null,
         status: "registered",
       });
-      await client.query("commit");
 
       return withCurrentState(job, event);
-    } catch (error) {
-      await client.query("rollback");
-      throw error;
-    } finally {
-      client.release();
-    }
+    });
   }
 
   public async appendJobEvent(input: AppendJobEventInput): Promise<JobEvent> {
-    const result = await this.pool.query<DbJobEventRow>(
-      `
-        insert into job_events (
-          id,
-          job_id,
-          runtime_job_id,
-          occurred_at,
-          status,
-          failure_stage,
-          note
-        )
-        values ($1, $2, $3, $4, $5, $6, $7)
-        returning
-          id,
-          job_id,
-          runtime_job_id,
-          occurred_at,
-          status,
-          failure_stage,
-          note
-      `,
-      [
-        createUuidV7(),
-        input.jobId,
-        input.runtimeJobId,
-        input.occurredAt,
-        input.status,
-        input.failureStage,
-        input.note,
-      ],
-    );
-
-    return toJobEvent(result.rows[0]);
+    return this.insertJobEvent(this.db, input);
   }
 
   public async getJob(jobId: string): Promise<Job | null> {
-    const result = await this.pool.query<DbJobWithStateRow>(
-      `
-        select
-          jobs.id,
-          jobs.kind,
-          jobs.payload,
-          jobs.created_at,
-          jobs.run_after,
-          latest.status as current_status,
-          latest.failure_stage as current_failure_stage,
-          latest.occurred_at as current_occurred_at,
-          latest.note as current_note
-        from jobs
-        left join lateral (
-          select
-            status,
-            failure_stage,
-            occurred_at,
-            note
-          from job_events
-          where job_events.job_id = jobs.id
-          order by occurred_at desc, id desc
-          limit 1
-        ) latest on true
-        where jobs.id = $1
-      `,
-      [jobId],
-    );
-
-    const row = result.rows[0];
+    const row = await this.selectJobsWithCurrentState()
+      .where("jobs.id", "=", jobId)
+      .executeTakeFirst();
 
     if (row === undefined) {
       return null;
@@ -167,101 +102,94 @@ class PgJobStore implements JobStore {
   }
 
   public async listJobs(): Promise<Job[]> {
-    const result = await this.pool.query<DbJobWithStateRow>(
-      `
-        select
-          jobs.id,
-          jobs.kind,
-          jobs.payload,
-          jobs.created_at,
-          jobs.run_after,
-          latest.status as current_status,
-          latest.failure_stage as current_failure_stage,
-          latest.occurred_at as current_occurred_at,
-          latest.note as current_note
-        from jobs
-        left join lateral (
-          select
-            status,
-            failure_stage,
-            occurred_at,
-            note
-          from job_events
-          where job_events.job_id = jobs.id
-          order by occurred_at desc, id desc
-          limit 1
-        ) latest on true
-        order by jobs.created_at desc, jobs.id desc
-      `,
-    );
+    const result = await this.selectJobsWithCurrentState()
+      .orderBy("jobs.created_at", "desc")
+      .orderBy("jobs.id", "desc")
+      .execute();
 
-    return result.rows.map((row) => toJobWithCurrentState(row));
+    return result.map((row) => toJobWithCurrentState(row));
   }
 
   private async insertJob(
-    client: PoolClient,
+    executor: QueryExecutor,
     input: CreateJobInput,
   ): Promise<Job> {
-    const result = await client.query<DbJobRow>(
-      `
-        insert into jobs (
-          id,
-          kind,
-          payload,
-          created_at,
-          run_after
-        )
-        values ($1, $2, $3, $4, $5)
-        returning
-          id,
-          kind,
-          payload,
-          created_at,
-          run_after
-      `,
-      [input.id, input.kind, input.payload, input.createdAt, input.runAfter],
-    );
+    const result = await executor
+      .insertInto("jobs")
+      .values({
+        created_at: input.createdAt,
+        id: input.id,
+        kind: input.kind,
+        payload: input.payload,
+        run_after: input.runAfter,
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
 
-    return toJob(result.rows[0]);
+    return toJob(result);
   }
 
   private async insertJobEvent(
-    client: PoolClient,
+    executor: QueryExecutor,
     input: AppendJobEventInput,
   ): Promise<JobEvent> {
-    const result = await client.query<DbJobEventRow>(
-      `
-        insert into job_events (
-          id,
-          job_id,
-          runtime_job_id,
-          occurred_at,
-          status,
-          failure_stage,
-          note
-        )
-        values ($1, $2, $3, $4, $5, $6, $7)
-        returning
-          id,
-          job_id,
-          runtime_job_id,
-          occurred_at,
-          status,
-          failure_stage,
-          note
-      `,
-      [
-        createUuidV7(),
-        input.jobId,
-        input.runtimeJobId,
-        input.occurredAt,
-        input.status,
-        input.failureStage,
-        input.note,
-      ],
-    );
+    const result = await executor
+      .insertInto("job_events")
+      .values({
+        failure_stage: input.failureStage,
+        id: createUuidV7(),
+        job_id: input.jobId,
+        note: input.note,
+        occurred_at: input.occurredAt,
+        runtime_job_id: input.runtimeJobId,
+        status: input.status,
+      })
+      .returningAll()
+      .executeTakeFirstOrThrow();
 
-    return toJobEvent(result.rows[0]);
+    return toJobEvent(result);
+  }
+
+  private selectJobsWithCurrentState() {
+    return this.db.selectFrom("jobs").select((eb) => [
+      "jobs.id",
+      "jobs.kind",
+      "jobs.payload",
+      "jobs.created_at",
+      "jobs.run_after",
+      eb
+        .selectFrom("job_events")
+        .select("job_events.status")
+        .whereRef("job_events.job_id", "=", "jobs.id")
+        .orderBy("job_events.occurred_at", "desc")
+        .orderBy("job_events.id", "desc")
+        .limit(1)
+        .as("current_status"),
+      eb
+        .selectFrom("job_events")
+        .select("job_events.failure_stage")
+        .whereRef("job_events.job_id", "=", "jobs.id")
+        .orderBy("job_events.occurred_at", "desc")
+        .orderBy("job_events.id", "desc")
+        .limit(1)
+        .as("current_failure_stage"),
+      eb
+        .selectFrom("job_events")
+        .select("job_events.occurred_at")
+        .whereRef("job_events.job_id", "=", "jobs.id")
+        .orderBy("job_events.occurred_at", "desc")
+        .orderBy("job_events.id", "desc")
+        .limit(1)
+        .as("current_occurred_at"),
+      eb
+        .selectFrom("job_events")
+        .select("job_events.note")
+        .whereRef("job_events.job_id", "=", "jobs.id")
+        .orderBy("job_events.occurred_at", "desc")
+        .orderBy("job_events.id", "desc")
+        .limit(1)
+        .as("current_note"),
+    ]);
   }
 }
 
@@ -277,24 +205,30 @@ export function createJobStore(input: CreateJobStoreInput): JobStore {
       return defaultJobStore;
     }
 
-    defaultJobStore = new PgJobStore(createPgPool({}));
+    defaultJobStore = new PgJobStore(createPgDatabase({}));
 
     return defaultJobStore;
   }
 
-  return new PgJobStore(createPgPool(options));
+  return new PgJobStore(createPgDatabase(options));
 }
 
-function createPgPool(options: {
+function createPgDatabase(options: {
   databaseUrl?: string;
   searchPath?: string;
-}): Pool {
-  return new Pool({
+}): Kysely<GeshiDatabase> {
+  const pool = new Pool({
     connectionString: resolveDatabaseUrl(options.databaseUrl),
     options:
       options.searchPath === undefined
         ? undefined
         : `-c search_path=${options.searchPath}`,
+  });
+
+  return new Kysely<GeshiDatabase>({
+    dialect: new PostgresDialect({
+      pool,
+    }),
   });
 }
 

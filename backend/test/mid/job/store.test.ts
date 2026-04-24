@@ -1,13 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 
-import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createJobStore } from "../../../src/job/index.js";
+import type { TestJobDatabase } from "./test-database.js";
+import { createTestJobDatabase } from "./test-database.js";
 
-const DEFAULT_TEST_DATABASE_URL = "postgres://geshi:geshi@127.0.0.1:5432/geshi";
-const SCHEMA_SQL_PATH = new URL("../../../db/schema.sql", import.meta.url);
+const DEFAULT_TEST_DATABASE_URL = "postgres://geshi:geshi@127.0.0.1:15432/geshi";
 
 describe("PgJobStore (mid)", () => {
   const schemaName = `mid_${randomUUID().replaceAll("-", "_")}`;
@@ -16,39 +15,22 @@ describe("PgJobStore (mid)", () => {
     process.env.DATABASE_URL ??
     DEFAULT_TEST_DATABASE_URL;
 
-  let adminPool: Pool | null = null;
-  let storePool: Pool | null = null;
+  let testDatabase: TestJobDatabase | null = null;
 
   beforeAll(async () => {
-    adminPool = new Pool({
-      connectionString: baseDatabaseUrl,
+    testDatabase = await createTestJobDatabase({
+      databaseUrl: baseDatabaseUrl,
+      schemaName,
     });
-
-    await adminPool.query(`create schema "${schemaName}"`);
-
-    storePool = new Pool({
-      connectionString: baseDatabaseUrl,
-      options: `-c search_path=${schemaName}`,
-    });
-
-    const schemaSql = await readFile(SCHEMA_SQL_PATH, "utf8");
-    await storePool.query(schemaSql);
   });
 
   beforeEach(async () => {
-    await storePool!.query(
-      "truncate table job_events, jobs restart identity cascade",
-    );
+    await testDatabase!.reset();
   });
 
   afterAll(async () => {
-    if (storePool !== null) {
-      await storePool.end();
-    }
-
-    if (adminPool !== null) {
-      await adminPool.query(`drop schema if exists "${schemaName}" cascade`);
-      await adminPool.end();
+    if (testDatabase !== null) {
+      await testDatabase.destroy();
     }
   });
 

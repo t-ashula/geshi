@@ -3,7 +3,6 @@ import { appendFileSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
 import { Queue, Worker } from "bullmq";
-import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { resolveTestRedisConnection } from "../../../src/bullmq/index.js";
@@ -24,9 +23,10 @@ import {
   UPDATE_JOB_QUEUE_NAME,
 } from "../../../src/job/runtime/bullmq/index.js";
 import type { Logger } from "../../../src/logger/index.js";
+import type { TestJobDatabase } from "./test-database.js";
+import { createTestJobDatabase } from "./test-database.js";
 
-const DEFAULT_TEST_DATABASE_URL = "postgres://geshi:geshi@127.0.0.1:5432/geshi";
-const SCHEMA_SQL_PATH = new URL("../../../db/schema.sql", import.meta.url);
+const DEFAULT_TEST_DATABASE_URL = "postgres://geshi:geshi@127.0.0.1:15432/geshi";
 const HEALTH_CHECK_QUEUE_NAME = "job-health-check";
 
 describe("HealthCheck job flow (mid)", () => {
@@ -39,8 +39,7 @@ describe("HealthCheck job flow (mid)", () => {
     DEFAULT_TEST_DATABASE_URL;
   const redisConnection = resolveTestRedisConnection();
 
-  let adminPool: Pool | null = null;
-  let storePool: Pool | null = null;
+  let testDatabase: TestJobDatabase | null = null;
   let exportQueue: Queue<{ jobId: string }> | null = null;
   let updateQueue: Queue<unknown> | null = null;
   let importQueue: Queue<unknown> | null = null;
@@ -53,19 +52,10 @@ describe("HealthCheck job flow (mid)", () => {
   beforeAll(async () => {
     process.stdout.write(`HealthCheck flow log file: ${logFilePath}\n`);
 
-    adminPool = new Pool({
-      connectionString: baseDatabaseUrl,
+    testDatabase = await createTestJobDatabase({
+      databaseUrl: baseDatabaseUrl,
+      schemaName,
     });
-
-    await adminPool.query(`create schema "${schemaName}"`);
-
-    storePool = new Pool({
-      connectionString: baseDatabaseUrl,
-      options: `-c search_path=${schemaName}`,
-    });
-
-    const schemaSql = await readFile(SCHEMA_SQL_PATH, "utf8");
-    await storePool.query(schemaSql);
 
     exportQueue = new Queue(EXPORT_JOB_QUEUE_NAME, {
       connection: redisConnection,
@@ -130,7 +120,7 @@ describe("HealthCheck job flow (mid)", () => {
 
   beforeEach(async () => {
     writeFileSync(logFilePath, "");
-    await storePool!.query("truncate table job_events, jobs cascade");
+    await testDatabase!.reset();
     await exportQueue!.drain(true);
     await updateQueue!.drain(true);
     await importQueue!.drain(true);
@@ -159,13 +149,8 @@ describe("HealthCheck job flow (mid)", () => {
       healthCheckQueue?.close(),
     ]);
 
-    if (storePool !== null) {
-      await storePool.end();
-    }
-
-    if (adminPool !== null) {
-      await adminPool.query(`drop schema if exists "${schemaName}" cascade`);
-      await adminPool.end();
+    if (testDatabase !== null) {
+      await testDatabase.destroy();
     }
   });
 
@@ -206,29 +191,17 @@ describe("HealthCheck job flow (mid)", () => {
     expect(terminalJob?.status).toBe("succeeded");
     expect(terminalJob?.note).toBe("HealthCheck completed");
 
-    const events = await storePool!.query<{
-      status: string;
-      runtime_job_id: string | null;
-      note: string | null;
-    }>(
-      `
-        select status, runtime_job_id, note
-        from job_events
-        where job_id = $1
-        order by occurred_at asc, id asc
-      `,
-      [job.id],
-    );
+    const events = await testDatabase!.listJobEvents(job.id);
 
-    expect(events.rows.map((row) => row.status)).toEqual([
+    expect(events.map((row) => row.status)).toEqual([
       "registered",
       "queued",
       "running",
       "importing",
       "succeeded",
     ]);
-    expect(events.rows[1]?.runtime_job_id).toBeTruthy();
-    expect(events.rows[4]?.note).toBe("HealthCheck completed");
+    expect(events[1]?.runtime_job_id).toBeTruthy();
+    expect(events[4]?.note).toBe("HealthCheck completed");
 
     const logFile = await readFile(logFilePath, "utf8");
 

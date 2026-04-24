@@ -127,8 +127,8 @@ npm run test:mid:back
 
 `test:mid:back` は実 PostgreSQL / Redis に接続する．
 接続先は `TEST_DATABASE_URL` を優先し，未指定時は
-`postgres://geshi:geshi@127.0.0.1:5432/geshi` を使う．
-Redis 側は `TEST_REDIS_DB` を優先し，未指定時は `15` を使う．
+`postgres://geshi:geshi@127.0.0.1:15432/geshi` を使う．
+Redis 側は `TEST_REDIS_DB` を優先し，未指定時は DB `15`，port `16379` を使う．
 
 test 用 schema は一時 schema として作成し，
 `backend/db/schema.sql` を流し込んで初期化する．
