@@ -5,3 +5,4 @@
 - [ADR-0002: 開発項目駆動の開発フローを採用する](./0002-development-flow.md)
 - [ADR-0003: 全体アーキテクチャ](./0003-system-architecture.md)
 - [ADR-0004: 開発環境の初期設定を標準化する](./0004-development-environment.md)
+- [ADR-0005: データモデルを主体テーブルと履歴テーブルで構成する](./0005-data-model.md)
