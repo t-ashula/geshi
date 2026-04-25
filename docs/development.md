@@ -9,6 +9,14 @@
 - `docker`
 - `docker compose`
 
+### 採用する基盤
+
+- `nodejs 24`
+  - `TypeScript`
+  - `ESLint`
+  - `Prettier`
+  - `Vitest`
+
 ### 初期設定
 
 1. リポジトリを取得する
@@ -20,9 +28,9 @@
 
 2. コミットテンプレートを設定する
 
-    ```sh
-    git config commit.template .commit-template.txt
-    ```
+   ```sh
+   git config commit.template .commit-template.txt
+   ```
 
 3. 必要なツールバージョンを揃える
    - 使用する言語ランタイムや主要 CLI ツールは `.tool-versions` に従う
