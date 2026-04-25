@@ -1,6 +1,6 @@
 # geshi
 
-a pluggable streaming archiver and viewer
+a pluggable personal media archive for podcasts, streams, and feeds
 
 ## development
 
