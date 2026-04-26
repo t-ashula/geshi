@@ -54,6 +54,7 @@
 - 開発者固有の値は `.env.local` に閉じる
 - セットアップ，起動，Lint，テストの入口はリポジトリルートから辿れるようにする
 - 個別ディレクトリに散らばった独自コマンドだけに依存しない
+- schema migration と data migration の手順は [Migration](./migration.md) に従う
 
 ## commit
 

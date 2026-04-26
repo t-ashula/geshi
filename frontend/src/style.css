@@ -140,6 +140,12 @@ h1 {
   border: 1px solid #e7d8be;
 }
 
+.source-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 .source-card-header {
   display: flex;
   align-items: baseline;
@@ -165,6 +171,66 @@ h1 {
 .source-card a {
   color: #83461d;
   text-decoration: none;
+}
+
+.subpanel {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e1cfb2;
+}
+
+.subpanel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.subpanel h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.job-card,
+.content-card {
+  padding: 16px;
+  border-radius: 18px;
+  background: #fffdf8;
+  border: 1px solid #e7d8be;
+}
+
+.job-card {
+  margin-top: 16px;
+}
+
+.content-list {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 16px 0 0;
+  list-style: none;
+}
+
+.content-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.content-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.meta {
+  margin: 0;
+  color: #6a543e;
+  font-size: 0.9rem;
+}
+
+.failure-message {
+  color: #7c1f1f;
 }
 
 .feedback {

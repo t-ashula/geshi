@@ -1,7 +1,10 @@
 import { v7 as uuidv7 } from "uuid";
 
 import type { SourceListItem } from "../db/source-repository.js";
-import type { SourceRepository } from "../db/source-repository.js";
+import type {
+  ObserveSourceTarget,
+  SourceRepository,
+} from "../db/source-repository.js";
 import { createUrlHash } from "../lib/url-hash.js";
 
 export type CreateSourceRequest = {
@@ -30,9 +33,12 @@ export class SourceService {
     const slug = createSlug(normalizedUrl, request.title);
 
     return this.sourceRepository.createSource({
+      collectorSettingId: uuidv7(),
+      collectorSettingSnapshotId: uuidv7(),
       description: normalizeOptionalString(request.description),
       id: uuidv7(),
       kind: "podcast",
+      pluginSlug: "podcast-rss",
       slug,
       snapshotId: uuidv7(),
       title: normalizeOptionalString(request.title),
@@ -43,6 +49,12 @@ export class SourceService {
 
   public async listSources(): Promise<SourceListItem[]> {
     return this.sourceRepository.listSources();
+  }
+
+  public async findObserveSourceTarget(
+    sourceId: string,
+  ): Promise<ObserveSourceTarget | null> {
+    return this.sourceRepository.findObserveSourceTarget(sourceId);
   }
 }
 

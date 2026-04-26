@@ -24,9 +24,12 @@ describe("SourceRepository", () => {
 
   it("creates a source with its initial snapshot", async () => {
     const createdSource = await repository.createSource({
+      collectorSettingId: uuidv7(),
+      collectorSettingSnapshotId: uuidv7(),
       description: "Weekly notes",
       id: uuidv7(),
       kind: "podcast",
+      pluginSlug: "podcast-rss",
       slug: "example-podcast",
       snapshotId: uuidv7(),
       title: "Example Podcast",
@@ -44,9 +47,12 @@ describe("SourceRepository", () => {
     const sourceId = uuidv7();
 
     await repository.createSource({
+      collectorSettingId: uuidv7(),
+      collectorSettingSnapshotId: uuidv7(),
       description: "First description",
       id: sourceId,
       kind: "podcast",
+      pluginSlug: "podcast-rss",
       slug: "latest-podcast",
       snapshotId: uuidv7(),
       title: "First title",
@@ -87,8 +93,11 @@ describe("SourceRepository", () => {
 
   it("rejects duplicate url hashes", async () => {
     await repository.createSource({
+      collectorSettingId: uuidv7(),
+      collectorSettingSnapshotId: uuidv7(),
       id: uuidv7(),
       kind: "podcast",
+      pluginSlug: "podcast-rss",
       slug: "duplicate-one",
       snapshotId: uuidv7(),
       url: "https://example.com/duplicate-one.xml",
@@ -97,8 +106,11 @@ describe("SourceRepository", () => {
 
     await expect(
       repository.createSource({
+        collectorSettingId: uuidv7(),
+        collectorSettingSnapshotId: uuidv7(),
         id: uuidv7(),
         kind: "podcast",
+        pluginSlug: "podcast-rss",
         slug: "duplicate-two",
         snapshotId: uuidv7(),
         url: "https://example.com/duplicate-two.xml",

@@ -84,7 +84,7 @@
 ### 取得元
 
 - plugin が読む取得先は `source.url` とする
-- backend は `source.url` を `rssUrl` として plugin へ渡す
+- backend は `source.url` を `sourceUrl` として plugin へ渡す
 - plugin 固有の追加設定が必要な場合は `collectorSettingSnapshot.config` を使う
 
 ### `observe`
