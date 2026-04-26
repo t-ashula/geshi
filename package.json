@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "backend:start": "node --import tsx backend/src/index.ts",
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -23,11 +24,14 @@
     "globals": "^17.5.0",
     "pg-mem": "^3.0.14",
     "prettier": "^3.8.3",
+    "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0",
     "vitest": "^4.1.5"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.0",
+    "hono": "^4.12.15",
     "kysely": "^0.28.16",
     "pg": "^8.20.0",
     "uuid": "^14.0.0"
