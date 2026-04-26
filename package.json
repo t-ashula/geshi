@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "backend:start": "node --import tsx backend/src/index.ts",
+    "frontend:dev": "vite --config frontend/vite.config.ts",
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && vue-tsc --noEmit -p frontend/tsconfig.json"
   },
   "engines": {
     "node": ">=24 <25"
@@ -17,23 +18,29 @@
   "devDependencies": {
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
+    "@vitejs/plugin-vue": "^6.0.6",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-simple-import-sort": "^13.0.0",
     "eslint-plugin-unicorn": "^64.0.0",
+    "eslint-plugin-vue": "^10.9.0",
     "globals": "^17.5.0",
     "pg-mem": "^3.0.14",
     "prettier": "^3.8.3",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0",
-    "vitest": "^4.1.5"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.5",
+    "vue-eslint-parser": "^10.4.0",
+    "vue-tsc": "^3.2.7"
   },
   "dependencies": {
     "@hono/node-server": "^2.0.0",
     "hono": "^4.12.15",
     "kysely": "^0.28.16",
     "pg": "^8.20.0",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.0",
+    "vue": "^3.5.33"
   }
 }

@@ -8,15 +8,13 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "types": ["node", "vitest/globals"]
+    "types": ["vite/client", "vitest/globals"]
   },
   "include": [
-    "backend/src/**/*.ts",
-    "backend/test/**/*.ts",
-    "frontend/src/**/*.d.ts",
-    "frontend/src/**/*.ts",
-    "frontend/test/**/*.ts",
-    "frontend/vite.config.ts",
-    "vitest.config.ts"
+    "src/**/*.d.ts",
+    "src/**/*.ts",
+    "src/**/*.vue",
+    "test/**/*.ts",
+    "vite.config.ts"
   ]
 }
