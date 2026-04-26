@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [vue()],
+  root: import.meta.dirname,
   server: {
     proxy: {
       "/api": {
