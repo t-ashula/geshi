@@ -1,11 +1,19 @@
+import eslintConfigPrettier from "eslint-config-prettier";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
+import vue from "eslint-plugin-vue";
 import tseslint from "typescript-eslint";
 import unicorn from "eslint-plugin-unicorn";
-import eslintConfigPrettier from "eslint-config-prettier";
+import vueParser from "vue-eslint-parser";
 
 const typedConfigs = tseslint.configs.recommendedTypeChecked.map((config) => ({
   ...config,
-  files: ["src/**/*.ts", "test/**/*.ts"],
+  files: [
+    "backend/src/**/*.ts",
+    "backend/test/**/*.ts",
+    "frontend/src/**/*.ts",
+    "frontend/test/**/*.ts",
+    "frontend/vite.config.ts",
+  ],
 }));
 
 export default tseslint.config(
@@ -13,7 +21,13 @@ export default tseslint.config(
     ignores: ["coverage/**", "dist/**", "node_modules/**", "tmp/**"],
   },
   {
-    files: ["src/**/*.ts", "test/**/*.ts"],
+    files: [
+      "backend/src/**/*.ts",
+      "backend/test/**/*.ts",
+      "frontend/src/**/*.ts",
+      "frontend/test/**/*.ts",
+      "frontend/vite.config.ts",
+    ],
     plugins: {
       "@typescript-eslint": tseslint.plugin,
       unicorn,
@@ -50,7 +64,32 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/**/*.ts", "test/**/*.ts"],
+    files: ["frontend/src/**/*.vue"],
+    plugins: {
+      vue,
+    },
+    languageOptions: {
+      parser: vueParser,
+      parserOptions: {
+        extraFileExtensions: [".vue"],
+        parser: tseslint.parser,
+        project: "./frontend/tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "vue/html-self-closing": "error",
+      "vue/multi-word-component-names": "off",
+    },
+  },
+  {
+    files: [
+      "backend/src/**/*.ts",
+      "backend/test/**/*.ts",
+      "frontend/src/**/*.ts",
+      "frontend/test/**/*.ts",
+      "frontend/vite.config.ts",
+    ],
     plugins: {
       unicorn,
     },
