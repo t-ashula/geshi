@@ -62,6 +62,21 @@ source から収集される個別の内容単位を表す．
   - `failed`
 - `createdAt`
 
+### collectorSetting
+
+source をどう収集するかを表す．
+
+例:
+
+- podcast RSS をどう巡回するか
+
+主な属性:
+
+- `id`
+- `sourceId`
+- `pluginSlug`
+- `createdAt`
+
 ### asset
 
 content にひもづく実ファイルや派生ファイルを表す．
@@ -129,6 +144,24 @@ source の可変属性のある時点の状態を表す．
 - `version` は `sourceId` ごとの版番号とする
 - どの値がいつ有効だったかを追えるようにする
 
+### collectorSettingSnapshot
+
+collectorSetting の可変属性のある時点の状態を表す．
+
+主な属性:
+
+- `id`
+- `collectorSettingId`
+- `version`
+- `enabled`
+- `config`
+- `recordedAt`
+
+補足:
+
+- `version` は `collectorSettingId` ごとの版番号とする
+- plugin 固有 option や運用状態のようなクロール実行設定を履歴として追えるようにする
+
 ### contentSnapshot
 
 content の可変属性のある時点の状態を表す．
@@ -145,9 +178,11 @@ content の可変属性のある時点の状態を表す．
 ## 関連
 
 - 1 `source` : N `content`
+- 1 `source` : N `collectorSetting`
 - 1 `content` : N `asset`
 - 1 `asset` : N `transcript`
 - 1 `source` : N `sourceSnapshot`
+- 1 `collectorSetting` : N `collectorSettingSnapshot`
 - 1 `content` : N `contentSnapshot`
 
 ## 設計上の原則
@@ -157,6 +192,14 @@ content の可変属性のある時点の状態を表す．
 - source は購読・巡回・再収集の単位とする
 - source 自体は閲覧単位ではなく，content を生む上位単位とする
 - source の固定属性は主体テーブルに置く
+
+### collectorSetting は収集方法
+
+- collectorSetting は source をどう収集するかを表す
+- pluginSlug のような収集方式の識別は source ではなく collectorSetting 側へ寄せる
+- source の識別と，収集方式の識別を分ける
+- crawl するしないのような運用状態を含む収集設定の変更履歴は collectorSettingSnapshot 側に持つ
+- plugin 固有の追加設定は collectorSettingSnapshot.config に入れる
 
 ### content は閲覧と検索の中心
 
@@ -172,10 +215,11 @@ content の可変属性のある時点の状態を表す．
 
 ### 可変属性は履歴テーブルに保持する
 
-- `source` や `content` の履歴が必要な属性は snapshot 側に持つ
+- `source`，`collectorSetting`，`content` の履歴が必要な属性は snapshot 側に持つ
 - 現在値だけを主体テーブルへ上書きしない
 - `updatedAt` で履歴要件を代替しない
-- URL のように source の固定属性として扱うものは snapshot に持たない
+- source の canonical な取得先 URL は source に持つ
+- plugin 入力に使う `rssUrl` のような値は，worker が source と collectorSettingSnapshot から組み立てる
 
 ### transcript は後付け可能にする
 

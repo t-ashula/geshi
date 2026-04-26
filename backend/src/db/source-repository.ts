@@ -1,20 +1,36 @@
 import type { Insertable, Kysely, Selectable } from "kysely";
 
 import type {
+  CollectorSettingSnapshotTable,
+  CollectorSettingTable,
   GeshiDatabase,
   SourceSnapshotTable,
   SourceTable,
 } from "./types.js";
 
 export type CreateSourceInput = {
+  collectorSettingId: string;
+  collectorSettingSnapshotId: string;
   description?: string | null;
   id: string;
   kind: "podcast";
+  pluginSlug: string;
   slug: string;
   snapshotId: string;
   title?: string | null;
   url: string;
   urlHash: string;
+};
+
+export type ObserveSourceTarget = {
+  collectorSettingId: string;
+  collectorSettingSnapshotId: string;
+  config: Record<string, unknown>;
+  pluginSlug: string;
+  slug: string;
+  sourceId: string;
+  sourceKind: "podcast";
+  url: string;
 };
 
 export type SourceListItem = {
@@ -51,6 +67,16 @@ export class SourceRepository {
         await transaction
           .insertInto("source_snapshots")
           .values(toSourceSnapshotInsert(input))
+          .executeTakeFirstOrThrow();
+
+        await transaction
+          .insertInto("collector_settings")
+          .values(toCollectorSettingInsert(input))
+          .executeTakeFirstOrThrow();
+
+        await transaction
+          .insertInto("collector_setting_snapshots")
+          .values(toCollectorSettingSnapshotInsert(input))
           .executeTakeFirstOrThrow();
 
         const source = await transaction
@@ -104,6 +130,51 @@ export class SourceRepository {
       toSourceListItem(source, latestSnapshotBySourceId.get(source.id) ?? null),
     );
   }
+
+  public async findObserveSourceTarget(
+    sourceId: string,
+  ): Promise<ObserveSourceTarget | null> {
+    const source = await this.database
+      .selectFrom("sources")
+      .selectAll()
+      .where("id", "=", sourceId)
+      .executeTakeFirst();
+
+    if (source === undefined) {
+      return null;
+    }
+
+    const collectorSetting = await this.database
+      .selectFrom("collector_settings")
+      .selectAll()
+      .where("source_id", "=", sourceId)
+      .orderBy("created_at asc")
+      .executeTakeFirst();
+
+    if (collectorSetting === undefined) {
+      return null;
+    }
+
+    const collectorSettingSnapshot = await this.database
+      .selectFrom("collector_setting_snapshots")
+      .selectAll()
+      .where("collector_setting_id", "=", collectorSetting.id)
+      .orderBy("version desc")
+      .executeTakeFirst();
+
+    if (
+      collectorSettingSnapshot === undefined ||
+      !collectorSettingSnapshot.enabled
+    ) {
+      return null;
+    }
+
+    return toObserveSourceTarget(
+      source,
+      collectorSetting,
+      collectorSettingSnapshot,
+    );
+  }
 }
 
 function isDuplicateSourceUrlHashError(error: unknown): boolean {
@@ -149,6 +220,29 @@ function toSourceSnapshotInsert(
   };
 }
 
+function toCollectorSettingInsert(
+  input: CreateSourceInput,
+): Insertable<CollectorSettingTable> {
+  return {
+    id: input.collectorSettingId,
+    plugin_slug: input.pluginSlug,
+    source_id: input.id,
+  };
+}
+
+function toCollectorSettingSnapshotInsert(
+  input: CreateSourceInput,
+): Insertable<CollectorSettingSnapshotTable> {
+  return {
+    collector_setting_id: input.collectorSettingId,
+    config: {},
+    enabled: true,
+    id: input.collectorSettingSnapshotId,
+    recorded_at: new Date(),
+    version: 1,
+  };
+}
+
 function toSourceListItem(
   source: Selectable<SourceTable>,
   snapshot: Selectable<SourceSnapshotTable> | null,
@@ -164,5 +258,22 @@ function toSourceListItem(
     url: source.url,
     urlHash: source.url_hash,
     version: snapshot?.version ?? null,
+  };
+}
+
+function toObserveSourceTarget(
+  source: Selectable<SourceTable>,
+  collectorSetting: Selectable<CollectorSettingTable>,
+  collectorSettingSnapshot: Selectable<CollectorSettingSnapshotTable>,
+): ObserveSourceTarget {
+  return {
+    collectorSettingId: collectorSetting.id,
+    collectorSettingSnapshotId: collectorSettingSnapshot.id,
+    config: collectorSettingSnapshot.config,
+    pluginSlug: collectorSetting.plugin_slug,
+    slug: source.slug,
+    sourceId: source.id,
+    sourceKind: source.kind,
+    url: source.url,
   };
 }

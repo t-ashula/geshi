@@ -1,6 +1,8 @@
 import type { Hono } from "hono";
 
 import { DuplicateSourceUrlHashError } from "../../../db/source-repository.js";
+import type { JobService } from "../../../service/job-service.js";
+import { SourceNotFoundError } from "../../../service/job-service.js";
 import type { SourceService } from "../../../service/source-service.js";
 import { InvalidSourceUrlError } from "../../../service/source-service.js";
 
@@ -9,6 +11,7 @@ type App = Hono;
 export function registerSourceRoutes(
   app: App,
   sourceService: SourceService,
+  jobService: JobService,
 ): void {
   app.get("/api/v1/sources", async (context) => {
     const sources = await sourceService.listSources();
@@ -70,6 +73,30 @@ export function registerSourceRoutes(
             },
           },
           409,
+        );
+      }
+
+      throw error;
+    }
+  });
+
+  app.post("/api/v1/sources/:sourceId/observe", async (context) => {
+    try {
+      const job = await jobService.enqueueObserveSourceJob(
+        context.req.param("sourceId"),
+      );
+
+      return context.json({ data: job }, 202);
+    } catch (error) {
+      if (error instanceof SourceNotFoundError) {
+        return context.json(
+          {
+            error: {
+              code: "source_not_found",
+              message: "Source not found.",
+            },
+          },
+          404,
         );
       }
 

@@ -10,3 +10,5 @@
 - [ADR-0007: api backend の初期構成](./0007-api-backend-initial-architecture.md)
 - [ADR-0008: source 登録に向けた永続化と migration 方針](./0008-source-storage-and-migration-strategy.md)
 - [ADR-0009: podcast rss source 登録フローの責務分担](./0009-podcast-rss-source-registration-flow.md)
+- [ADR-0010: source クロールの実行基盤として job queue を導入する](./0010-source-crawl-job-queue.md)
+- [ADR-0011: source クロールを plugin 境界で拡張可能にする](./0011-source-crawl-plugin-responsibilities.md)
