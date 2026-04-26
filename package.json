@@ -6,6 +6,7 @@
   "scripts": {
     "backend:start": "node --import tsx backend/src/index.ts",
     "frontend:dev": "vite --config frontend/vite.config.ts",
+    "format:check": "prettier --check .",
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
