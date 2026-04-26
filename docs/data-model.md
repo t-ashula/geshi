@@ -33,11 +33,10 @@
 主な属性:
 
 - `id`
+- `slug`
 - `kind`
-- `status`
-  - `active`
-  - `paused`
-  - `archived`
+- `url`
+- `urlHash`
 - `createdAt`
 
 ### content
@@ -122,13 +121,12 @@ source の可変属性のある時点の状態を表す．
 - `sourceId`
 - `version`
 - `title`
-- `url`
 - `description`
 - `recordedAt`
 
 補足:
 
-- URL 変更履歴はこの単位で表す
+- `version` は `sourceId` ごとの版番号とする
 - どの値がいつ有効だったかを追えるようにする
 
 ### contentSnapshot
@@ -158,6 +156,7 @@ content の可変属性のある時点の状態を表す．
 
 - source は購読・巡回・再収集の単位とする
 - source 自体は閲覧単位ではなく，content を生む上位単位とする
+- source の固定属性は主体テーブルに置く
 
 ### content は閲覧と検索の中心
 
@@ -176,6 +175,7 @@ content の可変属性のある時点の状態を表す．
 - `source` や `content` の履歴が必要な属性は snapshot 側に持つ
 - 現在値だけを主体テーブルへ上書きしない
 - `updatedAt` で履歴要件を代替しない
+- URL のように source の固定属性として扱うものは snapshot に持たない
 
 ### transcript は後付け可能にする
 
