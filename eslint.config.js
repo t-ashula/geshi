@@ -5,7 +5,7 @@ import eslintConfigPrettier from "eslint-config-prettier";
 
 const typedConfigs = tseslint.configs.recommendedTypeChecked.map((config) => ({
   ...config,
-  files: ["src/**/*.ts", "test/**/*.ts"],
+  files: ["backend/src/**/*.ts", "backend/test/**/*.ts"],
 }));
 
 export default tseslint.config(
@@ -13,7 +13,7 @@ export default tseslint.config(
     ignores: ["coverage/**", "dist/**", "node_modules/**", "tmp/**"],
   },
   {
-    files: ["src/**/*.ts", "test/**/*.ts"],
+    files: ["backend/src/**/*.ts", "backend/test/**/*.ts"],
     plugins: {
       "@typescript-eslint": tseslint.plugin,
       unicorn,
@@ -50,7 +50,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/**/*.ts", "test/**/*.ts"],
+    files: ["backend/src/**/*.ts", "backend/test/**/*.ts"],
     plugins: {
       unicorn,
     },
