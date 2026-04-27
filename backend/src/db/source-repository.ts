@@ -106,13 +106,13 @@ export class SourceRepository {
     const sources = await this.database
       .selectFrom("sources")
       .selectAll()
-      .orderBy("created_at desc")
+      .orderBy("created_at", "desc")
       .execute();
     const snapshots = await this.database
       .selectFrom("source_snapshots")
       .selectAll()
-      .orderBy("source_id asc")
-      .orderBy("version desc")
+      .orderBy("source_id", "asc")
+      .orderBy("version", "desc")
       .execute();
 
     const latestSnapshotBySourceId = new Map<
@@ -148,7 +148,7 @@ export class SourceRepository {
       .selectFrom("collector_settings")
       .selectAll()
       .where("source_id", "=", sourceId)
-      .orderBy("created_at asc")
+      .orderBy("created_at", "asc")
       .executeTakeFirst();
 
     if (collectorSetting === undefined) {
@@ -159,7 +159,7 @@ export class SourceRepository {
       .selectFrom("collector_setting_snapshots")
       .selectAll()
       .where("collector_setting_id", "=", collectorSetting.id)
-      .orderBy("version desc")
+      .orderBy("version", "desc")
       .executeTakeFirst();
 
     if (

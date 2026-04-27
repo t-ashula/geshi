@@ -72,7 +72,7 @@ export class ContentRepository {
           .selectFrom("content_snapshots")
           .selectAll()
           .where("content_id", "=", existingContent.id)
-          .orderBy("version desc")
+          .orderBy("version", "desc")
           .executeTakeFirst();
 
         const nextVersion = (latestSnapshot?.version ?? 0) + 1;
@@ -97,8 +97,8 @@ export class ContentRepository {
     const snapshots = await this.database
       .selectFrom("content_snapshots")
       .selectAll()
-      .orderBy("content_id asc")
-      .orderBy("version desc")
+      .orderBy("content_id", "asc")
+      .orderBy("version", "desc")
       .execute();
 
     const latestSnapshotByContentId = new Map<
