@@ -1,7 +1,8 @@
 import { v7 as uuidv7 } from "uuid";
 
 import type { JobListItem, JobRepository } from "../db/job-repository.js";
-import { type JobQueue, OBSERVE_SOURCE_JOB_NAME } from "../job-queue/types.js";
+import type { JobQueue } from "../job-queue/types.js";
+import { OBSERVE_SOURCE_JOB_NAME } from "../job-queue/types.js";
 import type { SourceService } from "./source-service.js";
 
 export class SourceNotFoundError extends Error {

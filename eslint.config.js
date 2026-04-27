@@ -59,6 +59,15 @@ export default tseslint.config(
           prefer: "type-imports",
         },
       ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "ImportDeclaration[importKind='value'] > ImportSpecifier[importKind='type']",
+          message:
+            "Use a separate `import type { ... }` declaration for type-only imports.",
+        },
+      ],
       "simple-import-sort/imports": "error",
       "simple-import-sort/exports": "error",
     },

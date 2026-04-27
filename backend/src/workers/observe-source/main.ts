@@ -5,10 +5,8 @@ import { createDatabaseFromPool } from "../../db/database.js";
 import { JobRepository } from "../../db/job-repository.js";
 import { createPgBoss } from "../../job-queue/pg-boss.js";
 import { ensureQueue } from "../../job-queue/pg-boss.js";
-import {
-  OBSERVE_SOURCE_JOB_NAME,
-  type ObserveSourceJobPayload,
-} from "../../job-queue/types.js";
+import type { ObserveSourceJobPayload } from "../../job-queue/types.js";
+import { OBSERVE_SOURCE_JOB_NAME } from "../../job-queue/types.js";
 import { getRuntimeConfig } from "../../runtime-config.js";
 import { ContentService } from "../../service/content-service.js";
 import { handleObserveSourceJob } from "./handle.js";
