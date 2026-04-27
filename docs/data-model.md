@@ -93,6 +93,7 @@ content にひもづく実ファイルや派生ファイルを表す．
 
 - `id`
 - `contentId`
+- `primary`
 - `kind`
   - `audio`
   - `video`
@@ -212,6 +213,7 @@ content の可変属性のある時点の状態を表す．
 - ファイル本体は storage に置く
 - `sourceUrl` は取得元情報として asset に持つ
 - `sourceUrl` は asset の一意制約には使わない
+- `primary` によって，その content に対する主たる asset を表せるようにする
 
 ### 可変属性は履歴テーブルに保持する
 
