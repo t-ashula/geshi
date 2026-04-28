@@ -19,3 +19,6 @@
 - [ADR-0016: source collector plugin は content と asset の fingerprint を返す](./0016-source-collector-content-and-asset-identity.md)
 - [ADR-0017: api backend は fingerprint に基づいて content と asset の登録規則を適用する](./0017-source-collector-upsert-based-on-identity.md)
 - [ADR-0018: backend と worker に構造化ログを導入する](./0018-structured-logging.md)
+- [ADR-0019: Web UI 起点の最小 E2E を Playwright で検証する](./0019-e2e-test-foundation.md)
+- [ADR-0020: E2E 用 source はローカル HTTP server から供給する](./0020-e2e-local-source-server.md)
+- [ADR-0021: E2E 用 DB を実運用 DB から分離する](./0021-e2e-database-isolation.md)
