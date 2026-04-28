@@ -13,6 +13,8 @@ const typedConfigs = tseslint.configs.recommendedTypeChecked.map((config) => ({
     "frontend/src/**/*.ts",
     "frontend/test/**/*.ts",
     "frontend/vite.config.ts",
+    "test/**/*.ts",
+    "test/playwright.config.ts",
   ],
 }));
 
@@ -27,6 +29,8 @@ export default tseslint.config(
       "frontend/src/**/*.ts",
       "frontend/test/**/*.ts",
       "frontend/vite.config.ts",
+      "test/**/*.ts",
+      "test/playwright.config.ts",
     ],
     plugins: {
       "@typescript-eslint": tseslint.plugin,
@@ -98,6 +102,8 @@ export default tseslint.config(
       "frontend/src/**/*.ts",
       "frontend/test/**/*.ts",
       "frontend/vite.config.ts",
+      "test/**/*.ts",
+      "test/playwright.config.ts",
     ],
     plugins: {
       unicorn,

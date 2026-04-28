@@ -10,6 +10,8 @@
     "worker:acquire-content": "node --import tsx backend/src/workers/acquire-content/main.ts",
     "worker:observe-source": "node --import tsx backend/src/workers/observe-source/main.ts",
     "frontend:dev": "vite --config frontend/vite.config.ts",
+    "test:e2e": "sh test/scripts/run-e2e.sh",
+    "test:e2e:cases": "playwright test --config test/playwright.config.ts",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "lint": "eslint .",
@@ -21,9 +23,11 @@
     "node": ">=24 <25"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^25.6.0",
     "@types/pg": "^8.20.0",
     "@vitejs/plugin-vue": "^6.0.6",
+    "@playwright/test": "^1.56.1",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-simple-import-sort": "^13.0.0",

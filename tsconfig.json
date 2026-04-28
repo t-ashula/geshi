@@ -17,6 +17,8 @@
     "frontend/src/**/*.ts",
     "frontend/test/**/*.ts",
     "frontend/vite.config.ts",
+    "test/**/*.ts",
+    "test/playwright.config.ts",
     "vitest.config.ts"
   ]
 }
