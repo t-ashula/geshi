@@ -4,6 +4,7 @@ import type { JobRepository } from "../../db/job-repository.js";
 import type { AcquireContentJobPayload } from "../../job-queue/types.js";
 import { findLatestFingerprint } from "../../lib/fingerprint.js";
 import { sha256ChecksumString } from "../../lib/hash.js";
+import type { Logger } from "../../logger/index.js";
 import { getSourceCollectorPlugin } from "../../plugins/index.js";
 import type { AcquiredAsset } from "../../plugins/types.js";
 import type { AssetService } from "../../service/asset-service.js";
@@ -14,6 +15,7 @@ type HandleAcquireContentJobDependencies = {
   assetService: AssetService;
   contentService: ContentService;
   jobRepository: JobRepository;
+  logger: Logger;
   storage: Storage;
 };
 
@@ -21,7 +23,16 @@ export async function handleAcquireContentJob(
   payload: AcquireContentJobPayload,
   dependencies: HandleAcquireContentJobDependencies,
 ): Promise<void> {
+  const logger = dependencies.logger.child({
+    assetId: payload.assetId,
+    contentId: payload.contentId,
+    jobId: payload.jobId,
+    pluginSlug: payload.pluginSlug,
+    sourceId: payload.sourceId,
+  });
+
   await dependencies.jobRepository.markRunning(payload.jobId);
+  logger.info("acquire job started.");
 
   try {
     const plugin = getSourceCollectorPlugin(payload.pluginSlug);
@@ -58,7 +69,9 @@ export async function handleAcquireContentJob(
         summary: content.summary,
         title: content.title,
       },
-      logger: console,
+      logger: logger.child({
+        operation: "acquire",
+      }),
     });
     const storedAsset = await dependencies.storage.put({
       body: acquiredAsset.body,
@@ -85,6 +98,7 @@ export async function handleAcquireContentJob(
       "stored",
     );
     await dependencies.jobRepository.markSucceeded(payload.jobId);
+    logger.info("acquire job completed.");
   } catch (error) {
     const failureMessage =
       error instanceof Error ? error.message : "Acquire content job failed.";
@@ -98,6 +112,10 @@ export async function handleAcquireContentJob(
       failureMessage,
       true,
     );
+    logger.error("acquire job failed.", {
+      error,
+      failureMessage,
+    });
     throw error;
   }
 }

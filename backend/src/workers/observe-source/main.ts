@@ -14,12 +14,17 @@ import {
   ACQUIRE_CONTENT_JOB_NAME,
   OBSERVE_SOURCE_JOB_NAME,
 } from "../../job-queue/types.js";
+import { createLogger } from "../../logger/index.js";
 import { getRuntimeConfig } from "../../runtime-config.js";
 import { AssetService } from "../../service/asset-service.js";
 import { ContentService } from "../../service/content-service.js";
 import { handleObserveSourceJob } from "./handle.js";
 
 const runtimeConfig = getRuntimeConfig();
+const logger = createLogger({
+  process: "worker",
+  worker: OBSERVE_SOURCE_JOB_NAME,
+});
 const pool = new Pool({
   database: runtimeConfig.pgDatabase,
   host: runtimeConfig.pgHost,
@@ -37,7 +42,7 @@ const contentService = new ContentService(contentRepository);
 const jobRepository = new JobRepository(database);
 
 boss.on("error", (error) => {
-  console.error(error);
+  logger.error("job queue runtime failed.", { error });
 });
 
 await boss.start();
@@ -60,6 +65,11 @@ await boss.work<ObserveSourceJobPayload>(
       contentService,
       jobQueue,
       jobRepository,
+      logger,
     });
   },
 );
+
+logger.info("worker started.", {
+  queueName: OBSERVE_SOURCE_JOB_NAME,
+});

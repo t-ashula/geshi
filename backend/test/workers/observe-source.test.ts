@@ -11,6 +11,7 @@ import { SourceRepository } from "../../src/db/source-repository.js";
 import type { JobPayload } from "../../src/job-queue/types.js";
 import type { AcquireContentJobPayload } from "../../src/job-queue/types.js";
 import { ACQUIRE_CONTENT_JOB_NAME } from "../../src/job-queue/types.js";
+import { createNoopLogger } from "../../src/logger/index.js";
 import { AssetService } from "../../src/service/asset-service.js";
 import { ContentService } from "../../src/service/content-service.js";
 import { handleObserveSourceJob } from "../../src/workers/observe-source/handle.js";
@@ -112,6 +113,7 @@ describe("handleObserveSourceJob", () => {
           },
         },
         jobRepository,
+        logger: createNoopLogger(),
         tmpRootDir,
       },
     );
@@ -233,6 +235,7 @@ describe("handleObserveSourceJob", () => {
             enqueue: () => Promise.resolve("queue-job-test"),
           },
           jobRepository,
+          logger: createNoopLogger(),
           tmpRootDir,
         },
       ),

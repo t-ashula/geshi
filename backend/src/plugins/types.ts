@@ -1,3 +1,5 @@
+import type { Logger } from "../logger/index.js";
+
 export type ObservedAsset = {
   kind: string;
   observedFingerprints: string[];
@@ -14,12 +16,6 @@ export type ObservedContent = {
   status: "discovered" | "stored" | "failed";
   summary: string | null;
   title: string | null;
-};
-
-export type Logger = {
-  error(message: string, ...args: unknown[]): void;
-  info(message: string, ...args: unknown[]): void;
-  warn(message: string, ...args: unknown[]): void;
 };
 
 export type SourceCollectorObserveInput = {

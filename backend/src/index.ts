@@ -12,12 +12,16 @@ import {
   ACQUIRE_CONTENT_JOB_NAME,
   OBSERVE_SOURCE_JOB_NAME,
 } from "./job-queue/types.js";
+import { createLogger } from "./logger/index.js";
 import { getRuntimeConfig } from "./runtime-config.js";
 import { ContentService } from "./service/content-service.js";
 import { JobService } from "./service/job-service.js";
 import { SourceService } from "./service/source-service.js";
 
 const runtimeConfig = getRuntimeConfig();
+const logger = createLogger({
+  process: "backend",
+});
 const pool = new Pool({
   database: runtimeConfig.pgDatabase,
   host: runtimeConfig.pgHost,
@@ -36,7 +40,7 @@ const jobQueue = new PgBossJobQueue(boss);
 const jobService = new JobService(sourceService, jobRepository, jobQueue);
 
 boss.on("error", (error) => {
-  console.error(error);
+  logger.error("job queue runtime failed.", { error });
 });
 
 await boss.start();
@@ -56,4 +60,8 @@ const app = createApp(sourceService, contentService, jobService);
 serve({
   fetch: app.fetch,
   port: runtimeConfig.backendPort,
+});
+
+logger.info("backend started.", {
+  backendPort: runtimeConfig.backendPort,
 });

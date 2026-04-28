@@ -9,6 +9,7 @@ import type {
   ObserveSourceJobPayload,
 } from "../../job-queue/types.js";
 import { ACQUIRE_CONTENT_JOB_NAME } from "../../job-queue/types.js";
+import type { Logger } from "../../logger/index.js";
 import { getSourceCollectorPlugin } from "../../plugins/index.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
@@ -18,6 +19,7 @@ type HandleObserveSourceJobDependencies = {
   contentService: ContentService;
   jobQueue: JobQueue;
   jobRepository: JobRepository;
+  logger: Logger;
   tmpRootDir?: string;
 };
 
@@ -27,11 +29,17 @@ export async function handleObserveSourceJob(
 ): Promise<void> {
   const tmpRootDir = dependencies.tmpRootDir ?? "/tmp/geshi";
   const workDir = join(tmpRootDir, payload.jobId);
+  const logger = dependencies.logger.child({
+    jobId: payload.jobId,
+    pluginSlug: payload.pluginSlug,
+    sourceId: payload.sourceId,
+  });
 
   await mkdir(workDir, {
     recursive: true,
   });
   await dependencies.jobRepository.markRunning(payload.jobId);
+  logger.info("observe job started.");
 
   try {
     const plugin = getSourceCollectorPlugin(payload.pluginSlug);
@@ -39,7 +47,9 @@ export async function handleObserveSourceJob(
     const observedContents = await plugin.observe({
       abortSignal: abortController.signal,
       config: payload.config,
-      logger: console,
+      logger: logger.child({
+        operation: "observe",
+      }),
       sourceUrl: payload.url,
       workDir,
     });
@@ -97,6 +107,9 @@ export async function handleObserveSourceJob(
       }
     }
     await dependencies.jobRepository.markSucceeded(payload.jobId);
+    logger.info("observe job completed.", {
+      observedContentCount: observedContents.length,
+    });
   } catch (error) {
     const failureMessage =
       error instanceof Error ? error.message : "Observe source job failed.";
@@ -106,6 +119,10 @@ export async function handleObserveSourceJob(
       failureMessage,
       true,
     );
+    logger.error("observe job failed.", {
+      error,
+      failureMessage,
+    });
     throw error;
   } finally {
     await rm(workDir, {

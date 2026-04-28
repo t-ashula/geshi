@@ -4,6 +4,7 @@ import { AssetRepository } from "../../src/db/asset-repository.js";
 import { ContentRepository } from "../../src/db/content-repository.js";
 import { JobRepository } from "../../src/db/job-repository.js";
 import { SourceRepository } from "../../src/db/source-repository.js";
+import { createNoopLogger } from "../../src/logger/index.js";
 import { AssetService } from "../../src/service/asset-service.js";
 import { ContentService } from "../../src/service/content-service.js";
 import { FilesystemStorage } from "../../src/storage/filesystem-storage.js";
@@ -136,6 +137,7 @@ describe("handleAcquireContentJob", () => {
           assetService,
           contentService,
           jobRepository,
+          logger: createNoopLogger(),
           storage,
         },
       );
