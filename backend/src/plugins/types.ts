@@ -1,4 +1,13 @@
+export type ObservedAsset = {
+  kind: string;
+  observedFingerprints: string[];
+  primary: boolean;
+  sourceUrl: string | null;
+};
+
 export type ObservedContent = {
+  assets: ObservedAsset[];
+  contentFingerprints: string[];
   externalId: string;
   kind: string;
   publishedAt: Date | null;
@@ -22,23 +31,24 @@ export type SourceCollectorObserveInput = {
 };
 
 export type SourceCollectorAcquireInput = {
+  asset: ObservedAsset;
   abortSignal: AbortSignal;
   config: Record<string, unknown>;
-  externalId: string | null;
+  content: Omit<ObservedContent, "assets" | "contentFingerprints">;
   logger: Logger;
-  sourceUrl: string | null;
-  workDir: string;
 };
 
 export type AcquiredAsset = {
+  acquiredFingerprints: string[];
+  body: Uint8Array;
   contentType: string | null;
-  fileName: string;
-  filePath: string;
   kind: string;
   metadata: Record<string, unknown>;
+  primary: boolean;
+  sourceUrl: string | null;
 };
 
 export interface SourceCollectorPlugin {
   observe(input: SourceCollectorObserveInput): Promise<ObservedContent[]>;
-  acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset[]>;
+  acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset>;
 }

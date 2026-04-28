@@ -19,9 +19,17 @@
 
 - `content` は継続対象から収集された閲覧単位を表す主体として維持する
 - `asset` は `content` に付随する保存対象および保存結果を表す主体として扱う
+- `asset` も `content` と同様に snapshot を持つものとして扱う
 - `acquire` の入力，実ファイル保存，失敗追跡に必要な情報は，`content` と `asset` の責務に分けて整理する
 - `content` / `asset` モデルは，podcast RSS の episode，個別ページ，実音声ファイルを無理なく表現できるように，必要な追加または修正を行う
-- `asset` には，content に対する主たる asset を表す `primary` を持たせる
+- `asset` には，以下の属性を持たせる
+  - content に対する主たる asset を表す `primary`
+  - hash algorithm を含む `checksum`
+  - 最新の `observedFingerprint`
+  - 最新の `acquiredFingerprint`
+  - metadata 登録時点を表す `createdAt`
+  - 実ファイル取得および保存完了時点を表す `acquiredAt`
+- `assetSnapshot` には，`asset` の可変属性と fingerprint の各 version を保持する
 - `storage` に保存した結果は，`asset` に対応づけて扱う
 
 ## 影響
@@ -29,6 +37,8 @@
 - plugin から得た情報と保存後の状態を，既存の `1 content : N asset` モデルに沿って整理しやすくなる
 - episode と付随 asset の保存結果を，同じ `content` 配下で追跡しやすくなる
 - content に対する主たる asset を表現しやすくなる
+- asset の取得前後と取得結果とを，同じ asset モデルの中で追跡しやすくなる
+- asset の observed / acquired fingerprint の変化を履歴として追いやすくなる
 - `content` と `asset` の責務を分けたまま，取得処理と永続化処理を接続しやすくなる
 - 一方で，既存 schema，repository，service に対する追加または修正が必要になる
 

@@ -1,0 +1,87 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { FilesystemStorage } from "../../src/storage/filesystem-storage.js";
+
+describe("FilesystemStorage", () => {
+  let rootDir: string;
+
+  beforeEach(async () => {
+    rootDir = await mkdtemp(join(tmpdir(), "geshi-storage-test-"));
+  });
+
+  it("stores and retrieves an object", async () => {
+    const storage = new FilesystemStorage(rootDir);
+    const stored = await storage.put({
+      body: new Uint8Array(Buffer.from("hello")),
+      contentType: "text/html",
+      key: "source/content/page-hash.html",
+      overwrite: false,
+    });
+
+    expect(stored.key).toBe("source/content/page-hash.html");
+    await expect(storage.get(stored.key)).resolves.toEqual(
+      new Uint8Array(Buffer.from("hello")),
+    );
+  });
+
+  it("overwrites an existing object when overwrite is true", async () => {
+    const storage = new FilesystemStorage(rootDir);
+    const first = await storage.put({
+      body: new Uint8Array(Buffer.from("first")),
+      contentType: "audio/mpeg",
+      key: "source/content/audio-hash.mp3",
+      overwrite: false,
+    });
+    const second = await storage.put({
+      body: new Uint8Array(Buffer.from("second")),
+      contentType: "audio/mpeg",
+      key: "source/content/audio-hash.mp3",
+      overwrite: true,
+    });
+
+    expect(second.key).toBe(first.key);
+    await expect(storage.get(first.key)).resolves.toEqual(
+      new Uint8Array(Buffer.from("second")),
+    );
+  });
+
+  it("joins path parts", () => {
+    const storage = new FilesystemStorage(rootDir);
+
+    expect(storage.pathJoin("source", "content", "file.ext")).toBe(
+      join("source", "content", "file.ext"),
+    );
+  });
+
+  it("rejects keys that escape rootDir", async () => {
+    const storage = new FilesystemStorage(rootDir);
+
+    expect(() => storage.pathJoin("..", "evil.txt")).toThrow();
+    await expect(
+      storage.put({
+        body: new Uint8Array(Buffer.from("evil")),
+        contentType: "text/html",
+        key: "../evil.txt",
+        overwrite: false,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("does not confuse sibling paths with rootDir descendants", async () => {
+    const storage = new FilesystemStorage(rootDir);
+    const siblingLikeKey = resolve(`${rootDir}-sibling`, "evil.txt");
+
+    await expect(
+      storage.put({
+        body: new Uint8Array(Buffer.from("evil")),
+        contentType: "text/html",
+        key: siblingLikeKey,
+        overwrite: false,
+      }),
+    ).rejects.toThrow();
+  });
+});

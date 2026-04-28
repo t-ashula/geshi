@@ -38,12 +38,12 @@ create table contents (
   id uuid primary key,
   source_id uuid not null references sources(id),
   external_id text not null,
+  content_fingerprint text not null,
   kind varchar(128) not null,
   published_at timestamptz,
   collected_at timestamptz not null default current_timestamp,
   status text not null constraint contents_status_check check (status = any (array['discovered'::text, 'stored'::text, 'failed'::text])),
-  created_at timestamptz not null default current_timestamp,
-  constraint contents_source_id_external_id_key unique (source_id, external_id)
+  created_at timestamptz not null default current_timestamp
 );
 
 create table content_snapshots (
@@ -54,6 +54,37 @@ create table content_snapshots (
   summary text,
   recorded_at timestamptz not null default current_timestamp,
   constraint content_snapshots_content_id_version_key unique (content_id, version)
+);
+
+create table assets (
+  id uuid primary key,
+  content_id uuid not null references contents(id),
+  kind varchar(128) not null,
+  is_primary boolean not null default false,
+  observed_fingerprint text not null,
+  acquired_fingerprint text,
+  source_url text,
+  storage_key text,
+  mime_type text,
+  byte_size integer,
+  checksum text,
+  created_at timestamptz not null default current_timestamp,
+  acquired_at timestamptz
+);
+
+create table asset_snapshots (
+  id uuid primary key,
+  asset_id uuid not null references assets(id),
+  version integer not null,
+  source_url text,
+  storage_key text,
+  mime_type text,
+  byte_size integer,
+  checksum text,
+  observed_fingerprint text not null,
+  acquired_fingerprint text,
+  recorded_at timestamptz not null default current_timestamp,
+  constraint asset_snapshots_asset_id_version_key unique (asset_id, version)
 );
 
 create table jobs (
@@ -76,4 +107,8 @@ create index if not exists collector_settings_source_id_idx on collector_setting
 create index if not exists collector_setting_snapshots_setting_id_version_idx on collector_setting_snapshots (collector_setting_id, version desc);
 create index if not exists contents_source_id_published_at_idx on contents (source_id, published_at desc nulls last);
 create index if not exists content_snapshots_content_id_version_idx on content_snapshots (content_id, version desc);
+create index if not exists assets_content_id_idx on assets (content_id);
+create index if not exists contents_source_id_content_fingerprint_idx on contents (source_id, content_fingerprint);
+create index if not exists assets_content_id_observed_fingerprint_idx on assets (content_id, observed_fingerprint);
+create index if not exists asset_snapshots_asset_id_version_idx on asset_snapshots (asset_id, version desc);
 create index if not exists jobs_source_id_created_at_idx on jobs (source_id, created_at desc);

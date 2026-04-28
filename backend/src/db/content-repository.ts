@@ -1,5 +1,6 @@
 import type { Insertable, Kysely, Selectable } from "kysely";
 
+import { findLatestFingerprint } from "../lib/fingerprint.js";
 import type {
   ContentSnapshotTable,
   ContentTable,
@@ -7,10 +8,27 @@ import type {
 } from "./types.js";
 
 export type ImportObservedContentInput = {
+  contentFingerprints: string[];
   externalId: string;
   kind: string;
   publishedAt: Date | null;
   sourceId: string;
+  status: "discovered" | "stored" | "failed";
+  summary: string | null;
+  title: string | null;
+};
+
+export type CreateObservedContentResult = {
+  fingerprintChanged: boolean;
+  id: string;
+};
+
+export type AcquireTargetContent = {
+  externalId: string;
+  id: string;
+  kind: string;
+  publishedAt: Date | null;
+  sourceSlug: string;
   status: "discovered" | "stored" | "failed";
   summary: string | null;
   title: string | null;
@@ -30,61 +48,147 @@ export type ContentListItem = {
 export class ContentRepository {
   public constructor(private readonly database: Kysely<GeshiDatabase>) {}
 
-  public async importObservedContents(
-    inputs: ImportObservedContentInput[],
-  ): Promise<void> {
-    await this.database.transaction().execute(async (transaction) => {
-      for (const input of inputs) {
-        const existingContent = await transaction
-          .selectFrom("contents")
-          .selectAll()
-          .where("source_id", "=", input.sourceId)
-          .where("external_id", "=", input.externalId)
-          .executeTakeFirst();
+  public async createObservedContent(
+    input: ImportObservedContentInput,
+  ): Promise<CreateObservedContentResult> {
+    return this.database.transaction().execute(async (transaction) => {
+      const latestFingerprint = findLatestFingerprint(
+        input.contentFingerprints,
+      );
 
-        if (existingContent === undefined) {
-          const insertedContent = await transaction
-            .insertInto("contents")
-            .values(toContentInsert(input))
-            .returningAll()
-            .executeTakeFirstOrThrow();
+      if (latestFingerprint === undefined) {
+        throw new Error("content fingerprint is required.");
+      }
+      const insertedContent = await transaction
+        .selectFrom("contents")
+        .selectAll()
+        .where("source_id", "=", input.sourceId)
+        .where("content_fingerprint", "in", input.contentFingerprints)
+        .executeTakeFirst();
 
-          await transaction
-            .insertInto("content_snapshots")
-            .values(toContentSnapshotInsert(insertedContent.id, 1, input))
-            .executeTakeFirstOrThrow();
-
-          continue;
-        }
-
-        await transaction
-          .updateTable("contents")
-          .set({
-            collected_at: new Date(),
-            kind: input.kind,
-            published_at: input.publishedAt,
-            status: input.status,
-          })
-          .where("id", "=", existingContent.id)
+      if (insertedContent === undefined) {
+        const createdContent = await transaction
+          .insertInto("contents")
+          .values(toContentInsert(input, latestFingerprint))
+          .returningAll()
           .executeTakeFirstOrThrow();
-
-        const latestSnapshot = await transaction
-          .selectFrom("content_snapshots")
-          .selectAll()
-          .where("content_id", "=", existingContent.id)
-          .orderBy("version", "desc")
-          .executeTakeFirst();
-
-        const nextVersion = (latestSnapshot?.version ?? 0) + 1;
 
         await transaction
           .insertInto("content_snapshots")
+          .values(toContentSnapshotInsert(createdContent.id, 1, input))
+          .executeTakeFirstOrThrow();
+
+        return {
+          fingerprintChanged: false,
+          id: createdContent.id,
+        };
+      }
+
+      const latestSnapshot = await transaction
+        .selectFrom("content_snapshots")
+        .selectAll()
+        .where("content_id", "=", insertedContent.id)
+        .orderBy("version", "desc")
+        .executeTakeFirst();
+
+      const fingerprintChanged =
+        insertedContent.content_fingerprint !== latestFingerprint;
+      const snapshotChanged =
+        latestSnapshot?.title !== input.title ||
+        latestSnapshot?.summary !== input.summary;
+
+      await transaction
+        .updateTable("contents")
+        .set({
+          collected_at: new Date(),
+          content_fingerprint: latestFingerprint,
+          external_id: input.externalId,
+          kind: input.kind,
+          published_at: input.publishedAt,
+          status: input.status,
+        })
+        .where("id", "=", insertedContent.id)
+        .executeTakeFirstOrThrow();
+
+      if (snapshotChanged) {
+        await transaction
+          .insertInto("content_snapshots")
           .values(
-            toContentSnapshotInsert(existingContent.id, nextVersion, input),
+            toContentSnapshotInsert(
+              insertedContent.id,
+              (latestSnapshot?.version ?? 0) + 1,
+              input,
+            ),
           )
           .executeTakeFirstOrThrow();
       }
+
+      return {
+        fingerprintChanged,
+        id: insertedContent.id,
+      };
     });
+  }
+
+  public async importObservedContents(
+    inputs: ImportObservedContentInput[],
+  ): Promise<void> {
+    for (const input of inputs) {
+      await this.createObservedContent(input);
+    }
+  }
+
+  public async markContentStatus(
+    contentId: string,
+    status: "discovered" | "stored" | "failed",
+  ): Promise<void> {
+    await this.database
+      .updateTable("contents")
+      .set({
+        status,
+      })
+      .where("id", "=", contentId)
+      .executeTakeFirstOrThrow();
+  }
+
+  public async findContentAcquireTarget(
+    contentId: string,
+  ): Promise<AcquireTargetContent | null> {
+    const content = await this.database
+      .selectFrom("contents")
+      .innerJoin("sources", "sources.id", "contents.source_id")
+      .select([
+        "contents.external_id",
+        "contents.id",
+        "contents.kind",
+        "contents.published_at",
+        "contents.status",
+        "sources.slug as source_slug",
+      ])
+      .where("contents.id", "=", contentId)
+      .executeTakeFirst();
+
+    if (content === undefined) {
+      return null;
+    }
+
+    const snapshot = await this.database
+      .selectFrom("content_snapshots")
+      .selectAll()
+      .where("content_id", "=", contentId)
+      .orderBy("version", "desc")
+      .executeTakeFirst();
+
+    return {
+      externalId: content.external_id,
+      id: content.id,
+      kind: content.kind,
+      publishedAt: content.published_at,
+      sourceSlug: content.source_slug,
+      status: content.status,
+      summary: snapshot?.summary ?? null,
+      title: snapshot?.title ?? null,
+    };
   }
 
   public async listContents(): Promise<ContentListItem[]> {
@@ -131,8 +235,10 @@ export class ContentRepository {
 
 function toContentInsert(
   input: ImportObservedContentInput,
+  contentFingerprint: string,
 ): Insertable<ContentTable> {
   return {
+    content_fingerprint: contentFingerprint,
     external_id: input.externalId,
     id: crypto.randomUUID(),
     kind: input.kind,

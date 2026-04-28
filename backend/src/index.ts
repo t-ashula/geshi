@@ -8,7 +8,10 @@ import { JobRepository } from "./db/job-repository.js";
 import { SourceRepository } from "./db/source-repository.js";
 import { ensureQueue, PgBossJobQueue } from "./job-queue/pg-boss.js";
 import { createPgBoss } from "./job-queue/pg-boss.js";
-import { OBSERVE_SOURCE_JOB_NAME } from "./job-queue/types.js";
+import {
+  ACQUIRE_CONTENT_JOB_NAME,
+  OBSERVE_SOURCE_JOB_NAME,
+} from "./job-queue/types.js";
 import { getRuntimeConfig } from "./runtime-config.js";
 import { ContentService } from "./service/content-service.js";
 import { JobService } from "./service/job-service.js";
@@ -38,6 +41,11 @@ boss.on("error", (error) => {
 
 await boss.start();
 await ensureQueue(boss, OBSERVE_SOURCE_JOB_NAME, {
+  retryBackoff: true,
+  retryDelay: 5,
+  retryLimit: 2,
+});
+await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, {
   retryBackoff: true,
   retryDelay: 5,
   retryLimit: 2,

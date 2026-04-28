@@ -21,11 +21,12 @@
 - 将来的に `s3` などへ差し替えられるように，`storage` は interface として規定する
 - `storage` は，少なくとも `asset` と対応づけられる形で，保存した実ファイルを参照できる必要がある
 - `storage` の仕様は，metadata を持つ `content` / `asset` モデルとは分けて [storage-doc] に定義する
-- `storage` は，少なくとも `put` と `get` を持つものとする
-- caller は保存先 namespace を決めて `storage` に渡す
-- caller は `put` 時に保存対象の body または stream を渡す
+- `storage` は，少なくとも `put` と `get` と `pathJoin` を持つものとする
+- caller は保存先 key を決めて `storage` に渡す
+- caller は `put` 時に保存対象の body を渡す
 - caller は `put` 時に `overwrite` フラグを渡す
-- `storage` は，受け取った namespace 配下で衝突しない最終 key を決める
+- key の各要素の連結は `storage.pathJoin` が担う
+- `storage.pathJoin` と `put/get` は，`rootDir` と key の解決先を比較し，解決先が `rootDir` 自身またはその配下に収まらない key を受け付けない
 - `storage` は，`overwrite` フラグに従って既存 key への上書き可否を制御する
 - `crawler` またはその呼び出し側は，取得した実ファイルを `storage` に保存し，その結果を metadata 側へ反映できるようにする
 - 保存失敗時には，失敗理由を追跡できるようにする
@@ -34,11 +35,12 @@
 
 - 実ファイル保存先としての `storage` の責務が，`content` / `asset` モデルとは別に明確になる
 - 当面の filesystem 実装と，将来の保存先差し替え可能性とを両立しやすくなる
-- caller と `storage` の間で，namespace と最終 key の責務分担を明確にできる
+- caller と `storage` の間で，key の責務分担を単純にできる
+- key 連結時の区切り文字と，解決先が `rootDir` 自身またはその配下に収まることによる path traversal 防止を `storage` 側で一元化できる
 - 上書き可否を caller から明示的に制御できる
 - `storage` 保存成功後に `asset` へ何を反映するかを，後続で整理しやすくなる
 - crawler 側と metadata 側の境界を保ったまま，実ファイル保存フローを設計しやすくなる
-- 一方で，namespace の具体規則，最終 key の生成規則，失敗時の後始末は追加で決める必要がある
+- 一方で，key の具体規則と失敗時の後始末は追加で決める必要がある
 
 ## 代替案
 

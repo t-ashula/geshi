@@ -16,3 +16,5 @@
 - [ADR-0013: podcast rss plugin で episode と付随 asset を対応づけて扱う](./0013-podcast-rss-episode-and-asset-handling.md)
 - [ADR-0014: acquire を扱うために content と asset モデルを拡張する](./0014-content-and-asset-model-for-acquire.md)
 - [ADR-0015: acquire した実ファイルを保存する storage の責務を定義する](./0015-storage-for-acquired-assets.md)
+- [ADR-0016: source collector plugin は content と asset の fingerprint を返す](./0016-source-collector-content-and-asset-identity.md)
+- [ADR-0017: api backend は fingerprint に基づいて content と asset の登録規則を適用する](./0017-source-collector-upsert-based-on-identity.md)
