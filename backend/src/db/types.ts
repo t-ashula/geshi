@@ -54,6 +54,7 @@ export type CollectorSettingSnapshotTable = {
 
 export type ContentTable = {
   collected_at: TimestampColumn;
+  content_fingerprint: string;
   created_at: TimestampColumn;
   external_id: string;
   id: string;
@@ -72,6 +73,36 @@ export type ContentSnapshotTable = {
   version: number;
 };
 
+export type AssetTable = {
+  acquired_fingerprint: string | null;
+  acquired_at: NullableTimestampColumn;
+  byte_size: number | null;
+  checksum: string | null;
+  content_id: string;
+  created_at: TimestampColumn;
+  id: string;
+  is_primary: GeneratedBooleanColumn;
+  kind: string;
+  mime_type: string | null;
+  observed_fingerprint: string;
+  source_url: string | null;
+  storage_key: string | null;
+};
+
+export type AssetSnapshotTable = {
+  acquired_fingerprint: string | null;
+  asset_id: string;
+  byte_size: number | null;
+  checksum: string | null;
+  id: string;
+  mime_type: string | null;
+  observed_fingerprint: string;
+  recorded_at: TimestampColumn;
+  source_url: string | null;
+  storage_key: string | null;
+  version: number;
+};
+
 export type JobTable = {
   attempt_count: GeneratedNumberColumn;
   created_at: TimestampColumn;
@@ -87,6 +118,8 @@ export type JobTable = {
 };
 
 export type GeshiDatabase = {
+  assets: AssetTable;
+  asset_snapshots: AssetSnapshotTable;
   collector_setting_snapshots: CollectorSettingSnapshotTable;
   collector_settings: CollectorSettingTable;
   content_snapshots: ContentSnapshotTable;

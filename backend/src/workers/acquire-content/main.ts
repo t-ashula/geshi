@@ -4,20 +4,14 @@ import { AssetRepository } from "../../db/asset-repository.js";
 import { ContentRepository } from "../../db/content-repository.js";
 import { createDatabaseFromPool } from "../../db/database.js";
 import { JobRepository } from "../../db/job-repository.js";
-import {
-  createPgBoss,
-  ensureQueue,
-  PgBossJobQueue,
-} from "../../job-queue/pg-boss.js";
-import type { ObserveSourceJobPayload } from "../../job-queue/types.js";
-import {
-  ACQUIRE_CONTENT_JOB_NAME,
-  OBSERVE_SOURCE_JOB_NAME,
-} from "../../job-queue/types.js";
+import { createPgBoss, ensureQueue } from "../../job-queue/pg-boss.js";
+import type { AcquireContentJobPayload } from "../../job-queue/types.js";
+import { ACQUIRE_CONTENT_JOB_NAME } from "../../job-queue/types.js";
 import { getRuntimeConfig } from "../../runtime-config.js";
 import { AssetService } from "../../service/asset-service.js";
 import { ContentService } from "../../service/content-service.js";
-import { handleObserveSourceJob } from "./handle.js";
+import { FilesystemStorage } from "../../storage/filesystem-storage.js";
+import { handleAcquireContentJob } from "./handle.js";
 
 const runtimeConfig = getRuntimeConfig();
 const pool = new Pool({
@@ -29,37 +23,32 @@ const pool = new Pool({
 });
 const database = createDatabaseFromPool(pool);
 const boss = createPgBoss(runtimeConfig);
-const jobQueue = new PgBossJobQueue(boss);
 const assetRepository = new AssetRepository(database);
 const assetService = new AssetService(assetRepository);
 const contentRepository = new ContentRepository(database);
 const contentService = new ContentService(contentRepository);
 const jobRepository = new JobRepository(database);
+const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
 
 boss.on("error", (error) => {
   console.error(error);
 });
 
 await boss.start();
-await ensureQueue(boss, OBSERVE_SOURCE_JOB_NAME, {
-  retryBackoff: true,
-  retryDelay: 5,
-  retryLimit: 2,
-});
 await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, {
   retryBackoff: true,
   retryDelay: 5,
   retryLimit: 2,
 });
 
-await boss.work<ObserveSourceJobPayload>(
-  OBSERVE_SOURCE_JOB_NAME,
+await boss.work<AcquireContentJobPayload>(
+  ACQUIRE_CONTENT_JOB_NAME,
   async ([job]) => {
-    await handleObserveSourceJob(job.data, {
+    await handleAcquireContentJob(job.data, {
       assetService,
       contentService,
-      jobQueue,
       jobRepository,
+      storage,
     });
   },
 );

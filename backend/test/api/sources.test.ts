@@ -4,11 +4,8 @@ import { createApp } from "../../src/app.js";
 import { ContentRepository } from "../../src/db/content-repository.js";
 import { JobRepository } from "../../src/db/job-repository.js";
 import { SourceRepository } from "../../src/db/source-repository.js";
-import type {
-  JobPayload,
-  JobQueue,
-  ObserveSourceJobPayload,
-} from "../../src/job-queue/types.js";
+import type { JobPayload, JobQueue } from "../../src/job-queue/types.js";
+import type { ObserveSourceJobPayload } from "../../src/job-queue/types.js";
 import { OBSERVE_SOURCE_JOB_NAME } from "../../src/job-queue/types.js";
 import { ContentService } from "../../src/service/content-service.js";
 import { JobService } from "../../src/service/job-service.js";
@@ -170,7 +167,7 @@ describe("/api/v1/sources", () => {
       const app = createTestApp(testDatabase, {
         enqueue: (name, payload) => {
           enqueuedNames.push(name);
-          enqueuedPayloads.push(payload);
+          enqueuedPayloads.push(payload as ObserveSourceJobPayload);
 
           return Promise.resolve("queue-job-1");
         },

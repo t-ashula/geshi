@@ -35,6 +35,7 @@
 - metadata を保存する
 - 検索用 index を保持する
 - 必要に応じて transcript や派生データも保持する
+- 詳細仕様は [Storage](./storage.md) に分離する
 
 ## 通信関係
 

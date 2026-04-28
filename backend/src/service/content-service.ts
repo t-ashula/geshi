@@ -1,6 +1,8 @@
 import type {
+  AcquireTargetContent,
   ContentListItem,
   ContentRepository,
+  CreateObservedContentResult,
   ImportObservedContentInput,
 } from "../db/content-repository.js";
 
@@ -11,6 +13,25 @@ export class ContentService {
     inputs: ImportObservedContentInput[],
   ): Promise<void> {
     await this.contentRepository.importObservedContents(inputs);
+  }
+
+  public async createObservedContent(
+    input: ImportObservedContentInput,
+  ): Promise<CreateObservedContentResult> {
+    return this.contentRepository.createObservedContent(input);
+  }
+
+  public async markContentStatus(
+    contentId: string,
+    status: "discovered" | "stored" | "failed",
+  ): Promise<void> {
+    await this.contentRepository.markContentStatus(contentId, status);
+  }
+
+  public async findContentAcquireTarget(
+    contentId: string,
+  ): Promise<AcquireTargetContent | null> {
+    return this.contentRepository.findContentAcquireTarget(contentId);
   }
 
   public async listContents(): Promise<ContentListItem[]> {

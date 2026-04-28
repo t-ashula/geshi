@@ -93,6 +93,7 @@ content にひもづく実ファイルや派生ファイルを表す．
 
 - `id`
 - `contentId`
+- `primary`
 - `kind`
   - `audio`
   - `video`
@@ -106,7 +107,10 @@ content にひもづく実ファイルや派生ファイルを表す．
 - `mimeType`
 - `byteSize`
 - `checksum`
+- `observedFingerprint`
+- `acquiredFingerprint`
 - `createdAt`
+- `acquiredAt`
 
 ### transcript
 
@@ -175,6 +179,24 @@ content の可変属性のある時点の状態を表す．
 - `summary`
 - `recordedAt`
 
+### assetSnapshot
+
+asset の可変属性のある時点の状態を表す．
+
+主な属性:
+
+- `id`
+- `assetId`
+- `version`
+- `sourceUrl`
+- `storageKey`
+- `mimeType`
+- `byteSize`
+- `checksum`
+- `observedFingerprint`
+- `acquiredFingerprint`
+- `recordedAt`
+
 ## 関連
 
 - 1 `source` : N `content`
@@ -184,6 +206,7 @@ content の可変属性のある時点の状態を表す．
 - 1 `source` : N `sourceSnapshot`
 - 1 `collectorSetting` : N `collectorSettingSnapshot`
 - 1 `content` : N `contentSnapshot`
+- 1 `asset` : N `assetSnapshot`
 
 ## 設計上の原則
 
@@ -210,12 +233,15 @@ content の可変属性のある時点の状態を表す．
 
 - metadata 側には保存先参照だけを持つ
 - ファイル本体は storage に置く
-- `sourceUrl` は取得元情報として asset に持つ
-- `sourceUrl` は asset の一意制約には使わない
+- `sourceUrl` は必要な場合に取得元情報として asset に持つ
+- `primary` によって，その content に対する主たる asset を表せるようにする
+- `checksum` は hash algorithm を含む文字列として持つ
+- `asset` 本体には最新の observed / acquired fingerprint を持つ
+- `createdAt` は asset metadata を登録した時点，`acquiredAt` は実ファイル取得と保存が完了した時点を表す
 
 ### 可変属性は履歴テーブルに保持する
 
-- `source`，`collectorSetting`，`content` の履歴が必要な属性は snapshot 側に持つ
+- `source`，`collectorSetting`，`content`，`asset` の履歴が必要な属性は snapshot 側に持つ
 - 現在値だけを主体テーブルへ上書きしない
 - `updatedAt` で履歴要件を代替しない
 - source の canonical な取得先 URL は source に持つ

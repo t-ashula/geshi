@@ -1,7 +1,5 @@
-import { createHash } from "node:crypto";
+import { sha256Hex } from "./hash.js";
 
 export function createUrlHash(url: string): string {
-  const hash = createHash("sha256").update(url).digest("hex");
-
-  return `sha256:${hash}`;
+  return `sha256:${sha256Hex(url)}`;
 }

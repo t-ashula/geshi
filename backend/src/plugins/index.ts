@@ -1,4 +1,4 @@
-import { podcastRssPlugin } from "./collector/podcast-rss.js";
+import { podcastRssPlugin } from "./collector/podcast-rss/index.js";
 import type { SourceCollectorPlugin } from "./types.js";
 
 const sourceCollectorPlugins = new Map<string, SourceCollectorPlugin>([
