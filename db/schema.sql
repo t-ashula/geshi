@@ -63,11 +63,6 @@ create table assets (
   is_primary boolean not null default false,
   observed_fingerprint text not null,
   acquired_fingerprint text,
-  source_url text,
-  storage_key text,
-  mime_type text,
-  byte_size integer,
-  checksum text,
   created_at timestamptz not null default current_timestamp,
   acquired_at timestamptz
 );
@@ -81,8 +76,6 @@ create table asset_snapshots (
   mime_type text,
   byte_size integer,
   checksum text,
-  observed_fingerprint text not null,
-  acquired_fingerprint text,
   recorded_at timestamptz not null default current_timestamp,
   constraint asset_snapshots_asset_id_version_key unique (asset_id, version)
 );
