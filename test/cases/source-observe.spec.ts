@@ -9,9 +9,9 @@ test("registers a source and observes contents", async ({ page, request }) => {
   await page.getByRole("button", { name: "+" }).click();
   await page.getByRole("textbox", { name: "RSS URL" }).fill(sourceFeedUrl);
   await page.getByRole("textbox", { name: "Title" }).fill("E2E Feed");
-  await page.getByRole("textbox", { name: "Description" }).fill(
-    "E2E source fixture.",
-  );
+  await page
+    .getByRole("textbox", { name: "Description" })
+    .fill("E2E source fixture.");
   await page.getByRole("button", { name: "Register" }).click();
 
   await expect(page.getByText(sourceFeedUrl)).toBeVisible();
