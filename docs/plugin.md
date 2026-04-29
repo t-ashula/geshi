@@ -37,8 +37,28 @@
 ### 役割
 
 - 外部 source へアクセスする
+- source 登録前の初期データを確認 (`inspect`)
 - source から `content` 候補を抽出 (`observe`)
 - 必要に応じて実ファイルを取得 (`acquire`)
+
+### `inspect`
+
+- source 登録前に，入力された URL から登録用の初期データを返す
+- plugin は source 種別ごとの取得と解釈を担い，backend はその結果を API 表現へ変換する
+- 現段階では呼び出し先 plugin の選択規則は定義せず，呼び出し側が対象 plugin を固定してよい
+
+- 入力
+  - source の取得先 URL
+  - plugin 固有 option
+  - logger
+  - abort signal
+- 出力
+  - source 登録フォームの初期値に必要なデータ
+    - 正規化済み URL
+    - sourceSlug
+    - title
+    - description
+- または inspect 非対応 / 非 RSS / 解釈不能などの失敗結果
 
 ### `observe`
 
@@ -89,6 +109,7 @@
 
 ### `observe`
 
+- preview で扱う feed 解釈規則と可能な限り揃える
 - RSS feed を取得する
 - feed item を列挙する
 - 各 item から `content` 候補を作る

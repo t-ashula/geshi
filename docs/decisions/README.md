@@ -23,3 +23,5 @@
 - [ADR-0020: E2E 用 source はローカル HTTP server から供給する](./0020-e2e-local-source-server.md)
 - [ADR-0021: E2E 用 DB を実運用 DB から分離する](./0021-e2e-database-isolation.md)
 - [ADR-0022: 期待される失敗は result 型で表現する](./0022-result-type-for-expected-failures.md)
+- [ADR-0023: source collector plugin に source 登録前 inspect API を追加する](./0023-source-registration-inspect-plugin-api.md)
+- [ADR-0024: web ui frontend の source 登録フローを 2 段階化する](./0024-source-registration-preview-ui-flow.md)
