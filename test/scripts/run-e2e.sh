@@ -7,7 +7,8 @@ log_dir="$root_dir/tmp/e2e"
 backend_log="$log_dir/backend.log"
 frontend_log="$log_dir/frontend.log"
 source_server_log="$log_dir/source-server.log"
-worker_log="$log_dir/worker.log"
+observe_worker_log="$log_dir/observe-worker.log"
+acquire_worker_log="$log_dir/acquire-worker.log"
 
 frontend_port="${E2E_FRONTEND_PORT:-4173}"
 backend_port="${E2E_BACKEND_PORT:-3000}"
@@ -32,6 +33,10 @@ cleanup() {
   if [ -n "${worker_pid:-}" ]; then
     kill "$worker_pid" >/dev/null 2>&1 || true
   fi
+
+  if [ -n "${acquire_worker_pid:-}" ]; then
+    kill "$acquire_worker_pid" >/dev/null 2>&1 || true
+  fi
 }
 
 trap cleanup EXIT INT TERM
@@ -49,13 +54,18 @@ source_server_pid=$!
 PGDATABASE=geshi_test \
 PORT="$backend_port" \
 GESHI_STORAGE_ROOT_DIR="$storage_root_dir" \
-node --import tsx backend/src/index.ts >"$backend_log" 2>&1 &
+npm run -s backend:start >"$backend_log" 2>&1 &
 backend_pid=$!
 
 PGDATABASE=geshi_test \
 GESHI_STORAGE_ROOT_DIR="$storage_root_dir" \
-node --import tsx backend/src/workers/observe-source/main.ts >"$worker_log" 2>&1 &
+npm run -s worker:observe-source >"$observe_worker_log" 2>&1 &
 worker_pid=$!
+
+PGDATABASE=geshi_test \
+GESHI_STORAGE_ROOT_DIR="$storage_root_dir" \
+npm run -s worker:acquire-content >"$acquire_worker_log" 2>&1 &
+acquire_worker_pid=$!
 
 npm run frontend:dev -- --host 127.0.0.1 --port "$frontend_port" >"$frontend_log" 2>&1 &
 frontend_pid=$!
