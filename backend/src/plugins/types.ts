@@ -1,4 +1,3 @@
-import type { Result } from "../lib/result.js";
 import type { Logger } from "../logger/index.js";
 
 export type ObservedAsset = {
@@ -66,9 +65,7 @@ export type AcquiredAsset = {
 };
 
 export interface SourceCollectorPlugin {
-  inspect(
-    input: SourceCollectorInspectInput,
-  ): Promise<Result<SourceMetadata, SourceCollectorInspectError>>;
+  inspect(input: SourceCollectorInspectInput): Promise<SourceMetadata>;
   observe(input: SourceCollectorObserveInput): Promise<ObservedContent[]>;
   acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset>;
 }

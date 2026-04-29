@@ -1,11 +1,11 @@
 import { XMLParser } from "fast-xml-parser";
 
-import { err, ok } from "../../../lib/result.js";
 import type {
   AcquiredAsset,
   ObservedAsset,
   ObservedContent,
   SourceCollectorAcquireInput,
+  SourceCollectorInspectError,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
   SourceCollectorPlugin,
@@ -55,6 +55,19 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
+class SourceCollectorInspectPluginError extends Error {
+  public readonly code: SourceCollectorInspectError["code"];
+
+  public constructor(
+    code: SourceCollectorInspectError["code"],
+    message: string,
+  ) {
+    super(message);
+    this.name = "SourceCollectorInspectPluginError";
+    this.code = code;
+  }
+}
+
 export const podcastRssPlugin: SourceCollectorPlugin = {
   async inspect(input: SourceCollectorInspectInput) {
     const response = await fetch(input.sourceUrl, {
@@ -62,27 +75,27 @@ export const podcastRssPlugin: SourceCollectorPlugin = {
     }).catch(() => null);
 
     if (response === null || !response.ok) {
-      return err({
-        code: "source_inspect_fetch_failed",
-        message: "Failed to fetch source metadata.",
-      });
+      throw new SourceCollectorInspectPluginError(
+        "source_inspect_fetch_failed",
+        "Failed to fetch source metadata.",
+      );
     }
 
     const body = await response.text();
     const parsedFeed = parsePodcastRssFeed(body);
 
     if (parsedFeed === null) {
-      return err({
-        code: "source_inspect_unrecognized",
-        message: "The given URL is not a supported RSS feed.",
-      });
+      throw new SourceCollectorInspectPluginError(
+        "source_inspect_unrecognized",
+        "The given URL is not a supported RSS feed.",
+      );
     }
 
-    return ok({
+    return {
       description: parsedFeed.metadata.description,
       title: parsedFeed.metadata.title,
       url: input.sourceUrl,
-    });
+    };
   },
 
   async observe(

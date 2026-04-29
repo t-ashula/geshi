@@ -288,14 +288,10 @@ describe("podcastRssPlugin.inspect", () => {
       sourceUrl: "https://example.com/feed.xml",
     });
 
-    expect(result.ok).toBe(true);
     expect(result).toMatchObject({
-      ok: true,
-      value: {
-        description: "Weekly notes",
-        title: "Example Podcast",
-        url: "https://example.com/feed.xml",
-      },
+      description: "Weekly notes",
+      title: "Example Podcast",
+      url: "https://example.com/feed.xml",
     });
   });
 
@@ -314,12 +310,9 @@ describe("podcastRssPlugin.inspect", () => {
         logger: createNoopLogger(),
         sourceUrl: "https://example.com/feed.xml",
       }),
-    ).resolves.toEqual({
-      error: {
-        code: "source_inspect_unrecognized",
-        message: "The given URL is not a supported RSS feed.",
-      },
-      ok: false,
+    ).rejects.toMatchObject({
+      code: "source_inspect_unrecognized",
+      message: "The given URL is not a supported RSS feed.",
     });
   });
 });
