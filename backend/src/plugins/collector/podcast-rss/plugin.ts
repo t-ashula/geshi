@@ -5,7 +5,7 @@ import type {
   ObservedAsset,
   ObservedContent,
   SourceCollectorAcquireInput,
-  SourceCollectorInspectError,
+  SourceCollectorInspectErrorCode,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
   SourceCollectorPlugin,
@@ -56,12 +56,9 @@ const parser = new XMLParser({
 });
 
 class SourceCollectorInspectPluginError extends Error {
-  public readonly code: SourceCollectorInspectError["code"];
+  public readonly code: SourceCollectorInspectErrorCode;
 
-  public constructor(
-    code: SourceCollectorInspectError["code"],
-    message: string,
-  ) {
+  public constructor(code: SourceCollectorInspectErrorCode, message: string) {
     super(message);
     this.name = "SourceCollectorInspectPluginError";
     this.code = code;

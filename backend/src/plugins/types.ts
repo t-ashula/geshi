@@ -31,11 +31,13 @@ export type SourceMetadata = {
   url: string;
 };
 
+export type SourceCollectorInspectErrorCode =
+  | "source_inspect_fetch_failed"
+  | "source_inspect_unrecognized"
+  | "source_inspect_unsupported";
+
 export type SourceCollectorInspectError = {
-  code:
-    | "source_inspect_fetch_failed"
-    | "source_inspect_unrecognized"
-    | "source_inspect_unsupported";
+  code: SourceCollectorInspectErrorCode;
   message: string;
 };
 
