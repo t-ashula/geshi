@@ -7,6 +7,7 @@ describe("validateCreateSourceRequest", () => {
     expect(
       validateCreateSourceRequest({
         description: "",
+        sourceSlug: "",
         title: "",
         url: "   ",
       }),
@@ -17,6 +18,7 @@ describe("validateCreateSourceRequest", () => {
     expect(
       validateCreateSourceRequest({
         description: "",
+        sourceSlug: "",
         title: "",
         url: "ftp://example.com/feed.xml",
       }),
@@ -27,6 +29,7 @@ describe("validateCreateSourceRequest", () => {
     expect(
       validateCreateSourceRequest({
         description: "",
+        sourceSlug: "",
         title: "",
         url: "https://example.com/feed.xml",
       }),

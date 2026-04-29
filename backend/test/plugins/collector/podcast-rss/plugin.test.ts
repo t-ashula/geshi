@@ -266,6 +266,69 @@ describe("podcastRssPlugin.observe", () => {
   });
 });
 
+describe("podcastRssPlugin.inspect", () => {
+  it("returns source metadata from RSS channel metadata", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?>
+            <rss>
+              <channel>
+                <title> Example Podcast </title>
+                <description> Weekly notes </description>
+              </channel>
+            </rss>`,
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    const result = await podcastRssPlugin.inspect({
+      abortSignal: new AbortController().signal,
+      config: {},
+      logger: createNoopLogger(),
+      sourceUrl: "https://example.com/feed.xml",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        description: "Weekly notes",
+        title: "Example Podcast",
+        url: "https://example.com/feed.xml",
+      },
+    });
+  });
+
+  it("returns an unrecognized error for non-rss responses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(new Response("<html></html>", { status: 200 })),
+      ),
+    );
+
+    await expect(
+      podcastRssPlugin.inspect({
+        abortSignal: new AbortController().signal,
+        config: {},
+        logger: createNoopLogger(),
+        sourceUrl: "https://example.com/feed.xml",
+      }),
+    ).resolves.toEqual({
+      error: {
+        code: "source_inspect_unrecognized",
+        message: "The given URL is not a supported RSS feed.",
+      },
+      ok: false,
+    });
+  });
+});
+
 describe("podcastRssPlugin.acquire", () => {
   it("downloads an asset and normalizes its content type", async () => {
     vi.stubGlobal(

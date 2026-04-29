@@ -16,6 +16,7 @@ import { createLogger } from "./logger/index.js";
 import { getRuntimeConfig } from "./runtime-config.js";
 import { ContentService } from "./service/content-service.js";
 import { JobService } from "./service/job-service.js";
+import { SourceInspectService } from "./service/source-inspect-service.js";
 import { SourceService } from "./service/source-service.js";
 
 const runtimeConfig = getRuntimeConfig();
@@ -36,6 +37,7 @@ const contentService = new ContentService(contentRepository);
 const jobRepository = new JobRepository(database);
 const sourceRepository = new SourceRepository(database);
 const sourceService = new SourceService(sourceRepository);
+const sourceInspectService = new SourceInspectService();
 const jobQueue = new PgBossJobQueue(boss);
 const jobService = new JobService(sourceService, jobRepository, jobQueue);
 
@@ -55,7 +57,12 @@ await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, {
   retryLimit: 2,
 });
 
-const app = createApp(sourceService, contentService, jobService);
+const app = createApp(
+  sourceService,
+  sourceInspectService,
+  contentService,
+  jobService,
+);
 
 serve({
   fetch: app.fetch,

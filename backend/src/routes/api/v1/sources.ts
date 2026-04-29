@@ -3,14 +3,18 @@ import type { Hono } from "hono";
 import { DuplicateSourceUrlHashError } from "../../../db/source-repository.js";
 import type { JobService } from "../../../service/job-service.js";
 import { SourceNotFoundError } from "../../../service/job-service.js";
+import type {
+  InspectSourceError,
+  SourceInspectService,
+} from "../../../service/source-inspect-service.js";
 import type { SourceService } from "../../../service/source-service.js";
-import { InvalidSourceUrlError } from "../../../service/source-service.js";
 
 type App = Hono;
 
 export function registerSourceRoutes(
   app: App,
   sourceService: SourceService,
+  sourceInspectService: SourceInspectService,
   jobService: JobService,
 ): void {
   app.get("/api/v1/sources", async (context) => {
@@ -39,31 +43,32 @@ export function registerSourceRoutes(
     const body = json as Record<string, unknown>;
 
     try {
-      const createdSource = await sourceService.createSource({
+      const result = await sourceService.createSource({
         description: toOptionalString(body.description),
+        sourceSlug: toOptionalString(body.sourceSlug),
         title: toOptionalString(body.title),
         url: toOptionalString(body.url) ?? "",
       });
 
-      return context.json(
-        {
-          data: createdSource,
-        },
-        201,
-      );
-    } catch (error) {
-      if (error instanceof InvalidSourceUrlError) {
+      if (!result.ok) {
         return context.json(
           {
             error: {
-              code: error.code,
-              message: error.message,
+              code: result.error.code,
+              message: result.error.message,
             },
           },
           422,
         );
       }
 
+      return context.json(
+        {
+          data: result.value,
+        },
+        201,
+      );
+    } catch (error) {
       if (error instanceof DuplicateSourceUrlHashError) {
         return context.json(
           {
@@ -78,6 +83,43 @@ export function registerSourceRoutes(
 
       throw error;
     }
+  });
+
+  app.post("/api/v1/sources/inspect", async (context) => {
+    const json: unknown = await context.req.json().catch(() => null);
+
+    if (json === null || typeof json !== "object") {
+      return context.json(
+        {
+          error: {
+            code: "invalid_json",
+            message: "Request body must be a JSON object.",
+          },
+        },
+        400,
+      );
+    }
+
+    const body = json as Record<string, unknown>;
+    const result = await sourceInspectService.inspectSource({
+      url: toOptionalString(body.url) ?? "",
+    });
+
+    if (!result.ok) {
+      return context.json(
+        {
+          error: {
+            code: result.error.code,
+            message: result.error.message,
+          },
+        },
+        inspectSourceStatus(result.error),
+      );
+    }
+
+    return context.json({
+      data: result.value,
+    });
   });
 
   app.post("/api/v1/sources/:sourceId/observe", async (context) => {
@@ -107,4 +149,8 @@ export function registerSourceRoutes(
 
 function toOptionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function inspectSourceStatus(_error: InspectSourceError): 422 {
+  return 422;
 }

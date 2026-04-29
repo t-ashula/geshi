@@ -1,8 +1,27 @@
 export type CreateSourceRequest = {
   description: string;
+  sourceSlug: string;
   title: string;
   url: string;
 };
+
+export type InspectSourceRequest = {
+  url: string;
+};
+
+export type InspectSourceDraft = {
+  description: string | null;
+  sourceSlug: string;
+  title: string | null;
+  url: string;
+};
+
+export type ApiError = {
+  code: string;
+  message: string;
+};
+
+export type Result<T, E> = { ok: true; value: T } | { error: E; ok: false };
 
 export type SourceListItem = {
   createdAt: string;
@@ -47,10 +66,7 @@ type CreateSourceResponse = {
 };
 
 type ErrorResponse = {
-  error: {
-    code: string;
-    message: string;
-  };
+  error: ApiError;
 };
 
 type ListSourcesResponse = {
@@ -63,6 +79,10 @@ type ListContentsResponse = {
 
 type JobResponse = {
   data: JobListItem;
+};
+
+type InspectSourceResponse = {
+  data: InspectSourceDraft;
 };
 
 export async function listSources(): Promise<SourceListItem[]> {
@@ -100,6 +120,43 @@ export async function createSource(
   }
 
   throw new Error("Source registration failed.");
+}
+
+export async function inspectSource(
+  request: InspectSourceRequest,
+): Promise<Result<InspectSourceDraft, ApiError>> {
+  const response = await fetch("/api/v1/sources/inspect", {
+    body: JSON.stringify(request),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const payload = (await response.json()) as
+    | InspectSourceResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    return {
+      error: payload.error,
+      ok: false,
+    };
+  }
+
+  if ("data" in payload) {
+    return {
+      ok: true,
+      value: payload.data,
+    };
+  }
+
+  return {
+    error: {
+      code: "source_inspect_failed",
+      message: "Source inspect failed.",
+    },
+    ok: false,
+  };
 }
 
 export async function observeSource(sourceId: string): Promise<JobListItem> {

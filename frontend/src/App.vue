@@ -10,6 +10,7 @@ import type {
 import {
   createSource,
   getJob,
+  inspectSource,
   listContents,
   listSources,
   observeSource,
@@ -19,16 +20,20 @@ import { validateCreateSourceRequest } from "./source-form.js";
 const contents = ref<ContentListItem[]>([]);
 const sources = ref<SourceListItem[]>([]);
 const isCreateFormVisible = ref(false);
+const isInspecting = ref(false);
 const isSubmitting = ref(false);
 const isObserveSubmitting = ref<string | null>(null);
 const isLoading = ref(true);
 const isContentsLoading = ref(true);
 const errorMessage = ref<string | null>(null);
+const inspectErrorMessage = ref<string | null>(null);
 const observeErrorMessage = ref<string | null>(null);
 const latestJob = ref<JobListItem | null>(null);
 const validationMessage = ref<string | null>(null);
+const lastInspectedUrl = ref<string | null>(null);
 const form = ref<CreateSourceRequest>({
   description: "",
+  sourceSlug: "",
   title: "",
   url: "",
 });
@@ -41,12 +46,55 @@ onMounted(async () => {
 function openCreateForm(): void {
   isCreateFormVisible.value = true;
   errorMessage.value = null;
+  inspectErrorMessage.value = null;
+  lastInspectedUrl.value = null;
   validationMessage.value = null;
 }
 
 function closeCreateForm(): void {
   isCreateFormVisible.value = false;
+  inspectErrorMessage.value = null;
+  lastInspectedUrl.value = null;
   validationMessage.value = null;
+}
+
+async function inspectCurrentSource(): Promise<void> {
+  const trimmedUrl = form.value.url.trim();
+
+  if (trimmedUrl === "" || lastInspectedUrl.value === trimmedUrl) {
+    return;
+  }
+
+  validationMessage.value = validateCreateSourceRequest(form.value);
+
+  if (validationMessage.value !== null) {
+    inspectErrorMessage.value = validationMessage.value;
+    return;
+  }
+
+  isInspecting.value = true;
+  inspectErrorMessage.value = null;
+
+  try {
+    const result = await inspectSource({
+      url: trimmedUrl,
+    });
+
+    if (!result.ok) {
+      inspectErrorMessage.value = result.error.message;
+      return;
+    }
+
+    form.value = {
+      description: result.value.description ?? "",
+      sourceSlug: result.value.sourceSlug,
+      title: result.value.title ?? "",
+      url: result.value.url,
+    };
+    lastInspectedUrl.value = result.value.url;
+  } finally {
+    isInspecting.value = false;
+  }
 }
 
 async function submitSource(): Promise<void> {
@@ -64,6 +112,7 @@ async function submitSource(): Promise<void> {
     await refreshSources();
     form.value = {
       description: "",
+      sourceSlug: "",
       title: "",
       url: "",
     };
@@ -147,25 +196,46 @@ async function refreshContents(): Promise<void> {
           <span>RSS URL</span>
           <input
             v-model="form.url"
+            :disabled="isInspecting || isSubmitting"
             type="url"
             placeholder="https://example.com/feed.xml"
+            @change="inspectCurrentSource"
+          />
+        </label>
+
+        <label>
+          <span>Source Slug</span>
+          <input
+            :value="form.sourceSlug"
+            readonly
+            type="text"
+            placeholder="Filled by inspect when available"
           />
         </label>
 
         <label>
           <span>Title</span>
-          <input v-model="form.title" type="text" placeholder="Optional" />
+          <input
+            v-model="form.title"
+            :disabled="isInspecting || isSubmitting"
+            type="text"
+            placeholder="Optional"
+          />
         </label>
 
         <label>
           <span>Description</span>
           <textarea
             v-model="form.description"
+            :disabled="isInspecting || isSubmitting"
             rows="4"
             placeholder="Optional"
           ></textarea>
         </label>
 
+        <p v-if="inspectErrorMessage" class="feedback error">
+          {{ inspectErrorMessage }}
+        </p>
         <p v-if="validationMessage" class="feedback error">
           {{ validationMessage }}
         </p>
@@ -181,10 +251,16 @@ async function refreshContents(): Promise<void> {
           <button
             type="button"
             class="primary-button"
-            :disabled="isSubmitting"
+            :disabled="isInspecting || isSubmitting"
             @click="submitSource"
           >
-            {{ isSubmitting ? "Registering..." : "Register" }}
+            {{
+              isSubmitting
+                ? "Registering..."
+                : isInspecting
+                  ? "Inspecting..."
+                  : "Register"
+            }}
           </button>
         </div>
       </div>
