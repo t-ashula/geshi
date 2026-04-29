@@ -128,14 +128,34 @@ describe("handleAcquireContentJob", () => {
 
       await handleAcquireContentJob(
         {
-          assetId: firstAssetId,
-          collectorSettingId: "setting-1",
-          collectorSettingSnapshotId: "setting-snapshot-1",
-          config: {},
-          contentId: content.id,
+          asset: {
+            id: firstAssetId,
+            kind: "html",
+            observedFingerprint:
+              "2026-04-28:html:https://example.com/episodes/1",
+            primary: true,
+            sourceUrl: "https://example.com/episodes/1",
+          },
+          collector: {
+            config: {},
+            pluginSlug: "podcast-rss",
+            settingId: "setting-1",
+            settingSnapshotId: "setting-snapshot-1",
+          },
+          content: {
+            externalId: "ep-1",
+            id: content.id,
+            kind: "podcast-episode",
+            publishedAt: new Date("2024-01-01T00:00:00Z"),
+            status: "discovered",
+            summary: "Hello",
+            title: "Episode 1",
+          },
           jobId,
-          pluginSlug: "podcast-rss",
-          sourceId: source.id,
+          source: {
+            id: source.id,
+            slug: source.slug,
+          },
         },
         {
           assetService,
@@ -232,14 +252,34 @@ describe("handleAcquireContentJob", () => {
       await expect(
         handleAcquireContentJob(
           {
-            assetId: asset.id,
-            collectorSettingId: "setting-2",
-            collectorSettingSnapshotId: "setting-snapshot-2",
-            config: {},
-            contentId: content.id,
+            asset: {
+              id: asset.id,
+              kind: "audio",
+              observedFingerprint:
+                "2026-04-28:audio:https://cdn.example.com/audio/2.mp3",
+              primary: false,
+              sourceUrl: "https://cdn.example.com/audio/2.mp3",
+            },
+            collector: {
+              config: {},
+              pluginSlug: "podcast-rss",
+              settingId: "setting-2",
+              settingSnapshotId: "setting-snapshot-2",
+            },
+            content: {
+              externalId: "ep-2",
+              id: content.id,
+              kind: "podcast-episode",
+              publishedAt: new Date("2024-01-02T00:00:00Z"),
+              status: "discovered",
+              summary: "World",
+              title: "Episode 2",
+            },
             jobId,
-            pluginSlug: "podcast-rss",
-            sourceId: source.id,
+            source: {
+              id: source.id,
+              slug: source.slug,
+            },
           },
           {
             assetService,
@@ -321,14 +361,33 @@ describe("handleAcquireContentJob", () => {
       await expect(
         handleAcquireContentJob(
           {
-            assetId: asset.id,
-            collectorSettingId: "setting-3",
-            collectorSettingSnapshotId: "setting-snapshot-3",
-            config: {},
-            contentId: content.id,
+            asset: {
+              id: asset.id,
+              kind: "audio",
+              observedFingerprint: "2026-04-28:audio:null",
+              primary: false,
+              sourceUrl: null,
+            },
+            collector: {
+              config: {},
+              pluginSlug: "podcast-rss",
+              settingId: "setting-3",
+              settingSnapshotId: "setting-snapshot-3",
+            },
+            content: {
+              externalId: "ep-3",
+              id: content.id,
+              kind: "podcast-episode",
+              publishedAt: new Date("2024-01-03T00:00:00Z"),
+              status: "discovered",
+              summary: "Missing sourceUrl",
+              title: "Episode 3",
+            },
             jobId,
-            pluginSlug: "podcast-rss",
-            sourceId: source.id,
+            source: {
+              id: source.id,
+              slug: source.slug,
+            },
           },
           {
             assetService,

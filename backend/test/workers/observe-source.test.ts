@@ -91,15 +91,19 @@ describe("handleObserveSourceJob", () => {
 
     await handleObserveSourceJob(
       {
-        collectorSettingId: "setting-1",
-        collectorSettingSnapshotId: "setting-snapshot-1",
-        config: {},
+        collector: {
+          config: {},
+          pluginSlug: "podcast-rss",
+          settingId: "setting-1",
+          settingSnapshotId: "setting-snapshot-1",
+        },
         jobId,
-        pluginSlug: "podcast-rss",
-        slug: source.slug,
-        sourceId: source.id,
-        sourceKind: "podcast",
-        url: source.url,
+        source: {
+          id: source.id,
+          kind: "podcast",
+          slug: source.slug,
+          url: source.url,
+        },
       },
       {
         assetService,
@@ -163,16 +167,34 @@ describe("handleObserveSourceJob", () => {
       | undefined;
 
     expect(acquirePayload).toMatchObject({
-      collectorSettingId: "setting-1",
-      collectorSettingSnapshotId: "setting-snapshot-1",
-      config: {},
-      contentId: contents[0].id,
-      pluginSlug: "podcast-rss",
-      sourceId: source.id,
+      asset: {
+        id: assets.find((asset) => asset.kind === "html")?.id,
+        kind: "html",
+        primary: true,
+        sourceUrl: "https://example.com/episodes/1",
+      },
+      collector: {
+        config: {},
+        pluginSlug: "podcast-rss",
+        settingId: "setting-1",
+        settingSnapshotId: "setting-snapshot-1",
+      },
+      content: {
+        externalId: "ep-1",
+        id: contents[0].id,
+        kind: "podcast-episode",
+        status: "discovered",
+        summary: "Hello",
+        title: "Episode 1",
+      },
+      source: {
+        id: source.id,
+        slug: source.slug,
+      },
     });
     expect(
       enqueuedJobs.map(
-        (job) => (job.payload as AcquireContentJobPayload).assetId,
+        (job) => (job.payload as AcquireContentJobPayload).asset.id,
       ),
     ).toEqual(expect.arrayContaining(assets.map((asset) => asset.id)));
     expect(job?.status).toBe("succeeded");
@@ -216,15 +238,19 @@ describe("handleObserveSourceJob", () => {
     await expect(
       handleObserveSourceJob(
         {
-          collectorSettingId: "setting-2",
-          collectorSettingSnapshotId: "setting-snapshot-2",
-          config: {},
+          collector: {
+            config: {},
+            pluginSlug: "podcast-rss",
+            settingId: "setting-2",
+            settingSnapshotId: "setting-snapshot-2",
+          },
           jobId,
-          pluginSlug: "podcast-rss",
-          slug: source.slug,
-          sourceId: source.id,
-          sourceKind: "podcast",
-          url: source.url,
+          source: {
+            id: source.id,
+            kind: "podcast",
+            slug: source.slug,
+            url: source.url,
+          },
         },
         {
           assetService: new AssetService(assetRepository),

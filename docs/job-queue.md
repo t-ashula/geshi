@@ -19,7 +19,7 @@
 
 - `pg-boss` から job を受け取る
 - job payload を解釈する
-- enqueue 時点の `source + collectorSettingSnapshot` 相当の情報を扱う
+- worker 実行に必要な情報を enqueue 時点の payload から受け取る
 - 対応 plugin を解決する
 - 一時ディレクトリを払い出す
 - plugin を呼ぶ
@@ -62,9 +62,9 @@ backend と `observe-source` worker は別 process として起動する．
 
 1. frontend または CLI が backend に初回クロール要求を送る
 2. backend が `observe-source` job を enqueue する
-3. enqueue payload には `source + collectorSettingSnapshot` 相当の情報をわたす
+3. enqueue payload には worker 実行に必要な情報を含める
 4. `observe-source` worker が job を受ける
-5. worker が `source.url` と `collectorSettingSnapshot.config` から plugin 入力を組み立てる
+5. worker が payload の情報から plugin 入力を組み立てる
 6. worker が RSS plugin の `observe` を起動する
 7. plugin の `observe` が コンテンツ候補一覧を返す
 8. worker が backend の api をよぶ

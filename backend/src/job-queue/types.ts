@@ -2,26 +2,49 @@ export const OBSERVE_SOURCE_JOB_NAME = "observe-source";
 export const ACQUIRE_CONTENT_JOB_NAME = "acquire-content";
 
 export type ObserveSourceJobPayload = {
-  collectorSettingId: string;
-  collectorSettingSnapshotId: string;
-  config: Record<string, unknown>;
   jobId: string;
-  pluginSlug: string;
-  slug: string;
-  sourceId: string;
-  sourceKind: "podcast";
-  url: string;
+  collector: {
+    config: Record<string, unknown>;
+    pluginSlug: string;
+    settingId: string;
+    settingSnapshotId: string;
+  };
+  source: {
+    id: string;
+    kind: "podcast";
+    slug: string;
+    url: string;
+  };
 };
 
 export type AcquireContentJobPayload = {
-  assetId: string;
-  collectorSettingId: string;
-  collectorSettingSnapshotId: string;
-  config: Record<string, unknown>;
-  contentId: string;
   jobId: string;
-  pluginSlug: string;
-  sourceId: string;
+  collector: {
+    config: Record<string, unknown>;
+    pluginSlug: string;
+    settingId: string;
+    settingSnapshotId: string;
+  };
+  asset: {
+    id: string;
+    kind: string;
+    observedFingerprint: string;
+    primary: boolean;
+    sourceUrl: string | null;
+  };
+  content: {
+    externalId: string;
+    id: string;
+    kind: string;
+    publishedAt: Date | null;
+    status: "discovered" | "stored" | "failed";
+    summary: string | null;
+    title: string | null;
+  };
+  source: {
+    id: string;
+    slug: string;
+  };
 };
 
 export type JobPayload = ObserveSourceJobPayload | AcquireContentJobPayload;

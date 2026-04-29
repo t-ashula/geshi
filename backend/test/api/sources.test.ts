@@ -337,9 +337,13 @@ describe("/api/v1/sources", () => {
       expect(enqueuedNames).toEqual([OBSERVE_SOURCE_JOB_NAME]);
       expect(enqueuedPayloads).toHaveLength(1);
       expect(enqueuedPayloads[0]).toMatchObject({
-        pluginSlug: "podcast-rss",
-        sourceId: createdPayload.data.id,
-        url: "https://example.com/feed.xml",
+        collector: {
+          pluginSlug: "podcast-rss",
+        },
+        source: {
+          id: createdPayload.data.id,
+          url: "https://example.com/feed.xml",
+        },
       });
     } finally {
       await destroyTestDatabase(testDatabase);

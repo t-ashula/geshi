@@ -31,8 +31,8 @@ export async function handleObserveSourceJob(
   const workDir = join(tmpRootDir, payload.jobId);
   const logger = dependencies.logger.child({
     jobId: payload.jobId,
-    pluginSlug: payload.pluginSlug,
-    sourceId: payload.sourceId,
+    pluginSlug: payload.collector.pluginSlug,
+    sourceId: payload.source.id,
   });
 
   await mkdir(workDir, {
@@ -42,15 +42,15 @@ export async function handleObserveSourceJob(
   logger.info("observe job started.");
 
   try {
-    const plugin = getSourceCollectorPlugin(payload.pluginSlug);
+    const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
     const abortController = new AbortController();
     const observedContents = await plugin.observe({
       abortSignal: abortController.signal,
-      config: payload.config,
+      config: payload.collector.config,
       logger: logger.child({
         operation: "observe",
       }),
-      sourceUrl: payload.url,
+      sourceUrl: payload.source.url,
       workDir,
     });
 
@@ -61,7 +61,7 @@ export async function handleObserveSourceJob(
           externalId: observedContent.externalId,
           kind: observedContent.kind,
           publishedAt: observedContent.publishedAt,
-          sourceId: payload.sourceId,
+          sourceId: payload.source.id,
           status: "discovered",
           summary: observedContent.summary,
           title: observedContent.title,
@@ -78,25 +78,67 @@ export async function handleObserveSourceJob(
             sourceUrl: asset.sourceUrl,
           })),
         );
+      const observedAssetByFingerprint = new Map(
+        observedContent.assets.map((asset) => [
+          asset.observedFingerprints[0],
+          asset,
+        ]),
+      );
 
       for (const assetId of observedAssets.assetIdsRequiringAcquire) {
+        const persistedAsset =
+          await dependencies.assetService.findAcquireTargetById(assetId);
+
+        if (persistedAsset === null) {
+          throw new Error(`Pending asset not found after observe: ${assetId}`);
+        }
+
+        const observedAsset = observedAssetByFingerprint.get(
+          persistedAsset.observedFingerprint,
+        );
+
+        if (observedAsset === undefined) {
+          throw new Error(
+            `Observed asset metadata not found for fingerprint: ${persistedAsset.observedFingerprint}`,
+          );
+        }
+
         const acquireJob = await dependencies.jobRepository.createJob({
           id: uuidv7(),
           kind: ACQUIRE_CONTENT_JOB_NAME,
           retryable: true,
-          sourceId: payload.sourceId,
+          sourceId: payload.source.id,
         });
         const queueJobId = await dependencies.jobQueue.enqueue(
           ACQUIRE_CONTENT_JOB_NAME,
           {
-            assetId,
-            collectorSettingId: payload.collectorSettingId,
-            collectorSettingSnapshotId: payload.collectorSettingSnapshotId,
-            config: payload.config,
-            contentId: storedContent.id,
+            asset: {
+              id: assetId,
+              kind: observedAsset.kind,
+              observedFingerprint: persistedAsset.observedFingerprint,
+              primary: observedAsset.primary,
+              sourceUrl: observedAsset.sourceUrl,
+            },
+            collector: {
+              config: payload.collector.config,
+              pluginSlug: payload.collector.pluginSlug,
+              settingId: payload.collector.settingId,
+              settingSnapshotId: payload.collector.settingSnapshotId,
+            },
+            content: {
+              externalId: observedContent.externalId,
+              id: storedContent.id,
+              kind: observedContent.kind,
+              publishedAt: observedContent.publishedAt,
+              status: observedContent.status,
+              summary: observedContent.summary,
+              title: observedContent.title,
+            },
             jobId: acquireJob.id,
-            pluginSlug: payload.pluginSlug,
-            sourceId: payload.sourceId,
+            source: {
+              id: payload.source.id,
+              slug: payload.source.slug,
+            },
           },
         );
 

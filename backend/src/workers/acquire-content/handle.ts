@@ -1,5 +1,3 @@
-import type { AcquireTargetAsset } from "../../db/asset-repository.js";
-import type { AcquireTargetContent } from "../../db/content-repository.js";
 import type { JobRepository } from "../../db/job-repository.js";
 import type { AcquireContentJobPayload } from "../../job-queue/types.js";
 import { findLatestFingerprint } from "../../lib/fingerprint.js";
@@ -24,51 +22,29 @@ export async function handleAcquireContentJob(
   dependencies: HandleAcquireContentJobDependencies,
 ): Promise<void> {
   const logger = dependencies.logger.child({
-    assetId: payload.assetId,
-    contentId: payload.contentId,
+    assetId: payload.asset.id,
+    contentId: payload.content.id,
     jobId: payload.jobId,
-    pluginSlug: payload.pluginSlug,
-    sourceId: payload.sourceId,
+    pluginSlug: payload.collector.pluginSlug,
+    sourceId: payload.source.id,
   });
 
   await dependencies.jobRepository.markRunning(payload.jobId);
   logger.info("acquire job started.");
 
   try {
-    const plugin = getSourceCollectorPlugin(payload.pluginSlug);
-    const content = await dependencies.contentService.findContentAcquireTarget(
-      payload.contentId,
-    );
-
-    if (content === null) {
-      throw new Error(`Content not found: ${payload.contentId}`);
-    }
-
-    const asset = await dependencies.assetService.findAcquireTargetById(
-      payload.assetId,
-    );
-
-    if (asset === null) {
-      throw new Error(`Asset not found: ${payload.assetId}`);
-    }
+    const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
 
     const acquiredAsset = await plugin.acquire({
       abortSignal: AbortSignal.timeout(30_000),
       asset: {
-        kind: asset.kind,
-        observedFingerprints: [asset.observedFingerprint],
-        primary: asset.primary,
-        sourceUrl: asset.sourceUrl,
+        kind: payload.asset.kind,
+        observedFingerprints: [payload.asset.observedFingerprint],
+        primary: payload.asset.primary,
+        sourceUrl: payload.asset.sourceUrl,
       },
-      config: payload.config,
-      content: {
-        externalId: content.externalId,
-        kind: content.kind,
-        publishedAt: content.publishedAt,
-        status: content.status,
-        summary: content.summary,
-        title: content.title,
-      },
+      config: payload.collector.config,
+      content: payload.content,
       logger: logger.child({
         operation: "acquire",
       }),
@@ -76,14 +52,14 @@ export async function handleAcquireContentJob(
     const storedAsset = await dependencies.storage.put({
       body: acquiredAsset.body,
       contentType: acquiredAsset.contentType,
-      key: createAssetKey(dependencies.storage, content, asset, acquiredAsset),
+      key: createAssetKey(dependencies.storage, payload, acquiredAsset),
       overwrite: true,
     });
 
     await dependencies.assetService.upsertStoredAsset({
       acquiredFingerprints: acquiredAsset.acquiredFingerprints,
       acquiredAt: new Date(),
-      assetId: asset.id,
+      assetId: payload.asset.id,
       byteSize: storedAsset.byteSize,
       checksum: sha256ChecksumString(acquiredAsset.body),
       kind: acquiredAsset.kind,
@@ -94,7 +70,7 @@ export async function handleAcquireContentJob(
     });
 
     await dependencies.contentService.markContentStatus(
-      payload.contentId,
+      payload.content.id,
       "stored",
     );
     await dependencies.jobRepository.markSucceeded(payload.jobId);
@@ -104,7 +80,7 @@ export async function handleAcquireContentJob(
       error instanceof Error ? error.message : "Acquire content job failed.";
 
     await dependencies.contentService.markContentStatus(
-      payload.contentId,
+      payload.content.id,
       "failed",
     );
     await dependencies.jobRepository.markFailed(
@@ -122,8 +98,7 @@ export async function handleAcquireContentJob(
 
 function createAssetKey(
   storage: Storage,
-  targetContent: AcquireTargetContent,
-  targetAsset: AcquireTargetAsset,
+  payload: AcquireContentJobPayload,
   acquiredAsset: AcquiredAsset,
 ): string {
   const latestAcquiredFingerprint = findLatestFingerprint(
@@ -135,11 +110,11 @@ function createAssetKey(
   }
 
   return storage.pathJoin(
-    targetContent.sourceSlug,
-    targetContent.id,
+    payload.source.slug,
+    payload.content.id,
     acquiredAsset.kind,
-    targetAsset.id,
-    (targetContent.title ?? "").slice(0, 16),
+    payload.asset.id,
+    (payload.content.title ?? "").slice(0, 16),
     `${latestAcquiredFingerprint.replace(":", "-")}${contentTypeToExtension(acquiredAsset.contentType)}`,
   );
 }

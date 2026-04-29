@@ -34,16 +34,19 @@ export class JobService {
       sourceId,
     });
     const queueJobId = await this.jobQueue.enqueue(OBSERVE_SOURCE_JOB_NAME, {
-      collectorSettingId: observeSourceTarget.collectorSettingId,
-      collectorSettingSnapshotId:
-        observeSourceTarget.collectorSettingSnapshotId,
-      config: observeSourceTarget.config,
+      collector: {
+        config: observeSourceTarget.config,
+        pluginSlug: observeSourceTarget.pluginSlug,
+        settingId: observeSourceTarget.collectorSettingId,
+        settingSnapshotId: observeSourceTarget.collectorSettingSnapshotId,
+      },
       jobId: job.id,
-      pluginSlug: observeSourceTarget.pluginSlug,
-      slug: observeSourceTarget.slug,
-      sourceId: observeSourceTarget.sourceId,
-      sourceKind: observeSourceTarget.sourceKind,
-      url: observeSourceTarget.url,
+      source: {
+        id: observeSourceTarget.sourceId,
+        kind: observeSourceTarget.sourceKind,
+        slug: observeSourceTarget.slug,
+        url: observeSourceTarget.url,
+      },
     });
 
     await this.jobRepository.attachQueueJobId(job.id, queueJobId);
