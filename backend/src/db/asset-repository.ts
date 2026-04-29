@@ -1,4 +1,4 @@
-import type { Insertable, Kysely } from "kysely";
+import type { Insertable, Kysely, Selectable } from "kysely";
 
 import { findLatestFingerprint } from "../lib/fingerprint.js";
 import type { AssetSnapshotTable, AssetTable, GeshiDatabase } from "./types.js";
@@ -64,6 +64,10 @@ export class AssetRepository {
         .selectAll()
         .where("id", "=", input.assetId)
         .executeTakeFirstOrThrow();
+      const latestSnapshot = await findLatestAssetSnapshot(
+        transaction,
+        asset.id,
+      );
       const latestAcquiredFingerprint = requireLatestFingerprint(
         input.acquiredFingerprints,
         "acquired asset fingerprint",
@@ -71,24 +75,19 @@ export class AssetRepository {
       const snapshotChanged =
         asset.acquired_fingerprint !== latestAcquiredFingerprint ||
         asset.acquired_at?.getTime() !== input.acquiredAt.getTime() ||
-        asset.byte_size !== input.byteSize ||
-        asset.checksum !== (input.checksum ?? null) ||
         asset.is_primary !== input.primary ||
-        asset.mime_type !== input.mimeType ||
-        asset.source_url !== input.sourceUrl ||
-        asset.storage_key !== input.storageKey;
+        latestSnapshot.byte_size !== input.byteSize ||
+        latestSnapshot.checksum !== (input.checksum ?? null) ||
+        latestSnapshot.mime_type !== input.mimeType ||
+        latestSnapshot.source_url !== input.sourceUrl ||
+        latestSnapshot.storage_key !== input.storageKey;
 
       await transaction
         .updateTable("assets")
         .set({
           acquired_at: input.acquiredAt,
           acquired_fingerprint: latestAcquiredFingerprint,
-          byte_size: input.byteSize,
-          checksum: input.checksum ?? null,
           is_primary: input.primary,
-          mime_type: input.mimeType,
-          source_url: input.sourceUrl,
-          storage_key: input.storageKey,
         })
         .where("id", "=", input.assetId)
         .executeTakeFirstOrThrow();
@@ -101,11 +100,9 @@ export class AssetRepository {
               input.assetId,
               await findNextAssetSnapshotVersion(transaction, input.assetId),
               {
-                acquiredFingerprint: latestAcquiredFingerprint,
                 byteSize: input.byteSize,
                 checksum: input.checksum ?? null,
                 mimeType: input.mimeType,
-                observedFingerprint: asset.observed_fingerprint,
                 sourceUrl: input.sourceUrl,
                 storageKey: input.storageKey,
               },
@@ -145,11 +142,9 @@ export class AssetRepository {
             .insertInto("asset_snapshots")
             .values(
               toAssetSnapshotInsert(createdAsset.id, 1, {
-                acquiredFingerprint: null,
                 byteSize: null,
                 checksum: null,
                 mimeType: null,
-                observedFingerprint: latestObservedFingerprint,
                 sourceUrl: input.sourceUrl,
                 storageKey: null,
               }),
@@ -160,19 +155,20 @@ export class AssetRepository {
           continue;
         }
 
+        const latestSnapshot = await findLatestAssetSnapshot(
+          transaction,
+          existingAsset.id,
+        );
         const observedFingerprintChanged =
           existingAsset.observed_fingerprint !== latestObservedFingerprint;
         const observedStateChanged =
-          observedFingerprintChanged ||
           existingAsset.is_primary !== input.primary ||
-          existingAsset.source_url !== input.sourceUrl;
+          latestSnapshot.source_url !== input.sourceUrl;
 
         await transaction
           .updateTable("assets")
           .set({
             is_primary: input.primary,
-            observed_fingerprint: latestObservedFingerprint,
-            source_url: input.sourceUrl,
           })
           .where("id", "=", existingAsset.id)
           .executeTakeFirstOrThrow();
@@ -188,13 +184,11 @@ export class AssetRepository {
                   existingAsset.id,
                 ),
                 {
-                  acquiredFingerprint: existingAsset.acquired_fingerprint,
-                  byteSize: existingAsset.byte_size,
-                  checksum: existingAsset.checksum,
-                  mimeType: existingAsset.mime_type,
-                  observedFingerprint: latestObservedFingerprint,
+                  byteSize: latestSnapshot.byte_size,
+                  checksum: latestSnapshot.checksum,
+                  mimeType: latestSnapshot.mime_type,
                   sourceUrl: input.sourceUrl,
-                  storageKey: existingAsset.storage_key,
+                  storageKey: latestSnapshot.storage_key,
                 },
               ),
             )
@@ -223,21 +217,30 @@ export class AssetRepository {
       .orderBy("created_at", "asc")
       .execute();
 
-    return assets.map((asset) => ({
-      acquiredFingerprint: asset.acquired_fingerprint,
-      byteSize: asset.byte_size,
-      checksum: asset.checksum,
-      contentId: asset.content_id,
-      createdAt: asset.created_at,
-      acquiredAt: asset.acquired_at,
-      id: asset.id,
-      kind: asset.kind,
-      mimeType: asset.mime_type,
-      observedFingerprint: asset.observed_fingerprint,
-      primary: asset.is_primary,
-      sourceUrl: asset.source_url,
-      storageKey: asset.storage_key,
-    }));
+    return Promise.all(
+      assets.map(async (asset) => {
+        const latestSnapshot = await findLatestAssetSnapshot(
+          this.database,
+          asset.id,
+        );
+
+        return {
+          acquiredFingerprint: asset.acquired_fingerprint,
+          byteSize: latestSnapshot.byte_size,
+          checksum: latestSnapshot.checksum,
+          contentId: asset.content_id,
+          createdAt: asset.created_at,
+          acquiredAt: asset.acquired_at,
+          id: asset.id,
+          kind: asset.kind,
+          mimeType: latestSnapshot.mime_type,
+          observedFingerprint: asset.observed_fingerprint,
+          primary: asset.is_primary,
+          sourceUrl: latestSnapshot.source_url,
+          storageKey: latestSnapshot.storage_key,
+        };
+      }),
+    );
   }
 
   public async listPendingAssetsByContentId(
@@ -251,14 +254,23 @@ export class AssetRepository {
       .orderBy("created_at", "asc")
       .execute();
 
-    return assets.map((asset) => ({
-      acquiredFingerprint: asset.acquired_fingerprint,
-      id: asset.id,
-      kind: asset.kind,
-      observedFingerprint: asset.observed_fingerprint,
-      primary: asset.is_primary,
-      sourceUrl: asset.source_url,
-    }));
+    return Promise.all(
+      assets.map(async (asset) => {
+        const latestSnapshot = await findLatestAssetSnapshot(
+          this.database,
+          asset.id,
+        );
+
+        return {
+          acquiredFingerprint: asset.acquired_fingerprint,
+          id: asset.id,
+          kind: asset.kind,
+          observedFingerprint: asset.observed_fingerprint,
+          primary: asset.is_primary,
+          sourceUrl: latestSnapshot.source_url,
+        };
+      }),
+    );
   }
 
   public async findAcquireTargetById(
@@ -274,13 +286,18 @@ export class AssetRepository {
       return null;
     }
 
+    const latestSnapshot = await findLatestAssetSnapshot(
+      this.database,
+      asset.id,
+    );
+
     return {
       acquiredFingerprint: asset.acquired_fingerprint,
       id: asset.id,
       kind: asset.kind,
       observedFingerprint: asset.observed_fingerprint,
       primary: asset.is_primary,
-      sourceUrl: asset.source_url,
+      sourceUrl: latestSnapshot.source_url,
     };
   }
 }
@@ -295,7 +312,6 @@ function toObservedAssetInsert(
     is_primary: input.primary,
     kind: input.kind,
     observed_fingerprint: observedFingerprint,
-    source_url: input.sourceUrl,
   };
 }
 
@@ -303,23 +319,19 @@ function toAssetSnapshotInsert(
   assetId: string,
   version: number,
   snapshot: {
-    acquiredFingerprint: string | null;
     byteSize: number | null;
     checksum: string | null;
     mimeType: string | null;
-    observedFingerprint: string;
     sourceUrl: string | null;
     storageKey: string | null;
   },
 ): Insertable<AssetSnapshotTable> {
   return {
-    acquired_fingerprint: snapshot.acquiredFingerprint,
     asset_id: assetId,
     byte_size: snapshot.byteSize,
     checksum: snapshot.checksum,
     id: crypto.randomUUID(),
     mime_type: snapshot.mimeType,
-    observed_fingerprint: snapshot.observedFingerprint,
     recorded_at: new Date(),
     source_url: snapshot.sourceUrl,
     storage_key: snapshot.storageKey,
@@ -339,6 +351,24 @@ async function findNextAssetSnapshotVersion(
     .executeTakeFirst();
 
   return (latestSnapshot?.version ?? 0) + 1;
+}
+
+async function findLatestAssetSnapshot(
+  database: Kysely<GeshiDatabase>,
+  assetId: string,
+): Promise<Selectable<AssetSnapshotTable>> {
+  const latestSnapshot = await database
+    .selectFrom("asset_snapshots")
+    .selectAll()
+    .where("asset_id", "=", assetId)
+    .orderBy("version", "desc")
+    .executeTakeFirst();
+
+  if (latestSnapshot === undefined) {
+    throw new Error(`Asset snapshot was not found for asset ${assetId}.`);
+  }
+
+  return latestSnapshot;
 }
 
 function requireLatestFingerprint(

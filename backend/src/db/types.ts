@@ -76,27 +76,20 @@ export type ContentSnapshotTable = {
 export type AssetTable = {
   acquired_fingerprint: string | null;
   acquired_at: NullableTimestampColumn;
-  byte_size: number | null;
-  checksum: string | null;
   content_id: string;
   created_at: TimestampColumn;
   id: string;
   is_primary: GeneratedBooleanColumn;
   kind: string;
-  mime_type: string | null;
   observed_fingerprint: string;
-  source_url: string | null;
-  storage_key: string | null;
 };
 
 export type AssetSnapshotTable = {
-  acquired_fingerprint: string | null;
   asset_id: string;
   byte_size: number | null;
   checksum: string | null;
   id: string;
   mime_type: string | null;
-  observed_fingerprint: string;
   recorded_at: TimestampColumn;
   source_url: string | null;
   storage_key: string | null;
