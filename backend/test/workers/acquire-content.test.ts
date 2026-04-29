@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AssetRepository } from "../../src/db/asset-repository.js";
 import { ContentRepository } from "../../src/db/content-repository.js";
@@ -15,6 +15,10 @@ import {
 } from "../db/test-database.js";
 
 describe("handleAcquireContentJob", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("acquires pending assets, stores them, and marks the job as succeeded", async () => {
     const testDatabase = await createTestDatabase();
 
@@ -156,7 +160,198 @@ describe("handleAcquireContentJob", () => {
       );
       expect(job?.status).toBe("succeeded");
     } finally {
-      vi.restoreAllMocks();
+      await destroyTestDatabase(testDatabase);
+    }
+  });
+
+  it("marks the job and content as failed when asset fetch fails", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      const sourceRepository = new SourceRepository(testDatabase.database);
+      const assetRepository = new AssetRepository(testDatabase.database);
+      const contentRepository = new ContentRepository(testDatabase.database);
+      const jobRepository = new JobRepository(testDatabase.database);
+      const assetService = new AssetService(assetRepository);
+      const contentService = new ContentService(contentRepository);
+      const storage = new FilesystemStorage("/tmp/geshi-storage-test");
+      const source = await sourceRepository.createSource({
+        collectorSettingId: crypto.randomUUID(),
+        collectorSettingSnapshotId: crypto.randomUUID(),
+        id: crypto.randomUUID(),
+        kind: "podcast",
+        pluginSlug: "podcast-rss",
+        slug: "source-two",
+        snapshotId: crypto.randomUUID(),
+        url: "https://example.com/feed.xml",
+        urlHash: "hash-2",
+      });
+      const content = await contentService.createObservedContent({
+        contentFingerprints: ["2026-04-28:ep-2"],
+        externalId: "ep-2",
+        kind: "podcast-episode",
+        publishedAt: new Date("2024-01-02T00:00:00Z"),
+        sourceId: source.id,
+        status: "discovered",
+        summary: "World",
+        title: "Episode 2",
+      });
+
+      await assetService.createObservedAssets([
+        {
+          contentFingerprintChanged: false,
+          contentId: content.id,
+          kind: "audio",
+          observedFingerprints: [
+            "2026-04-28:audio:https://cdn.example.com/audio/2.mp3",
+          ],
+          primary: false,
+          sourceUrl: "https://cdn.example.com/audio/2.mp3",
+        },
+      ]);
+      const asset = (await assetRepository.listAssets())[0];
+      const jobId = crypto.randomUUID();
+
+      await jobRepository.createJob({
+        id: jobId,
+        kind: "acquire-content",
+        retryable: true,
+        sourceId: source.id,
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve(
+            new Response("bad gateway", {
+              status: 502,
+            }),
+          ),
+        ),
+      );
+
+      await expect(
+        handleAcquireContentJob(
+          {
+            assetId: asset.id,
+            collectorSettingId: "setting-2",
+            collectorSettingSnapshotId: "setting-snapshot-2",
+            config: {},
+            contentId: content.id,
+            jobId,
+            pluginSlug: "podcast-rss",
+            sourceId: source.id,
+          },
+          {
+            assetService,
+            contentService,
+            jobRepository,
+            logger: createNoopLogger(),
+            storage,
+          },
+        ),
+      ).rejects.toThrow("Failed to fetch asset: 502");
+
+      const storedContent = await contentRepository.findContentAcquireTarget(
+        content.id,
+      );
+      const job = await jobRepository.findJobById(jobId);
+
+      expect(storedContent?.status).toBe("failed");
+      expect(job?.status).toBe("failed");
+      expect(job?.failureMessage).toContain("Failed to fetch asset: 502");
+      expect(job?.retryable).toBe(true);
+    } finally {
+      await destroyTestDatabase(testDatabase);
+    }
+  });
+
+  it("marks the job and content as failed when the asset sourceUrl is missing", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      const sourceRepository = new SourceRepository(testDatabase.database);
+      const assetRepository = new AssetRepository(testDatabase.database);
+      const contentRepository = new ContentRepository(testDatabase.database);
+      const jobRepository = new JobRepository(testDatabase.database);
+      const assetService = new AssetService(assetRepository);
+      const contentService = new ContentService(contentRepository);
+      const storage = new FilesystemStorage("/tmp/geshi-storage-test");
+      const source = await sourceRepository.createSource({
+        collectorSettingId: crypto.randomUUID(),
+        collectorSettingSnapshotId: crypto.randomUUID(),
+        id: crypto.randomUUID(),
+        kind: "podcast",
+        pluginSlug: "podcast-rss",
+        slug: "source-three",
+        snapshotId: crypto.randomUUID(),
+        url: "https://example.com/feed.xml",
+        urlHash: "hash-3",
+      });
+      const content = await contentService.createObservedContent({
+        contentFingerprints: ["2026-04-28:ep-3"],
+        externalId: "ep-3",
+        kind: "podcast-episode",
+        publishedAt: new Date("2024-01-03T00:00:00Z"),
+        sourceId: source.id,
+        status: "discovered",
+        summary: "Missing sourceUrl",
+        title: "Episode 3",
+      });
+
+      await assetService.createObservedAssets([
+        {
+          contentFingerprintChanged: false,
+          contentId: content.id,
+          kind: "audio",
+          observedFingerprints: ["2026-04-28:audio:null"],
+          primary: false,
+          sourceUrl: null,
+        },
+      ]);
+      const asset = (await assetRepository.listAssets())[0];
+      const jobId = crypto.randomUUID();
+
+      await jobRepository.createJob({
+        id: jobId,
+        kind: "acquire-content",
+        retryable: true,
+        sourceId: source.id,
+      });
+
+      await expect(
+        handleAcquireContentJob(
+          {
+            assetId: asset.id,
+            collectorSettingId: "setting-3",
+            collectorSettingSnapshotId: "setting-snapshot-3",
+            config: {},
+            contentId: content.id,
+            jobId,
+            pluginSlug: "podcast-rss",
+            sourceId: source.id,
+          },
+          {
+            assetService,
+            contentService,
+            jobRepository,
+            logger: createNoopLogger(),
+            storage,
+          },
+        ),
+      ).rejects.toThrow("Podcast RSS asset sourceUrl is required.");
+
+      const storedContent = await contentRepository.findContentAcquireTarget(
+        content.id,
+      );
+      const job = await jobRepository.findJobById(jobId);
+
+      expect(storedContent?.status).toBe("failed");
+      expect(job?.status).toBe("failed");
+      expect(job?.failureMessage).toContain(
+        "Podcast RSS asset sourceUrl is required.",
+      );
+      expect(job?.retryable).toBe(true);
+    } finally {
       await destroyTestDatabase(testDatabase);
     }
   });
