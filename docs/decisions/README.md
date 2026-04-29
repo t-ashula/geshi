@@ -22,3 +22,4 @@
 - [ADR-0019: Web UI 起点の最小 E2E を Playwright で検証する](./0019-e2e-test-foundation.md)
 - [ADR-0020: E2E 用 source はローカル HTTP server から供給する](./0020-e2e-local-source-server.md)
 - [ADR-0021: E2E 用 DB を実運用 DB から分離する](./0021-e2e-database-isolation.md)
+- [ADR-0022: 期待される失敗は result 型で表現する](./0022-result-type-for-expected-failures.md)
