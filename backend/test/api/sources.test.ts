@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../src/app.js";
 import { ContentRepository } from "../../src/db/content-repository.js";
@@ -9,6 +9,7 @@ import type { ObserveSourceJobPayload } from "../../src/job-queue/types.js";
 import { OBSERVE_SOURCE_JOB_NAME } from "../../src/job-queue/types.js";
 import { ContentService } from "../../src/service/content-service.js";
 import { JobService } from "../../src/service/job-service.js";
+import { SourceInspectService } from "../../src/service/source-inspect-service.js";
 import { SourceService } from "../../src/service/source-service.js";
 import {
   createTestDatabase,
@@ -16,6 +17,10 @@ import {
 } from "../db/test-database.js";
 
 describe("/api/v1/sources", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("returns an empty source list", async () => {
     const testDatabase = await createTestDatabase();
 
@@ -68,6 +73,93 @@ describe("/api/v1/sources", () => {
       expect(payload.data.description).toBe("Weekly notes");
       expect(payload.data.version).toBe(1);
       expect(payload.data.slug).toMatch(/^example-podcast-/);
+    } finally {
+      await destroyTestDatabase(testDatabase);
+    }
+  });
+
+  it("creates a source with inspected slug", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      const app = createTestApp(testDatabase);
+      const response = await app.request("/api/v1/sources", {
+        body: JSON.stringify({
+          description: "Weekly notes",
+          sourceSlug: "inspected-slug",
+          title: "Example Podcast",
+          url: "https://example.com/feed.xml",
+        }),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+
+      expect(response.status).toBe(201);
+
+      const payload = (await response.json()) as {
+        data: {
+          slug: string;
+        };
+      };
+
+      expect(payload.data.slug).toBe("inspected-slug");
+    } finally {
+      await destroyTestDatabase(testDatabase);
+    }
+  });
+
+  it("inspects a source and returns metadata", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve(
+            new Response(
+              `<?xml version="1.0"?>
+              <rss>
+                <channel>
+                  <title>Example Podcast</title>
+                  <description>Weekly notes</description>
+                </channel>
+              </rss>`,
+              { status: 200 },
+            ),
+          ),
+        ),
+      );
+      const app = createTestApp(testDatabase);
+      const response = await app.request("/api/v1/sources/inspect", {
+        body: JSON.stringify({
+          url: "https://example.com/feed.xml",
+        }),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+
+      expect(response.status).toBe(200);
+      const payload = (await response.json()) as {
+        data: {
+          description: string;
+          sourceSlug: string;
+          title: string;
+          url: string;
+        };
+      };
+
+      expect(payload).toMatchObject({
+        data: {
+          description: "Weekly notes",
+          title: "Example Podcast",
+          url: "https://example.com/feed.xml",
+        },
+      });
+      expect(payload.data.sourceSlug).toMatch(/^example-podcast-/);
     } finally {
       await destroyTestDatabase(testDatabase);
     }
@@ -158,6 +250,39 @@ describe("/api/v1/sources", () => {
     }
   });
 
+  it("returns inspect errors from the plugin", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve(new Response("<html></html>", { status: 200 })),
+        ),
+      );
+      const app = createTestApp(testDatabase);
+      const response = await app.request("/api/v1/sources/inspect", {
+        body: JSON.stringify({
+          url: "https://example.com/not-rss",
+        }),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toEqual({
+        error: {
+          code: "source_inspect_unrecognized",
+          message: "The given URL is not a supported RSS feed.",
+        },
+      });
+    } finally {
+      await destroyTestDatabase(testDatabase);
+    }
+  });
+
   it("enqueues an observe job for a source", async () => {
     const testDatabase = await createTestDatabase();
     const enqueuedPayloads: ObserveSourceJobPayload[] = [];
@@ -234,7 +359,13 @@ function createTestApp(
   const jobRepository = new JobRepository(testDatabase.database);
   const sourceRepository = new SourceRepository(testDatabase.database);
   const sourceService = new SourceService(sourceRepository);
+  const sourceInspectService = new SourceInspectService();
   const jobService = new JobService(sourceService, jobRepository, jobQueue);
 
-  return createApp(sourceService, contentService, jobService);
+  return createApp(
+    sourceService,
+    sourceInspectService,
+    contentService,
+    jobService,
+  );
 }

@@ -1,3 +1,4 @@
+import type { Result } from "../lib/result.js";
 import type { Logger } from "../logger/index.js";
 
 export type ObservedAsset = {
@@ -26,6 +27,27 @@ export type SourceCollectorObserveInput = {
   workDir: string;
 };
 
+export type SourceMetadata = {
+  description: string | null;
+  title: string | null;
+  url: string;
+};
+
+export type SourceCollectorInspectError = {
+  code:
+    | "source_inspect_fetch_failed"
+    | "source_inspect_unrecognized"
+    | "source_inspect_unsupported";
+  message: string;
+};
+
+export type SourceCollectorInspectInput = {
+  abortSignal: AbortSignal;
+  config: Record<string, unknown>;
+  logger: Logger;
+  sourceUrl: string;
+};
+
 export type SourceCollectorAcquireInput = {
   asset: ObservedAsset;
   abortSignal: AbortSignal;
@@ -45,6 +67,9 @@ export type AcquiredAsset = {
 };
 
 export interface SourceCollectorPlugin {
+  inspect(
+    input: SourceCollectorInspectInput,
+  ): Promise<Result<SourceMetadata, SourceCollectorInspectError>>;
   observe(input: SourceCollectorObserveInput): Promise<ObservedContent[]>;
   acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset>;
 }

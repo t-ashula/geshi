@@ -35,6 +35,14 @@ app.get("/feeds/podcast.xml", (context) => {
   });
 });
 
+app.get("/feeds/not-rss.xml", () => {
+  return new Response("<html><body>not rss</body></html>", {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+    },
+  });
+});
+
 app.get("/episodes/1.html", async (_context) => {
   const body = await readFixtureText("episodes/1.html");
 

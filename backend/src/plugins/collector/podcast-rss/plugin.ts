@@ -1,12 +1,15 @@
 import { XMLParser } from "fast-xml-parser";
 
+import { err, ok } from "../../../lib/result.js";
 import type {
   AcquiredAsset,
   ObservedAsset,
   ObservedContent,
   SourceCollectorAcquireInput,
+  SourceCollectorInspectInput,
   SourceCollectorObserveInput,
   SourceCollectorPlugin,
+  SourceMetadata,
 } from "../../types.js";
 import type {
   AcquiredAssetFingerprintInput,
@@ -23,7 +26,9 @@ import {
 } from "./fingerprint.js";
 
 type RssChannel = {
+  description?: string;
   item?: RssItem | RssItem[];
+  title?: string;
 };
 
 type RssFeed = {
@@ -51,6 +56,35 @@ const parser = new XMLParser({
 });
 
 export const podcastRssPlugin: SourceCollectorPlugin = {
+  async inspect(input: SourceCollectorInspectInput) {
+    const response = await fetch(input.sourceUrl, {
+      signal: input.abortSignal,
+    }).catch(() => null);
+
+    if (response === null || !response.ok) {
+      return err({
+        code: "source_inspect_fetch_failed",
+        message: "Failed to fetch source metadata.",
+      });
+    }
+
+    const body = await response.text();
+    const parsedFeed = parsePodcastRssFeed(body);
+
+    if (parsedFeed === null) {
+      return err({
+        code: "source_inspect_unrecognized",
+        message: "The given URL is not a supported RSS feed.",
+      });
+    }
+
+    return ok({
+      description: parsedFeed.metadata.description,
+      title: parsedFeed.metadata.title,
+      url: input.sourceUrl,
+    });
+  },
+
   async observe(
     input: SourceCollectorObserveInput,
   ): Promise<ObservedContent[]> {
@@ -63,11 +97,13 @@ export const podcastRssPlugin: SourceCollectorPlugin = {
     }
 
     const body = await response.text();
-    const parsedFeed = parser.parse(body) as RssFeed;
-    const channel = parsedFeed.rss?.channel;
-    const items = toArray(channel?.item);
+    const parsedFeed = parsePodcastRssFeed(body);
 
-    return items
+    if (parsedFeed === null) {
+      throw new Error("Invalid RSS feed.");
+    }
+
+    return parsedFeed.items
       .map(toObservedContent)
       .filter((item): item is ObservedContent => item !== null);
   },
@@ -104,6 +140,11 @@ export const podcastRssPlugin: SourceCollectorPlugin = {
       sourceUrl: input.asset.sourceUrl,
     };
   },
+};
+
+type ParsedPodcastRssFeed = {
+  items: RssItem[];
+  metadata: Pick<SourceMetadata, "description" | "title">;
 };
 
 function toObservedContent(item: RssItem): ObservedContent | null {
@@ -246,6 +287,23 @@ function normalizeContentType(value: string | null): string | null {
   const normalizedValue = value?.split(";")[0]?.trim();
 
   return normalizedValue ? normalizedValue : null;
+}
+
+function parsePodcastRssFeed(value: string): ParsedPodcastRssFeed | null {
+  const parsedFeed = parser.parse(value) as RssFeed;
+  const channel = parsedFeed.rss?.channel;
+
+  if (channel === undefined) {
+    return null;
+  }
+
+  return {
+    items: toArray(channel.item),
+    metadata: {
+      description: normalizeString(channel.description),
+      title: normalizeString(channel.title),
+    },
+  };
 }
 
 function toArray<T>(value: T | T[] | undefined): T[] {
