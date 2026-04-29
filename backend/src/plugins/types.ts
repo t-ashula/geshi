@@ -24,7 +24,6 @@ export type SourceCollectorObserveInput = {
   config: Record<string, unknown>;
   logger: Logger;
   sourceUrl: string;
-  workDir: string;
 };
 
 export type SourceMetadata = {

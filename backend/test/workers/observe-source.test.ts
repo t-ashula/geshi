@@ -1,7 +1,3 @@
-import { mkdtemp } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AssetRepository } from "../../src/db/asset-repository.js";
@@ -22,11 +18,9 @@ import {
 
 describe("handleObserveSourceJob", () => {
   let testDatabase: Awaited<ReturnType<typeof createTestDatabase>>;
-  let tmpRootDir: string;
 
   beforeEach(async () => {
     testDatabase = await createTestDatabase();
-    tmpRootDir = await mkdtemp(join(tmpdir(), "geshi-observe-test-"));
   });
 
   afterEach(async () => {
@@ -118,7 +112,6 @@ describe("handleObserveSourceJob", () => {
         },
         jobRepository,
         logger: createNoopLogger(),
-        tmpRootDir,
       },
     );
 
@@ -262,7 +255,6 @@ describe("handleObserveSourceJob", () => {
           },
           jobRepository,
           logger: createNoopLogger(),
-          tmpRootDir,
         },
       ),
     ).rejects.toThrow("Failed to fetch RSS feed: 502");

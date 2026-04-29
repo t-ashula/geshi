@@ -1,6 +1,3 @@
-import { mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
-
 import { v7 as uuidv7 } from "uuid";
 
 import type { JobRepository } from "../../db/job-repository.js";
@@ -20,24 +17,18 @@ type HandleObserveSourceJobDependencies = {
   jobQueue: JobQueue;
   jobRepository: JobRepository;
   logger: Logger;
-  tmpRootDir?: string;
 };
 
 export async function handleObserveSourceJob(
   payload: ObserveSourceJobPayload,
   dependencies: HandleObserveSourceJobDependencies,
 ): Promise<void> {
-  const tmpRootDir = dependencies.tmpRootDir ?? "/tmp/geshi";
-  const workDir = join(tmpRootDir, payload.jobId);
   const logger = dependencies.logger.child({
     jobId: payload.jobId,
     pluginSlug: payload.collector.pluginSlug,
     sourceId: payload.source.id,
   });
 
-  await mkdir(workDir, {
-    recursive: true,
-  });
   await dependencies.jobRepository.markRunning(payload.jobId);
   logger.info("observe job started.");
 
@@ -51,7 +42,6 @@ export async function handleObserveSourceJob(
         operation: "observe",
       }),
       sourceUrl: payload.source.url,
-      workDir,
     });
 
     for (const observedContent of observedContents) {
@@ -166,10 +156,5 @@ export async function handleObserveSourceJob(
       failureMessage,
     });
     throw error;
-  } finally {
-    await rm(workDir, {
-      force: true,
-      recursive: true,
-    });
   }
 }

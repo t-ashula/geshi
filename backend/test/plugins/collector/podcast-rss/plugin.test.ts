@@ -21,7 +21,6 @@ async function observeFixture(name: string) {
     config: {},
     logger: createNoopLogger(),
     sourceUrl: "https://example.com/feed.xml",
-    workDir: "/tmp/plugin-test",
   });
 }
 
@@ -121,7 +120,6 @@ describe("podcastRssPlugin.observe", () => {
       config: {},
       logger: createNoopLogger(),
       sourceUrl: "https://example.com/feed.xml",
-      workDir: "/tmp/plugin-test",
     });
 
     expect(contents).toHaveLength(1);
@@ -185,7 +183,6 @@ describe("podcastRssPlugin.observe", () => {
       config: {},
       logger: createNoopLogger(),
       sourceUrl: "https://example.com/feed.xml",
-      workDir: "/tmp/plugin-test",
     });
 
     expect(contents).toHaveLength(2);
@@ -239,7 +236,6 @@ describe("podcastRssPlugin.observe", () => {
       config: {},
       logger: createNoopLogger(),
       sourceUrl: "https://example.com/feed.xml",
-      workDir: "/tmp/plugin-test",
     });
 
     expect(contents).toHaveLength(1);
@@ -260,7 +256,6 @@ describe("podcastRssPlugin.observe", () => {
         config: {},
         logger: createNoopLogger(),
         sourceUrl: "https://example.com/feed.xml",
-        workDir: "/tmp/plugin-test",
       }),
     ).rejects.toThrow("Failed to fetch RSS feed: 502");
   });
