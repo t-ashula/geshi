@@ -1,7 +1,6 @@
 services:
   postgres:
     image: postgres:18.3-alpine3.23
-    profiles: ["dev", "e2e"]
     environment:
       POSTGRES_DB: geshi
       POSTGRES_PASSWORD: geshi
@@ -18,7 +17,6 @@ services:
 
   dashboard:
     image: node:24-bookworm-slim
-    profiles: ["dev"]
     working_dir: /app
     command: sh -c "npm install -g @pg-boss/dashboard && pg-boss-dashboard"
     environment:
