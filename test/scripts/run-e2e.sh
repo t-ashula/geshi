@@ -39,11 +39,29 @@ cleanup() {
   fi
 }
 
+wait_for_test_db() {
+  attempts=0
+
+  while [ "$attempts" -lt 30 ]; do
+    if docker compose -f test/compose.test.yaml exec -T postgres \
+      pg_isready -U geshi -d geshi >/dev/null 2>&1; then
+      return 0
+    fi
+
+    attempts=$((attempts + 1))
+    sleep 1
+  done
+
+  echo "postgres did not become ready in time" >&2
+  return 1
+}
+
 trap cleanup EXIT INT TERM
 
 cd "$root_dir"
 
 make e2e-db-up
+wait_for_test_db
 make e2e-db-reset
 make e2e-db-schema-apply
 
@@ -76,4 +94,5 @@ sh test/scripts/wait-for-http.sh "http://127.0.0.1:$frontend_port" 30
 
 E2E_FRONTEND_URL="http://127.0.0.1:$frontend_port" \
 E2E_SOURCE_FEED_URL="http://127.0.0.1:$source_server_port/feeds/podcast.xml" \
+E2E_NON_RSS_SOURCE_URL="http://127.0.0.1:$source_server_port/feeds/not-rss.xml" \
 npx playwright test --config test/playwright.config.ts
