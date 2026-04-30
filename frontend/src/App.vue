@@ -58,8 +58,8 @@ const form = ref<CreateSourceRequest>({
   url: "",
 });
 const periodicCrawlSettings = ref<PeriodicCrawlSettings>({
-  enabled: false,
-  intervalMinutes: 15,
+  enabled: true,
+  intervalMinutes: 60,
 });
 const sourceCrawlForm = ref<PeriodicCrawlSettings>({
   enabled: false,

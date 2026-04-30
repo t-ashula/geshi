@@ -30,8 +30,8 @@ describe("/api/v1/settings/periodic-crawl", () => {
       expect(response.status).toBe(200);
       await expect(response.json()).resolves.toEqual({
         data: {
-          enabled: false,
-          intervalMinutes: 15,
+          enabled: true,
+          intervalMinutes: 60,
         },
       });
     } finally {

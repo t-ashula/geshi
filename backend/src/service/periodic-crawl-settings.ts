@@ -10,8 +10,8 @@ export type SourcePeriodicCrawlSettings = {
 
 export function defaultPeriodicCrawlAppSettings(): PeriodicCrawlAppSettings {
   return {
-    enabled: false,
-    intervalMinutes: 15,
+    enabled: true,
+    intervalMinutes: 60,
   };
 }
 
