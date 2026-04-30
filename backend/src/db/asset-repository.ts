@@ -1,6 +1,8 @@
 import type { Insertable, Kysely, Selectable } from "kysely";
 
 import { findLatestFingerprint } from "../lib/fingerprint.js";
+import type { Result } from "../lib/result.js";
+import { err, ok } from "../lib/result.js";
 import type { AssetSnapshotTable, AssetTable, GeshiDatabase } from "./types.js";
 
 export type UpsertStoredAssetInput = {
@@ -71,160 +73,182 @@ export type CreateObservedAssetsResult = {
   assetIdsRequiringAcquire: string[];
 };
 
+export type AssetRepositoryError = Error;
+
 export class AssetRepository {
   public constructor(private readonly database: Kysely<GeshiDatabase>) {}
 
-  public async upsertStoredAsset(input: UpsertStoredAssetInput): Promise<void> {
-    await this.database.transaction().execute(async (transaction) => {
-      const asset = await transaction
-        .selectFrom("assets")
-        .selectAll()
-        .where("id", "=", input.assetId)
-        .executeTakeFirstOrThrow();
-      const latestSnapshot = await findLatestAssetSnapshot(
-        transaction,
-        asset.id,
-      );
-      const latestAcquiredFingerprint = requireLatestFingerprint(
-        input.acquiredFingerprints,
-        "acquired asset fingerprint",
-      );
-      const snapshotChanged =
-        asset.acquired_fingerprint !== latestAcquiredFingerprint ||
-        asset.acquired_at?.getTime() !== input.acquiredAt.getTime() ||
-        asset.is_primary !== input.primary ||
-        latestSnapshot.byte_size !== input.byteSize ||
-        latestSnapshot.checksum !== (input.checksum ?? null) ||
-        latestSnapshot.mime_type !== input.mimeType ||
-        latestSnapshot.source_url !== input.sourceUrl ||
-        latestSnapshot.storage_key !== input.storageKey;
-
-      await transaction
-        .updateTable("assets")
-        .set({
-          acquired_at: input.acquiredAt,
-          acquired_fingerprint: latestAcquiredFingerprint,
-          is_primary: input.primary,
-        })
-        .where("id", "=", input.assetId)
-        .executeTakeFirstOrThrow();
-
-      if (snapshotChanged) {
-        await transaction
-          .insertInto("asset_snapshots")
-          .values(
-            toAssetSnapshotInsert(
-              input.assetId,
-              await findNextAssetSnapshotVersion(transaction, input.assetId),
-              {
-                byteSize: input.byteSize,
-                checksum: input.checksum ?? null,
-                mimeType: input.mimeType,
-                sourceUrl: input.sourceUrl,
-                storageKey: input.storageKey,
-              },
-            ),
-          )
-          .executeTakeFirstOrThrow();
-      }
-    });
-  }
-
-  public async createObservedAssets(
-    inputs: CreateObservedAssetInput[],
-  ): Promise<CreateObservedAssetsResult> {
-    const assetIdsRequiringAcquire: string[] = [];
-
-    await this.database.transaction().execute(async (transaction) => {
-      for (const input of inputs) {
-        const latestObservedFingerprint = requireLatestFingerprint(
-          input.observedFingerprints,
-          "observed asset fingerprint",
-        );
-        const existingAsset = await transaction
+  public async upsertStoredAsset(
+    input: UpsertStoredAssetInput,
+  ): Promise<Result<void, AssetRepositoryError>> {
+    try {
+      await this.database.transaction().execute(async (transaction) => {
+        const asset = await transaction
           .selectFrom("assets")
           .selectAll()
-          .where("content_id", "=", input.contentId)
-          .where("observed_fingerprint", "in", input.observedFingerprints)
-          .executeTakeFirst();
-
-        if (existingAsset === undefined) {
-          const createdAsset = await transaction
-            .insertInto("assets")
-            .values(toObservedAssetInsert(input, latestObservedFingerprint))
-            .returningAll()
-            .executeTakeFirstOrThrow();
-
-          await transaction
-            .insertInto("asset_snapshots")
-            .values(
-              toAssetSnapshotInsert(createdAsset.id, 1, {
-                byteSize: null,
-                checksum: null,
-                mimeType: null,
-                sourceUrl: input.sourceUrl,
-                storageKey: null,
-              }),
-            )
-            .executeTakeFirstOrThrow();
-
-          assetIdsRequiringAcquire.push(createdAsset.id);
-          continue;
-        }
-
+          .where("id", "=", input.assetId)
+          .executeTakeFirstOrThrow();
         const latestSnapshot = await findLatestAssetSnapshot(
           transaction,
-          existingAsset.id,
+          asset.id,
         );
-        const observedFingerprintChanged =
-          existingAsset.observed_fingerprint !== latestObservedFingerprint;
-        const observedStateChanged =
-          existingAsset.is_primary !== input.primary ||
-          latestSnapshot.source_url !== input.sourceUrl;
+        const latestAcquiredFingerprint = requireLatestFingerprint(
+          input.acquiredFingerprints,
+          "acquired asset fingerprint",
+        );
+        const snapshotChanged =
+          asset.acquired_fingerprint !== latestAcquiredFingerprint ||
+          asset.acquired_at?.getTime() !== input.acquiredAt.getTime() ||
+          asset.is_primary !== input.primary ||
+          latestSnapshot.byte_size !== input.byteSize ||
+          latestSnapshot.checksum !== (input.checksum ?? null) ||
+          latestSnapshot.mime_type !== input.mimeType ||
+          latestSnapshot.source_url !== input.sourceUrl ||
+          latestSnapshot.storage_key !== input.storageKey;
 
         await transaction
           .updateTable("assets")
           .set({
+            acquired_at: input.acquiredAt,
+            acquired_fingerprint: latestAcquiredFingerprint,
             is_primary: input.primary,
           })
-          .where("id", "=", existingAsset.id)
+          .where("id", "=", input.assetId)
           .executeTakeFirstOrThrow();
 
-        if (observedStateChanged) {
+        if (snapshotChanged) {
           await transaction
             .insertInto("asset_snapshots")
             .values(
               toAssetSnapshotInsert(
-                existingAsset.id,
-                await findNextAssetSnapshotVersion(
-                  transaction,
-                  existingAsset.id,
-                ),
+                input.assetId,
+                await findNextAssetSnapshotVersion(transaction, input.assetId),
                 {
-                  byteSize: latestSnapshot.byte_size,
-                  checksum: latestSnapshot.checksum,
-                  mimeType: latestSnapshot.mime_type,
+                  byteSize: input.byteSize,
+                  checksum: input.checksum ?? null,
+                  mimeType: input.mimeType,
                   sourceUrl: input.sourceUrl,
-                  storageKey: latestSnapshot.storage_key,
+                  storageKey: input.storageKey,
                 },
               ),
             )
             .executeTakeFirstOrThrow();
         }
+      });
 
-        if (
-          input.contentFingerprintChanged ||
-          observedFingerprintChanged ||
-          existingAsset.acquired_fingerprint === null
-        ) {
-          assetIdsRequiringAcquire.push(existingAsset.id);
+      return ok(undefined);
+    } catch (error) {
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to upsert stored asset."),
+      );
+    }
+  }
+
+  public async createObservedAssets(
+    inputs: CreateObservedAssetInput[],
+  ): Promise<Result<CreateObservedAssetsResult, AssetRepositoryError>> {
+    const assetIdsRequiringAcquire: string[] = [];
+
+    try {
+      await this.database.transaction().execute(async (transaction) => {
+        for (const input of inputs) {
+          const latestObservedFingerprint = requireLatestFingerprint(
+            input.observedFingerprints,
+            "observed asset fingerprint",
+          );
+          const existingAsset = await transaction
+            .selectFrom("assets")
+            .selectAll()
+            .where("content_id", "=", input.contentId)
+            .where("observed_fingerprint", "in", input.observedFingerprints)
+            .executeTakeFirst();
+
+          if (existingAsset === undefined) {
+            const createdAsset = await transaction
+              .insertInto("assets")
+              .values(toObservedAssetInsert(input, latestObservedFingerprint))
+              .returningAll()
+              .executeTakeFirstOrThrow();
+
+            await transaction
+              .insertInto("asset_snapshots")
+              .values(
+                toAssetSnapshotInsert(createdAsset.id, 1, {
+                  byteSize: null,
+                  checksum: null,
+                  mimeType: null,
+                  sourceUrl: input.sourceUrl,
+                  storageKey: null,
+                }),
+              )
+              .executeTakeFirstOrThrow();
+
+            assetIdsRequiringAcquire.push(createdAsset.id);
+            continue;
+          }
+
+          const latestSnapshot = await findLatestAssetSnapshot(
+            transaction,
+            existingAsset.id,
+          );
+          const observedFingerprintChanged =
+            existingAsset.observed_fingerprint !== latestObservedFingerprint;
+          const observedStateChanged =
+            existingAsset.is_primary !== input.primary ||
+            latestSnapshot.source_url !== input.sourceUrl;
+
+          await transaction
+            .updateTable("assets")
+            .set({
+              is_primary: input.primary,
+            })
+            .where("id", "=", existingAsset.id)
+            .executeTakeFirstOrThrow();
+
+          if (observedStateChanged) {
+            await transaction
+              .insertInto("asset_snapshots")
+              .values(
+                toAssetSnapshotInsert(
+                  existingAsset.id,
+                  await findNextAssetSnapshotVersion(
+                    transaction,
+                    existingAsset.id,
+                  ),
+                  {
+                    byteSize: latestSnapshot.byte_size,
+                    checksum: latestSnapshot.checksum,
+                    mimeType: latestSnapshot.mime_type,
+                    sourceUrl: input.sourceUrl,
+                    storageKey: latestSnapshot.storage_key,
+                  },
+                ),
+              )
+              .executeTakeFirstOrThrow();
+          }
+
+          if (
+            input.contentFingerprintChanged ||
+            observedFingerprintChanged ||
+            existingAsset.acquired_fingerprint === null
+          ) {
+            assetIdsRequiringAcquire.push(existingAsset.id);
+          }
         }
-      }
-    });
+      });
 
-    return {
-      assetIdsRequiringAcquire,
-    };
+      return ok({
+        assetIdsRequiringAcquire,
+      });
+    } catch (error) {
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to create observed assets."),
+      );
+    }
   }
 
   public async listAssets(): Promise<AssetListItem[]> {

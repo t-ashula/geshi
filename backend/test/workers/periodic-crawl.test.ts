@@ -9,6 +9,7 @@ import {
   OBSERVE_SOURCE_JOB_NAME,
   PERIODIC_CRAWL_JOB_NAME,
 } from "../../src/job-queue/types.js";
+import { err } from "../../src/lib/result.js";
 import { createNoopLogger } from "../../src/logger/index.js";
 import { AppSettingService } from "../../src/service/app-setting-service.js";
 import { JobService } from "../../src/service/job-service.js";
@@ -70,6 +71,9 @@ describe("handlePeriodicCrawlJob", () => {
       retryable: true,
       sourceId: null,
     });
+    if (!periodicJob.ok) {
+      throw periodicJob.error;
+    }
     const jobQueue = {
       enqueue: (name: string, payload: JobPayload) => {
         enqueuedJobs.push({
@@ -96,9 +100,9 @@ describe("handlePeriodicCrawlJob", () => {
       .mockReturnValue(new Date("2026-04-30T00:00:00Z").getTime());
 
     try {
-      await handlePeriodicCrawlJob(
+      const result = await handlePeriodicCrawlJob(
         {
-          jobId: periodicJob.id,
+          jobId: periodicJob.value.id,
         },
         {
           appSettingService,
@@ -109,6 +113,8 @@ describe("handlePeriodicCrawlJob", () => {
           sourceService,
         },
       );
+
+      expect(result.ok).toBe(true);
     } finally {
       dateNowSpy.mockRestore();
     }
@@ -123,9 +129,59 @@ describe("handlePeriodicCrawlJob", () => {
       enqueuedJobs.find((job) => job.name === PERIODIC_CRAWL_JOB_NAME)
         ?.startAfter,
     ).toEqual(new Date("2026-04-30T00:05:00Z"));
-    expect((await jobRepository.findJobById(periodicJob.id))?.status).toBe(
-      "succeeded",
+    expect(
+      (await jobRepository.findJobById(periodicJob.value.id))?.status,
+    ).toBe("succeeded");
+
+    await destroyTestDatabase(testDatabase);
+  });
+
+  it("returns an error result and marks the job as failed when settings load fails", async () => {
+    const jobRepository = new JobRepository(testDatabase.database);
+    const periodicJob = await jobRepository.createJob({
+      id: uuidv7(),
+      kind: PERIODIC_CRAWL_JOB_NAME,
+      retryable: true,
+      sourceId: null,
+    });
+
+    if (!periodicJob.ok) {
+      throw periodicJob.error;
+    }
+
+    const result = await handlePeriodicCrawlJob(
+      {
+        jobId: periodicJob.value.id,
+      },
+      {
+        appSettingService: {
+          getPeriodicCrawlSettings: () =>
+            Promise.resolve(
+              err(new Error("Periodic crawl settings load failed.")),
+            ),
+        } as AppSettingService,
+        jobQueue: {
+          enqueue: () => Promise.resolve("queue-job"),
+          enqueueAfter: () => Promise.resolve("queue-job-after"),
+        },
+        jobRepository,
+        jobService: {} as JobService,
+        logger: createNoopLogger(),
+        sourceService: {} as SourceService,
+      },
     );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected periodic crawl to fail.");
+    }
+
+    expect(result.error.message).toContain(
+      "Periodic crawl settings load failed.",
+    );
+    expect(
+      (await jobRepository.findJobById(periodicJob.value.id))?.status,
+    ).toBe("failed");
 
     await destroyTestDatabase(testDatabase);
   });

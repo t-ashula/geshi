@@ -3,6 +3,7 @@ import type {
   ContentDetailItem,
   ContentListItem,
   ContentRepository,
+  ContentRepositoryError,
   CreateObservedContentResult,
   ImportObservedContentInput,
 } from "../db/content-repository.js";
@@ -14,26 +15,28 @@ export type FindContentDetailError = {
   message: string;
 };
 
+export type ContentServiceError = ContentRepositoryError;
+
 export class ContentService {
   public constructor(private readonly contentRepository: ContentRepository) {}
 
   public async importObservedContents(
     inputs: ImportObservedContentInput[],
-  ): Promise<void> {
-    await this.contentRepository.importObservedContents(inputs);
+  ): Promise<Result<void, ContentServiceError>> {
+    return this.contentRepository.importObservedContents(inputs);
   }
 
   public async createObservedContent(
     input: ImportObservedContentInput,
-  ): Promise<CreateObservedContentResult> {
+  ): Promise<Result<CreateObservedContentResult, ContentServiceError>> {
     return this.contentRepository.createObservedContent(input);
   }
 
   public async markContentStatus(
     contentId: string,
     status: "discovered" | "stored" | "failed",
-  ): Promise<void> {
-    await this.contentRepository.markContentStatus(contentId, status);
+  ): Promise<Result<void, ContentServiceError>> {
+    return this.contentRepository.markContentStatus(contentId, status);
   }
 
   public async findContentAcquireTarget(

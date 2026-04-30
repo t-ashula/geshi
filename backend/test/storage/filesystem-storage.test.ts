@@ -21,11 +21,15 @@ describe("FilesystemStorage", () => {
       key: "source/content/page-hash.html",
       overwrite: false,
     });
+    if (!stored.ok) {
+      throw stored.error;
+    }
 
-    expect(stored.key).toBe("source/content/page-hash.html");
-    await expect(storage.get(stored.key)).resolves.toEqual(
-      new Uint8Array(Buffer.from("hello")),
-    );
+    expect(stored.value.key).toBe("source/content/page-hash.html");
+    await expect(storage.get(stored.value.key)).resolves.toMatchObject({
+      ok: true,
+      value: new Uint8Array(Buffer.from("hello")),
+    });
   });
 
   it("overwrites an existing object when overwrite is true", async () => {
@@ -43,10 +47,18 @@ describe("FilesystemStorage", () => {
       overwrite: true,
     });
 
-    expect(second.key).toBe(first.key);
-    await expect(storage.get(first.key)).resolves.toEqual(
-      new Uint8Array(Buffer.from("second")),
-    );
+    if (!first.ok) {
+      throw first.error;
+    }
+    if (!second.ok) {
+      throw second.error;
+    }
+
+    expect(second.value.key).toBe(first.value.key);
+    await expect(storage.get(first.value.key)).resolves.toMatchObject({
+      ok: true,
+      value: new Uint8Array(Buffer.from("second")),
+    });
   });
 
   it("joins path parts", () => {
@@ -68,7 +80,7 @@ describe("FilesystemStorage", () => {
         key: "../evil.txt",
         overwrite: false,
       }),
-    ).rejects.toThrow();
+    ).resolves.toMatchObject({ ok: false });
   });
 
   it("does not confuse sibling paths with rootDir descendants", async () => {
@@ -82,6 +94,6 @@ describe("FilesystemStorage", () => {
         key: siblingLikeKey,
         overwrite: false,
       }),
-    ).rejects.toThrow();
+    ).resolves.toMatchObject({ ok: false });
   });
 });

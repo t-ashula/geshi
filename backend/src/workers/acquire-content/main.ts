@@ -49,13 +49,17 @@ await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, {
 await boss.work<AcquireContentJobPayload>(
   ACQUIRE_CONTENT_JOB_NAME,
   async ([job]) => {
-    await handleAcquireContentJob(job.data, {
+    const result = await handleAcquireContentJob(job.data, {
       assetService,
       contentService,
       jobRepository,
       logger,
       storage,
     });
+
+    if (!result.ok) {
+      throw result.error;
+    }
   },
 );
 

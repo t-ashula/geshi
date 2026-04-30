@@ -1,3 +1,5 @@
+import type { Result } from "../lib/result.js";
+
 export type StoragePutInput = {
   body: Uint8Array;
   contentType: string | null;
@@ -12,7 +14,7 @@ export type StoragePutOutput = {
 };
 
 export interface Storage {
-  get(key: string): Promise<Uint8Array>;
+  get(key: string): Promise<Result<Uint8Array, Error>>;
   pathJoin(...parts: string[]): string;
-  put(input: StoragePutInput): Promise<StoragePutOutput>;
+  put(input: StoragePutInput): Promise<Result<StoragePutOutput, Error>>;
 }

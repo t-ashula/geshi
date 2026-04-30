@@ -51,11 +51,14 @@ describe("handleAcquireContentJob", () => {
         summary: "Hello",
         title: "Episode 1",
       });
+      if (!content.ok) {
+        throw content.error;
+      }
 
-      await assetService.createObservedAssets([
+      const createdAssetsResult = await assetService.createObservedAssets([
         {
           contentFingerprintChanged: false,
-          contentId: content.id,
+          contentId: content.value.id,
           kind: "html",
           observedFingerprints: [
             "2026-04-28:html:https://example.com/episodes/1",
@@ -65,7 +68,7 @@ describe("handleAcquireContentJob", () => {
         },
         {
           contentFingerprintChanged: false,
-          contentId: content.id,
+          contentId: content.value.id,
           kind: "audio",
           observedFingerprints: [
             "2026-04-28:audio:https://cdn.example.com/audio/1.mp3",
@@ -74,17 +77,23 @@ describe("handleAcquireContentJob", () => {
           sourceUrl: "https://cdn.example.com/audio/1.mp3",
         },
       ]);
+      if (!createdAssetsResult.ok) {
+        throw createdAssetsResult.error;
+      }
       const createdAssets = await assetRepository.listAssets();
       const firstAssetId = createdAssets[0]?.id;
 
       const jobId = crypto.randomUUID();
 
-      await jobRepository.createJob({
+      const createdJob = await jobRepository.createJob({
         id: jobId,
         kind: "acquire-content",
         retryable: true,
         sourceId: source.id,
       });
+      if (!createdJob.ok) {
+        throw createdJob.error;
+      }
 
       vi.stubGlobal(
         "fetch",
@@ -126,7 +135,7 @@ describe("handleAcquireContentJob", () => {
         throw new Error("Expected at least one asset.");
       }
 
-      await handleAcquireContentJob(
+      const result = await handleAcquireContentJob(
         {
           asset: {
             id: firstAssetId,
@@ -144,7 +153,7 @@ describe("handleAcquireContentJob", () => {
           },
           content: {
             externalId: "ep-1",
-            id: content.id,
+            id: content.value.id,
             kind: "podcast-episode",
             publishedAt: new Date("2024-01-01T00:00:00Z"),
             status: "discovered",
@@ -165,6 +174,7 @@ describe("handleAcquireContentJob", () => {
           storage,
         },
       );
+      expect(result.ok).toBe(true);
 
       const assets = await assetRepository.listAssets();
       const updatedAsset = assets.find((asset) => asset.id === firstAssetId);
@@ -216,11 +226,14 @@ describe("handleAcquireContentJob", () => {
         summary: "World",
         title: "Episode 2",
       });
+      if (!content.ok) {
+        throw content.error;
+      }
 
-      await assetService.createObservedAssets([
+      const createdAssetsResult = await assetService.createObservedAssets([
         {
           contentFingerprintChanged: false,
-          contentId: content.id,
+          contentId: content.value.id,
           kind: "audio",
           observedFingerprints: [
             "2026-04-28:audio:https://cdn.example.com/audio/2.mp3",
@@ -229,15 +242,21 @@ describe("handleAcquireContentJob", () => {
           sourceUrl: "https://cdn.example.com/audio/2.mp3",
         },
       ]);
+      if (!createdAssetsResult.ok) {
+        throw createdAssetsResult.error;
+      }
       const asset = (await assetRepository.listAssets())[0];
       const jobId = crypto.randomUUID();
 
-      await jobRepository.createJob({
+      const createdJob = await jobRepository.createJob({
         id: jobId,
         kind: "acquire-content",
         retryable: true,
         sourceId: source.id,
       });
+      if (!createdJob.ok) {
+        throw createdJob.error;
+      }
       vi.stubGlobal(
         "fetch",
         vi.fn(() =>
@@ -249,50 +268,49 @@ describe("handleAcquireContentJob", () => {
         ),
       );
 
-      await expect(
-        handleAcquireContentJob(
-          {
-            asset: {
-              id: asset.id,
-              kind: "audio",
-              observedFingerprint:
-                "2026-04-28:audio:https://cdn.example.com/audio/2.mp3",
-              primary: false,
-              sourceUrl: "https://cdn.example.com/audio/2.mp3",
-            },
-            collector: {
-              config: {},
-              pluginSlug: "podcast-rss",
-              settingId: "setting-2",
-              settingSnapshotId: "setting-snapshot-2",
-            },
-            content: {
-              externalId: "ep-2",
-              id: content.id,
-              kind: "podcast-episode",
-              publishedAt: new Date("2024-01-02T00:00:00Z"),
-              status: "discovered",
-              summary: "World",
-              title: "Episode 2",
-            },
-            jobId,
-            source: {
-              id: source.id,
-              slug: source.slug,
-            },
+      const result = await handleAcquireContentJob(
+        {
+          asset: {
+            id: asset.id,
+            kind: "audio",
+            observedFingerprint:
+              "2026-04-28:audio:https://cdn.example.com/audio/2.mp3",
+            primary: false,
+            sourceUrl: "https://cdn.example.com/audio/2.mp3",
           },
-          {
-            assetService,
-            contentService,
-            jobRepository,
-            logger: createNoopLogger(),
-            storage,
+          collector: {
+            config: {},
+            pluginSlug: "podcast-rss",
+            settingId: "setting-2",
+            settingSnapshotId: "setting-snapshot-2",
           },
-        ),
-      ).rejects.toThrow("Failed to fetch asset: 502");
+          content: {
+            externalId: "ep-2",
+            id: content.value.id,
+            kind: "podcast-episode",
+            publishedAt: new Date("2024-01-02T00:00:00Z"),
+            status: "discovered",
+            summary: "World",
+            title: "Episode 2",
+          },
+          jobId,
+          source: {
+            id: source.id,
+            slug: source.slug,
+          },
+        },
+        {
+          assetService,
+          contentService,
+          jobRepository,
+          logger: createNoopLogger(),
+          storage,
+        },
+      );
+      expect(result.ok).toBe(false);
 
       const storedContent = await contentRepository.findContentAcquireTarget(
-        content.id,
+        content.value.id,
       );
       const job = await jobRepository.findJobById(jobId);
 
@@ -337,70 +355,78 @@ describe("handleAcquireContentJob", () => {
         summary: "Missing sourceUrl",
         title: "Episode 3",
       });
+      if (!content.ok) {
+        throw content.error;
+      }
 
-      await assetService.createObservedAssets([
+      const createdAssetsResult = await assetService.createObservedAssets([
         {
           contentFingerprintChanged: false,
-          contentId: content.id,
+          contentId: content.value.id,
           kind: "audio",
           observedFingerprints: ["2026-04-28:audio:null"],
           primary: false,
           sourceUrl: null,
         },
       ]);
+      if (!createdAssetsResult.ok) {
+        throw createdAssetsResult.error;
+      }
       const asset = (await assetRepository.listAssets())[0];
       const jobId = crypto.randomUUID();
 
-      await jobRepository.createJob({
+      const createdJob = await jobRepository.createJob({
         id: jobId,
         kind: "acquire-content",
         retryable: true,
         sourceId: source.id,
       });
+      if (!createdJob.ok) {
+        throw createdJob.error;
+      }
 
-      await expect(
-        handleAcquireContentJob(
-          {
-            asset: {
-              id: asset.id,
-              kind: "audio",
-              observedFingerprint: "2026-04-28:audio:null",
-              primary: false,
-              sourceUrl: null,
-            },
-            collector: {
-              config: {},
-              pluginSlug: "podcast-rss",
-              settingId: "setting-3",
-              settingSnapshotId: "setting-snapshot-3",
-            },
-            content: {
-              externalId: "ep-3",
-              id: content.id,
-              kind: "podcast-episode",
-              publishedAt: new Date("2024-01-03T00:00:00Z"),
-              status: "discovered",
-              summary: "Missing sourceUrl",
-              title: "Episode 3",
-            },
-            jobId,
-            source: {
-              id: source.id,
-              slug: source.slug,
-            },
+      const result = await handleAcquireContentJob(
+        {
+          asset: {
+            id: asset.id,
+            kind: "audio",
+            observedFingerprint: "2026-04-28:audio:null",
+            primary: false,
+            sourceUrl: null,
           },
-          {
-            assetService,
-            contentService,
-            jobRepository,
-            logger: createNoopLogger(),
-            storage,
+          collector: {
+            config: {},
+            pluginSlug: "podcast-rss",
+            settingId: "setting-3",
+            settingSnapshotId: "setting-snapshot-3",
           },
-        ),
-      ).rejects.toThrow("Podcast RSS asset sourceUrl is required.");
+          content: {
+            externalId: "ep-3",
+            id: content.value.id,
+            kind: "podcast-episode",
+            publishedAt: new Date("2024-01-03T00:00:00Z"),
+            status: "discovered",
+            summary: "Missing sourceUrl",
+            title: "Episode 3",
+          },
+          jobId,
+          source: {
+            id: source.id,
+            slug: source.slug,
+          },
+        },
+        {
+          assetService,
+          contentService,
+          jobRepository,
+          logger: createNoopLogger(),
+          storage,
+        },
+      );
+      expect(result.ok).toBe(false);
 
       const storedContent = await contentRepository.findContentAcquireTarget(
-        content.id,
+        content.value.id,
       );
       const job = await jobRepository.findJobById(jobId);
 

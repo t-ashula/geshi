@@ -111,11 +111,14 @@ describe("AssetRepository", () => {
         sourceUrl: "https://cdn.example.com/audio-new.mp3",
       },
     ]);
+    if (!result.ok) {
+      throw result.error;
+    }
 
     const assets = await repository.listAssets();
     const storedAsset = assets.find((asset) => asset.id === existingAsset.id);
 
-    expect(result.assetIdsRequiringAcquire).toEqual([existingAsset.id]);
+    expect(result.value.assetIdsRequiringAcquire).toEqual([existingAsset.id]);
     expect(storedAsset).toMatchObject({
       id: existingAsset.id,
       observedFingerprint: "2026-04-28:audio:old",

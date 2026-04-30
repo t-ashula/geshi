@@ -2,6 +2,7 @@ import type {
   AcquireTargetAsset,
   AssetListItem,
   AssetRepository,
+  AssetRepositoryError,
   ContentDetailAsset,
   CreateObservedAssetInput,
   CreateObservedAssetsResult,
@@ -16,17 +17,26 @@ export type FindStoredMediaByIdError = {
   message: string;
 };
 
+export type FindAcquireTargetByIdError = {
+  code: "asset_not_found";
+  message: string;
+};
+
+export type AssetServiceError = AssetRepositoryError;
+
 export class AssetService {
   public constructor(private readonly assetRepository: AssetRepository) {}
 
   public async createObservedAssets(
     inputs: CreateObservedAssetInput[],
-  ): Promise<CreateObservedAssetsResult> {
+  ): Promise<Result<CreateObservedAssetsResult, AssetServiceError>> {
     return this.assetRepository.createObservedAssets(inputs);
   }
 
-  public async upsertStoredAsset(input: UpsertStoredAssetInput): Promise<void> {
-    await this.assetRepository.upsertStoredAsset(input);
+  public async upsertStoredAsset(
+    input: UpsertStoredAssetInput,
+  ): Promise<Result<void, AssetServiceError>> {
+    return this.assetRepository.upsertStoredAsset(input);
   }
 
   public async listPendingAssetsByContentId(
@@ -37,8 +47,17 @@ export class AssetService {
 
   public async findAcquireTargetById(
     assetId: string,
-  ): Promise<AcquireTargetAsset | null> {
-    return this.assetRepository.findAcquireTargetById(assetId);
+  ): Promise<Result<AcquireTargetAsset, FindAcquireTargetByIdError>> {
+    const asset = await this.assetRepository.findAcquireTargetById(assetId);
+
+    if (asset === null) {
+      return err({
+        code: "asset_not_found",
+        message: `Pending asset not found after observe: ${assetId}`,
+      });
+    }
+
+    return ok(asset);
   }
 
   public async listAssets(): Promise<AssetListItem[]> {

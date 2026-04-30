@@ -66,7 +66,7 @@ await seedPeriodicCrawlJob(jobRepository, jobQueue);
 await boss.work<PeriodicCrawlJobPayload>(
   PERIODIC_CRAWL_JOB_NAME,
   async ([job]) => {
-    await handlePeriodicCrawlJob(job.data, {
+    const result = await handlePeriodicCrawlJob(job.data, {
       appSettingService,
       jobQueue,
       jobRepository,
@@ -74,6 +74,10 @@ await boss.work<PeriodicCrawlJobPayload>(
       logger,
       sourceService,
     });
+
+    if (!result.ok) {
+      throw result.error;
+    }
   },
 );
 
@@ -99,9 +103,19 @@ async function seedPeriodicCrawlJob(
     retryable: true,
     sourceId: null,
   });
+  if (!job.ok) {
+    throw job.error;
+  }
   const queueJobId = await currentJobQueue.enqueue(PERIODIC_CRAWL_JOB_NAME, {
-    jobId: job.id,
+    jobId: job.value.id,
   });
 
-  await currentJobRepository.attachQueueJobId(job.id, queueJobId);
+  const attachQueueJobIdResult = await currentJobRepository.attachQueueJobId(
+    job.value.id,
+    queueJobId,
+  );
+
+  if (!attachQueueJobIdResult.ok) {
+    throw attachQueueJobIdResult.error;
+  }
 }

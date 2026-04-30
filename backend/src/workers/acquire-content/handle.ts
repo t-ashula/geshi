@@ -3,6 +3,8 @@ import type { AcquireContentJobPayload } from "../../job-queue/types.js";
 import { contentTypeToExtension } from "../../lib/content-type-extension.js";
 import { findLatestFingerprint } from "../../lib/fingerprint.js";
 import { sha256ChecksumString } from "../../lib/hash.js";
+import type { Result } from "../../lib/result.js";
+import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import { getSourceCollectorPlugin } from "../../plugins/index.js";
 import type { AcquiredAsset } from "../../plugins/types.js";
@@ -21,7 +23,7 @@ type HandleAcquireContentJobDependencies = {
 export async function handleAcquireContentJob(
   payload: AcquireContentJobPayload,
   dependencies: HandleAcquireContentJobDependencies,
-): Promise<void> {
+): Promise<Result<void, Error>> {
   const logger = dependencies.logger.child({
     assetId: payload.asset.id,
     contentId: payload.content.id,
@@ -30,7 +32,13 @@ export async function handleAcquireContentJob(
     sourceId: payload.source.id,
   });
 
-  await dependencies.jobRepository.markRunning(payload.jobId);
+  const markRunningResult = await dependencies.jobRepository.markRunning(
+    payload.jobId,
+  );
+
+  if (!markRunningResult.ok) {
+    return markRunningResult;
+  }
   logger.info("acquire job started.");
 
   const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
@@ -53,7 +61,9 @@ export async function handleAcquireContentJob(
     });
   } catch (error) {
     await failAcquireContentJob(payload, dependencies, logger, error);
-    throw error;
+    return err(
+      error instanceof Error ? error : new Error("Acquire content job failed."),
+    );
   }
 
   try {
@@ -64,29 +74,71 @@ export async function handleAcquireContentJob(
       overwrite: true,
     });
 
-    await dependencies.assetService.upsertStoredAsset({
-      acquiredFingerprints: acquiredAsset.acquiredFingerprints,
-      acquiredAt: new Date(),
-      assetId: payload.asset.id,
-      byteSize: storedAsset.byteSize,
-      checksum: sha256ChecksumString(acquiredAsset.body),
-      kind: acquiredAsset.kind,
-      mimeType: acquiredAsset.contentType,
-      primary: acquiredAsset.primary,
-      sourceUrl: acquiredAsset.sourceUrl,
-      storageKey: storedAsset.key,
-    });
+    if (!storedAsset.ok) {
+      await failAcquireContentJob(
+        payload,
+        dependencies,
+        logger,
+        storedAsset.error,
+      );
+      return storedAsset;
+    }
 
-    await dependencies.contentService.markContentStatus(
-      payload.content.id,
-      "stored",
+    const upsertStoredAssetResult =
+      await dependencies.assetService.upsertStoredAsset({
+        acquiredFingerprints: acquiredAsset.acquiredFingerprints,
+        acquiredAt: new Date(),
+        assetId: payload.asset.id,
+        byteSize: storedAsset.value.byteSize,
+        checksum: sha256ChecksumString(acquiredAsset.body),
+        kind: acquiredAsset.kind,
+        mimeType: acquiredAsset.contentType,
+        primary: acquiredAsset.primary,
+        sourceUrl: acquiredAsset.sourceUrl,
+        storageKey: storedAsset.value.key,
+      });
+
+    if (!upsertStoredAssetResult.ok) {
+      await failAcquireContentJob(
+        payload,
+        dependencies,
+        logger,
+        upsertStoredAssetResult.error,
+      );
+      return upsertStoredAssetResult;
+    }
+
+    const markContentStatusResult =
+      await dependencies.contentService.markContentStatus(
+        payload.content.id,
+        "stored",
+      );
+
+    if (!markContentStatusResult.ok) {
+      await failAcquireContentJob(
+        payload,
+        dependencies,
+        logger,
+        markContentStatusResult.error,
+      );
+      return markContentStatusResult;
+    }
+    const markSucceededResult = await dependencies.jobRepository.markSucceeded(
+      payload.jobId,
     );
-    await dependencies.jobRepository.markSucceeded(payload.jobId);
+
+    if (!markSucceededResult.ok) {
+      return markSucceededResult;
+    }
     logger.info("acquire job completed.");
   } catch (error) {
     await failAcquireContentJob(payload, dependencies, logger, error);
-    throw error;
+    return err(
+      error instanceof Error ? error : new Error("Acquire content job failed."),
+    );
   }
+
+  return ok(undefined);
 }
 
 async function failAcquireContentJob(
@@ -98,15 +150,30 @@ async function failAcquireContentJob(
   const failureMessage =
     error instanceof Error ? error.message : "Acquire content job failed.";
 
-  await dependencies.contentService.markContentStatus(
-    payload.content.id,
-    "failed",
-  );
-  await dependencies.jobRepository.markFailed(
+  const markContentStatusResult =
+    await dependencies.contentService.markContentStatus(
+      payload.content.id,
+      "failed",
+    );
+  if (!markContentStatusResult.ok) {
+    logger.error("acquire job failure could not update content status.", {
+      error: markContentStatusResult.error,
+      failureMessage,
+    });
+  }
+  const markFailedResult = await dependencies.jobRepository.markFailed(
     payload.jobId,
     failureMessage,
     true,
   );
+
+  if (!markFailedResult.ok) {
+    logger.error("acquire job failure could not be persisted.", {
+      error: markFailedResult.error,
+      failureMessage,
+    });
+    return;
+  }
   logger.error("acquire job failed.", {
     error,
     failureMessage,

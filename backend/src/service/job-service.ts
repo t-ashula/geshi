@@ -5,12 +5,13 @@ import type { JobQueue } from "../job-queue/types.js";
 import { OBSERVE_SOURCE_JOB_NAME } from "../job-queue/types.js";
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
-import type { SourceService } from "./source-service.js";
+import type {
+  FindObserveSourceTargetError,
+  SourceService,
+} from "./source-service.js";
 
-export type EnqueueObserveSourceJobError = {
-  code: "source_not_found";
-  message: string;
-};
+export type EnqueueObserveSourceJobError = FindObserveSourceTargetError;
+export type EnqueueObserveSourceJobInfrastructureError = Error;
 
 export type FindJobByIdError = {
   code: "job_not_found";
@@ -26,15 +27,17 @@ export class JobService {
 
   public async enqueueObserveSourceJob(
     sourceId: string,
-  ): Promise<Result<JobListItem, EnqueueObserveSourceJobError>> {
+  ): Promise<
+    Result<
+      JobListItem,
+      EnqueueObserveSourceJobError | EnqueueObserveSourceJobInfrastructureError
+    >
+  > {
     const observeSourceTarget =
       await this.sourceService.findObserveSourceTarget(sourceId);
 
-    if (observeSourceTarget === null) {
-      return err({
-        code: "source_not_found",
-        message: "Source not found.",
-      });
+    if (!observeSourceTarget.ok) {
+      return observeSourceTarget;
     }
 
     const job = await this.jobRepository.createJob({
@@ -43,28 +46,40 @@ export class JobService {
       retryable: true,
       sourceId,
     });
+
+    if (!job.ok) {
+      return job;
+    }
+
     const queueJobId = await this.jobQueue.enqueue(OBSERVE_SOURCE_JOB_NAME, {
       collector: {
-        config: observeSourceTarget.config,
-        pluginSlug: observeSourceTarget.pluginSlug,
-        settingId: observeSourceTarget.collectorSettingId,
-        settingSnapshotId: observeSourceTarget.collectorSettingSnapshotId,
+        config: observeSourceTarget.value.config,
+        pluginSlug: observeSourceTarget.value.pluginSlug,
+        settingId: observeSourceTarget.value.collectorSettingId,
+        settingSnapshotId: observeSourceTarget.value.collectorSettingSnapshotId,
       },
-      jobId: job.id,
+      jobId: job.value.id,
       source: {
-        id: observeSourceTarget.sourceId,
-        kind: observeSourceTarget.sourceKind,
-        slug: observeSourceTarget.slug,
-        url: observeSourceTarget.url,
+        id: observeSourceTarget.value.sourceId,
+        kind: observeSourceTarget.value.sourceKind,
+        slug: observeSourceTarget.value.slug,
+        url: observeSourceTarget.value.url,
       },
     });
 
-    await this.jobRepository.attachQueueJobId(job.id, queueJobId);
+    const attachQueueJobIdResult = await this.jobRepository.attachQueueJobId(
+      job.value.id,
+      queueJobId,
+    );
 
-    const persistedJob = await this.jobRepository.findJobById(job.id);
+    if (!attachQueueJobIdResult.ok) {
+      return attachQueueJobIdResult;
+    }
+
+    const persistedJob = await this.jobRepository.findJobById(job.value.id);
 
     if (persistedJob === null) {
-      throw new Error(`Job disappeared after enqueue: ${job.id}`);
+      return err(new Error(`Job disappeared after enqueue: ${job.value.id}`));
     }
 
     return ok(persistedJob);

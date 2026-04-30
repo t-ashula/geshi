@@ -1,5 +1,7 @@
 import type { Kysely, Selectable } from "kysely";
 
+import type { Result } from "../lib/result.js";
+import { err, ok } from "../lib/result.js";
 import type { GeshiDatabase, JobTable } from "./types.js";
 
 export type CreateJobInput = {
@@ -28,79 +30,115 @@ export type LatestObserveJob = {
   sourceId: string;
 };
 
+export type JobRepositoryError = Error;
+
 export class JobRepository {
   public constructor(private readonly database: Kysely<GeshiDatabase>) {}
 
-  public async createJob(input: CreateJobInput): Promise<JobListItem> {
-    const createdJob = await this.database
-      .insertInto("jobs")
-      .values({
-        id: input.id,
-        kind: input.kind,
-        retryable: input.retryable,
-        source_id: input.sourceId,
-        status: "queued",
-      })
-      .returningAll()
-      .executeTakeFirstOrThrow();
+  public async createJob(
+    input: CreateJobInput,
+  ): Promise<Result<JobListItem, JobRepositoryError>> {
+    try {
+      const createdJob = await this.database
+        .insertInto("jobs")
+        .values({
+          id: input.id,
+          kind: input.kind,
+          retryable: input.retryable,
+          source_id: input.sourceId,
+          status: "queued",
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
 
-    return toJobListItem(createdJob);
+      return ok(toJobListItem(createdJob));
+    } catch (error) {
+      return err(toRepositoryError(error, "Failed to create job."));
+    }
   }
 
   public async attachQueueJobId(
     id: string,
     queueJobId: string | null,
-  ): Promise<void> {
-    await this.database
-      .updateTable("jobs")
-      .set({
-        queue_job_id: queueJobId,
-      })
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow();
+  ): Promise<Result<void, JobRepositoryError>> {
+    try {
+      await this.database
+        .updateTable("jobs")
+        .set({
+          queue_job_id: queueJobId,
+        })
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow();
+
+      return ok(undefined);
+    } catch (error) {
+      return err(toRepositoryError(error, "Failed to attach queue job id."));
+    }
   }
 
-  public async markRunning(id: string): Promise<void> {
-    await this.database
-      .updateTable("jobs")
-      .set((expressionBuilder) => ({
-        attempt_count: expressionBuilder("attempt_count", "+", 1),
-        failure_message: null,
-        finished_at: null,
-        started_at: new Date(),
-        status: "running",
-      }))
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow();
+  public async markRunning(
+    id: string,
+  ): Promise<Result<void, JobRepositoryError>> {
+    try {
+      await this.database
+        .updateTable("jobs")
+        .set((expressionBuilder) => ({
+          attempt_count: expressionBuilder("attempt_count", "+", 1),
+          failure_message: null,
+          finished_at: null,
+          started_at: new Date(),
+          status: "running",
+        }))
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow();
+
+      return ok(undefined);
+    } catch (error) {
+      return err(toRepositoryError(error, "Failed to mark job running."));
+    }
   }
 
-  public async markSucceeded(id: string): Promise<void> {
-    await this.database
-      .updateTable("jobs")
-      .set({
-        failure_message: null,
-        finished_at: new Date(),
-        status: "succeeded",
-      })
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow();
+  public async markSucceeded(
+    id: string,
+  ): Promise<Result<void, JobRepositoryError>> {
+    try {
+      await this.database
+        .updateTable("jobs")
+        .set({
+          failure_message: null,
+          finished_at: new Date(),
+          status: "succeeded",
+        })
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow();
+
+      return ok(undefined);
+    } catch (error) {
+      return err(toRepositoryError(error, "Failed to mark job succeeded."));
+    }
   }
 
   public async markFailed(
     id: string,
     failureMessage: string,
     retryable: boolean,
-  ): Promise<void> {
-    await this.database
-      .updateTable("jobs")
-      .set({
-        failure_message: failureMessage,
-        finished_at: new Date(),
-        retryable,
-        status: "failed",
-      })
-      .where("id", "=", id)
-      .executeTakeFirstOrThrow();
+  ): Promise<Result<void, JobRepositoryError>> {
+    try {
+      await this.database
+        .updateTable("jobs")
+        .set({
+          failure_message: failureMessage,
+          finished_at: new Date(),
+          retryable,
+          status: "failed",
+        })
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow();
+
+      return ok(undefined);
+    } catch (error) {
+      return err(toRepositoryError(error, "Failed to mark job failed."));
+    }
   }
 
   public async findJobById(id: string): Promise<JobListItem | null> {
@@ -113,51 +151,70 @@ export class JobRepository {
     return job === undefined ? null : toJobListItem(job);
   }
 
-  public async listQueuedOrRunningObserveSourceIds(): Promise<Set<string>> {
-    const jobs = await this.database
-      .selectFrom("jobs")
-      .select(["source_id"])
-      .where("kind", "=", "observe-source")
-      .where("status", "in", ["queued", "running"])
-      .where("source_id", "is not", null)
-      .execute();
+  public async listQueuedOrRunningObserveSourceIds(): Promise<
+    Result<Set<string>, JobRepositoryError>
+  > {
+    try {
+      const jobs = await this.database
+        .selectFrom("jobs")
+        .select(["source_id"])
+        .where("kind", "=", "observe-source")
+        .where("status", "in", ["queued", "running"])
+        .where("source_id", "is not", null)
+        .execute();
 
-    return new Set(
-      jobs
-        .map((job) => job.source_id)
-        .filter((sourceId): sourceId is string => sourceId !== null),
-    );
+      return ok(
+        new Set(
+          jobs
+            .map((job) => job.source_id)
+            .filter((sourceId): sourceId is string => sourceId !== null),
+        ),
+      );
+    } catch (error) {
+      return err(
+        toRepositoryError(
+          error,
+          "Failed to list queued or running observe source ids.",
+        ),
+      );
+    }
   }
 
   public async findLatestObserveJobsBySourceIds(
     sourceIds: string[],
-  ): Promise<Map<string, LatestObserveJob>> {
+  ): Promise<Result<Map<string, LatestObserveJob>, JobRepositoryError>> {
     if (sourceIds.length === 0) {
-      return new Map();
+      return ok(new Map());
     }
 
-    const jobs = await this.database
-      .selectFrom("jobs")
-      .select(["created_at", "source_id"])
-      .where("kind", "=", "observe-source")
-      .where("source_id", "in", sourceIds)
-      .orderBy("source_id", "asc")
-      .orderBy("created_at", "desc")
-      .execute();
-    const latestJobsBySourceId = new Map<string, LatestObserveJob>();
+    try {
+      const jobs = await this.database
+        .selectFrom("jobs")
+        .select(["created_at", "source_id"])
+        .where("kind", "=", "observe-source")
+        .where("source_id", "in", sourceIds)
+        .orderBy("source_id", "asc")
+        .orderBy("created_at", "desc")
+        .execute();
+      const latestJobsBySourceId = new Map<string, LatestObserveJob>();
 
-    for (const job of jobs) {
-      if (job.source_id === null || latestJobsBySourceId.has(job.source_id)) {
-        continue;
+      for (const job of jobs) {
+        if (job.source_id === null || latestJobsBySourceId.has(job.source_id)) {
+          continue;
+        }
+
+        latestJobsBySourceId.set(job.source_id, {
+          createdAt: job.created_at,
+          sourceId: job.source_id,
+        });
       }
 
-      latestJobsBySourceId.set(job.source_id, {
-        createdAt: job.created_at,
-        sourceId: job.source_id,
-      });
+      return ok(latestJobsBySourceId);
+    } catch (error) {
+      return err(
+        toRepositoryError(error, "Failed to find latest observe jobs."),
+      );
     }
-
-    return latestJobsBySourceId;
   }
 
   public async findQueuedOrRunningJobByKind(
@@ -189,4 +246,8 @@ function toJobListItem(job: Selectable<JobTable>): JobListItem {
     startedAt: job.started_at,
     status: job.status,
   };
+}
+
+function toRepositoryError(error: unknown, fallbackMessage: string): Error {
+  return error instanceof Error ? error : new Error(fallbackMessage);
 }

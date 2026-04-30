@@ -11,8 +11,20 @@ export function registerSettingRoutes(
   app.get("/api/v1/settings/periodic-crawl", async (context) => {
     const settings = await appSettingService.getPeriodicCrawlSettings();
 
+    if (!settings.ok) {
+      return context.json(
+        {
+          error: {
+            code: "periodic_crawl_settings_load_failed",
+            message: settings.error.message,
+          },
+        },
+        500,
+      );
+    }
+
     return context.json({
-      data: settings,
+      data: settings.value,
     });
   });
 

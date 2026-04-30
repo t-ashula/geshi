@@ -133,12 +133,15 @@ describe("/api/v1/contents", () => {
     try {
       const storage = new FilesystemStorage(storageRootDir);
       await insertStoredAudioFixture(testDatabase);
-      await storage.put({
+      const stored = await storage.put({
         body: new TextEncoder().encode("fake-mp3-body"),
         contentType: "audio/mpeg",
         key: "example-feed/episode-1.mp3",
         overwrite: true,
       });
+      if (!stored.ok) {
+        throw stored.error;
+      }
       const app = createTestApp(testDatabase, storageRootDir);
 
       const response = await app.request(
@@ -165,12 +168,15 @@ describe("/api/v1/contents", () => {
     try {
       const storage = new FilesystemStorage(storageRootDir);
       await insertStoredAudioFixture(testDatabase);
-      await storage.put({
+      const stored = await storage.put({
         body: new TextEncoder().encode("fake-mp3-body"),
         contentType: "audio/mpeg",
         key: "example-feed/episode-1.mp3",
         overwrite: true,
       });
+      if (!stored.ok) {
+        throw stored.error;
+      }
       const app = createTestApp(testDatabase, storageRootDir);
 
       const response = await app.request(

@@ -5,7 +5,7 @@ import type {
   SourceRepository,
 } from "../db/source-repository.js";
 import type { Result } from "../lib/result.js";
-import { err } from "../lib/result.js";
+import { err, ok } from "../lib/result.js";
 import { createSourceSlug, normalizeOptionalSlug } from "../lib/source-slug.js";
 import { createUrlHash } from "../lib/url-hash.js";
 import type { SourcePeriodicCrawlSettings } from "./periodic-crawl-settings.js";
@@ -27,6 +27,11 @@ export type UpdateSourceCollectorSettingsError = {
   message: string;
 };
 
+export type FindObserveSourceTargetError = {
+  code: "source_not_found";
+  message: string;
+};
+
 export class SourceService {
   public constructor(private readonly sourceRepository: SourceRepository) {}
 
@@ -44,9 +49,8 @@ export class SourceService {
       normalizeOptionalSlug(request.sourceSlug) ??
       createSourceSlug(normalizedUrl, request.title);
 
-    return {
-      ok: true,
-      value: await this.sourceRepository.createSource({
+    return ok(
+      await this.sourceRepository.createSource({
         collectorSettingId: crypto.randomUUID(),
         collectorSettingSnapshotId: crypto.randomUUID(),
         description: normalizeOptionalString(request.description),
@@ -59,7 +63,7 @@ export class SourceService {
         url: normalizedUrl,
         urlHash: createUrlHash(normalizedUrl),
       }),
-    };
+    );
   }
 
   public async listSources(): Promise<SourceListItem[]> {
@@ -68,8 +72,18 @@ export class SourceService {
 
   public async findObserveSourceTarget(
     sourceId: string,
-  ): Promise<ObserveSourceTarget | null> {
-    return this.sourceRepository.findObserveSourceTarget(sourceId);
+  ): Promise<Result<ObserveSourceTarget, FindObserveSourceTargetError>> {
+    const source =
+      await this.sourceRepository.findObserveSourceTarget(sourceId);
+
+    if (source === null) {
+      return err({
+        code: "source_not_found",
+        message: "Source not found.",
+      });
+    }
+
+    return ok(source);
   }
 
   public async updateSourceCollectorSettings(
@@ -90,16 +104,21 @@ export class SourceService {
       });
     }
 
-    return {
-      ok: true,
-      value: source,
-    };
+    return ok(source);
   }
 
   public async listPeriodicCrawlTargets(): Promise<
-    PeriodicCrawlSourceTarget[]
+    Result<PeriodicCrawlSourceTarget[], Error>
   > {
-    return this.sourceRepository.listPeriodicCrawlTargets();
+    try {
+      return ok(await this.sourceRepository.listPeriodicCrawlTargets());
+    } catch (error) {
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to list periodic crawl targets."),
+      );
+    }
   }
 }
 
@@ -141,8 +160,5 @@ export function normalizeSourceUrl(
     });
   }
 
-  return {
-    ok: true,
-    value: url.toString(),
-  };
+  return ok(url.toString());
 }

@@ -32,6 +32,10 @@ export function registerMediaAssetRoutes(
     }
 
     const body = await storage.get(asset.storageKey);
+
+    if (!body.ok) {
+      return context.notFound();
+    }
     const headers = new Headers({
       "Content-Type": asset.mimeType,
     });
@@ -40,9 +44,9 @@ export function registerMediaAssetRoutes(
       headers.set("Content-Length", String(asset.byteSize));
     }
 
-    const responseBytes = new Uint8Array(body.byteLength);
+    const responseBytes = new Uint8Array(body.value.byteLength);
 
-    responseBytes.set(body);
+    responseBytes.set(body.value);
 
     return new Response(responseBytes.buffer, {
       headers,

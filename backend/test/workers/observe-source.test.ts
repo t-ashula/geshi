@@ -7,6 +7,7 @@ import { SourceRepository } from "../../src/db/source-repository.js";
 import type { JobPayload } from "../../src/job-queue/types.js";
 import type { AcquireContentJobPayload } from "../../src/job-queue/types.js";
 import { ACQUIRE_CONTENT_JOB_NAME } from "../../src/job-queue/types.js";
+import { err } from "../../src/lib/result.js";
 import { createNoopLogger } from "../../src/logger/index.js";
 import { AssetService } from "../../src/service/asset-service.js";
 import { ContentService } from "../../src/service/content-service.js";
@@ -51,12 +52,15 @@ describe("handleObserveSourceJob", () => {
 
     const jobId = crypto.randomUUID();
 
-    await jobRepository.createJob({
+    const createdJob = await jobRepository.createJob({
       id: jobId,
       kind: "observe-source",
       retryable: true,
       sourceId: source.id,
     });
+    if (!createdJob.ok) {
+      throw createdJob.error;
+    }
 
     vi.stubGlobal(
       "fetch",
@@ -83,7 +87,7 @@ describe("handleObserveSourceJob", () => {
       }),
     );
 
-    await handleObserveSourceJob(
+    const result = await handleObserveSourceJob(
       {
         collector: {
           config: {},
@@ -116,6 +120,7 @@ describe("handleObserveSourceJob", () => {
         logger: createNoopLogger(),
       },
     );
+    expect(result.ok).toBe(true);
 
     const assets = await assetRepository.listAssets();
     const contents = await contentRepository.listContents();
@@ -213,12 +218,15 @@ describe("handleObserveSourceJob", () => {
 
     const jobId = crypto.randomUUID();
 
-    await jobRepository.createJob({
+    const createdJob = await jobRepository.createJob({
       id: jobId,
       kind: "observe-source",
       retryable: true,
       sourceId: source.id,
     });
+    if (!createdJob.ok) {
+      throw createdJob.error;
+    }
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -230,41 +238,127 @@ describe("handleObserveSourceJob", () => {
       ),
     );
 
-    await expect(
-      handleObserveSourceJob(
-        {
-          collector: {
-            config: {},
-            pluginSlug: "podcast-rss",
-            settingId: "setting-2",
-            settingSnapshotId: "setting-snapshot-2",
-          },
-          jobId,
-          source: {
-            id: source.id,
-            kind: "podcast",
-            slug: source.slug,
-            url: source.url,
-          },
+    const result = await handleObserveSourceJob(
+      {
+        collector: {
+          config: {},
+          pluginSlug: "podcast-rss",
+          settingId: "setting-2",
+          settingSnapshotId: "setting-snapshot-2",
         },
-        {
-          assetService: new AssetService(assetRepository),
-          contentService: new ContentService(
-            new ContentRepository(testDatabase.database),
-          ),
-          jobQueue: {
-            enqueue: () => Promise.resolve("queue-job-test"),
-            enqueueAfter: () => Promise.resolve("queue-job-after"),
-          },
-          jobRepository,
-          logger: createNoopLogger(),
+        jobId,
+        source: {
+          id: source.id,
+          kind: "podcast",
+          slug: source.slug,
+          url: source.url,
         },
-      ),
-    ).rejects.toThrow("Failed to fetch RSS feed: 502");
+      },
+      {
+        assetService: new AssetService(assetRepository),
+        contentService: new ContentService(
+          new ContentRepository(testDatabase.database),
+        ),
+        jobQueue: {
+          enqueue: () => Promise.resolve("queue-job-test"),
+          enqueueAfter: () => Promise.resolve("queue-job-after"),
+        },
+        jobRepository,
+        logger: createNoopLogger(),
+      },
+    );
+    expect(result.ok).toBe(false);
 
     const job = await jobRepository.findJobById(jobId);
 
     expect(job?.status).toBe("failed");
     expect(job?.failureMessage).toContain("Failed to fetch RSS feed: 502");
+  });
+
+  it("marks the job as failed when a pending asset cannot be reloaded", async () => {
+    const sourceRepository = new SourceRepository(testDatabase.database);
+    const assetRepository = new AssetRepository(testDatabase.database);
+    const contentRepository = new ContentRepository(testDatabase.database);
+    const jobRepository = new JobRepository(testDatabase.database);
+    const assetService = new AssetService(assetRepository);
+    const contentService = new ContentService(contentRepository);
+    const source = await sourceRepository.createSource({
+      collectorSettingId: crypto.randomUUID(),
+      collectorSettingSnapshotId: crypto.randomUUID(),
+      id: crypto.randomUUID(),
+      kind: "podcast",
+      pluginSlug: "podcast-rss",
+      slug: "source-three",
+      snapshotId: crypto.randomUUID(),
+      url: "https://example.com/missing-asset.xml",
+      urlHash: "hash-3",
+    });
+
+    const jobId = crypto.randomUUID();
+
+    const createdJob = await jobRepository.createJob({
+      id: jobId,
+      kind: "observe-source",
+      retryable: true,
+      sourceId: source.id,
+    });
+    if (!createdJob.ok) {
+      throw createdJob.error;
+    }
+    vi.spyOn(assetService, "findAcquireTargetById").mockResolvedValue(
+      err({
+        code: "asset_not_found",
+        message: "Pending asset not found after observe: missing-asset-id",
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?><rss><channel><item><guid>ep-1</guid><title>Episode 1</title><description>Hello</description><link>https://example.com/episodes/1</link><enclosure url="https://cdn.example.com/audio/1.mp3" /><pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate></item></channel></rss>`,
+            {
+              status: 200,
+            },
+          ),
+        ),
+      ),
+    );
+
+    const result = await handleObserveSourceJob(
+      {
+        collector: {
+          config: {},
+          pluginSlug: "podcast-rss",
+          settingId: "setting-3",
+          settingSnapshotId: "setting-snapshot-3",
+        },
+        jobId,
+        source: {
+          id: source.id,
+          kind: "podcast",
+          slug: source.slug,
+          url: source.url,
+        },
+      },
+      {
+        assetService,
+        contentService,
+        jobQueue: {
+          enqueue: () => Promise.resolve("queue-job-test"),
+          enqueueAfter: () => Promise.resolve("queue-job-after"),
+        },
+        jobRepository,
+        logger: createNoopLogger(),
+      },
+    );
+    expect(result.ok).toBe(false);
+
+    const job = await jobRepository.findJobById(jobId);
+
+    expect(job?.status).toBe("failed");
+    expect(job?.failureMessage).toContain(
+      "Pending asset not found after observe: missing-asset-id",
+    );
   });
 });

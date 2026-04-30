@@ -60,13 +60,17 @@ await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, {
 await boss.work<ObserveSourceJobPayload>(
   OBSERVE_SOURCE_JOB_NAME,
   async ([job]) => {
-    await handleObserveSourceJob(job.data, {
+    const result = await handleObserveSourceJob(job.data, {
       assetService,
       contentService,
       jobQueue,
       jobRepository,
       logger,
     });
+
+    if (!result.ok) {
+      throw result.error;
+    }
   },
 );
 

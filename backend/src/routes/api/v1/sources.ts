@@ -130,6 +130,18 @@ export function registerSourceRoutes(
     );
 
     if (!result.ok) {
+      if (result.error instanceof Error) {
+        return context.json(
+          {
+            error: {
+              code: "observe_enqueue_failed",
+              message: result.error.message,
+            },
+          },
+          500,
+        );
+      }
+
       return context.json(
         {
           error: {
