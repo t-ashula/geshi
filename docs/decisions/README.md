@@ -29,3 +29,5 @@
 - [ADR-0026: asset と asset snapshot の責務を current state と履歴に分ける](./0026-asset-and-asset-snapshot-boundary.md)
 - [ADR-0027: web ui frontend の browse state を URL に写す](./0027-web-ui-browse-state-routing.md)
 - [ADR-0028: 保存済み asset の参照と再生に backend API を追加する](./0028-stored-asset-playback-api.md)
+- [ADR-0029: 定期クロール job は source 設定を走査して observe-source を投入する](./0029-periodic-source-crawl-scheduling.md)
+- [ADR-0030: geshi 全体にかかる設定は source ごとの設定から分けて管理する](./0030-configuration-management.md)
