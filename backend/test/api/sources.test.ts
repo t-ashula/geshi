@@ -357,6 +357,30 @@ describe("/api/v1/sources", () => {
     }
   });
 
+  it("returns 404 when observe target source is missing", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      const app = createTestApp(testDatabase);
+      const response = await app.request(
+        "/api/v1/sources/00000000-0000-0000-0000-000000000000/observe",
+        {
+          method: "POST",
+        },
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        error: {
+          code: "source_not_found",
+          message: "Source not found.",
+        },
+      });
+    } finally {
+      await destroyTestDatabase(testDatabase);
+    }
+  });
+
   it("updates source crawl settings", async () => {
     const testDatabase = await createTestDatabase();
 

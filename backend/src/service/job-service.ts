@@ -3,14 +3,14 @@ import { v7 as uuidv7 } from "uuid";
 import type { JobListItem, JobRepository } from "../db/job-repository.js";
 import type { JobQueue } from "../job-queue/types.js";
 import { OBSERVE_SOURCE_JOB_NAME } from "../job-queue/types.js";
+import type { Result } from "../lib/result.js";
+import { err, ok } from "../lib/result.js";
 import type { SourceService } from "./source-service.js";
 
-export class SourceNotFoundError extends Error {
-  public constructor(sourceId: string) {
-    super(`Source not found: ${sourceId}`);
-    this.name = "SourceNotFoundError";
-  }
-}
+export type EnqueueObserveSourceJobError = {
+  code: "source_not_found";
+  message: string;
+};
 
 export class JobService {
   public constructor(
@@ -19,12 +19,17 @@ export class JobService {
     private readonly jobQueue: JobQueue,
   ) {}
 
-  public async enqueueObserveSourceJob(sourceId: string): Promise<JobListItem> {
+  public async enqueueObserveSourceJob(
+    sourceId: string,
+  ): Promise<Result<JobListItem, EnqueueObserveSourceJobError>> {
     const observeSourceTarget =
       await this.sourceService.findObserveSourceTarget(sourceId);
 
     if (observeSourceTarget === null) {
-      throw new SourceNotFoundError(sourceId);
+      return err({
+        code: "source_not_found",
+        message: "Source not found.",
+      });
     }
 
     const job = await this.jobRepository.createJob({
@@ -57,7 +62,7 @@ export class JobService {
       throw new Error(`Job disappeared after enqueue: ${job.id}`);
     }
 
-    return persistedJob;
+    return ok(persistedJob);
   }
 
   public async findJobById(id: string): Promise<JobListItem | null> {

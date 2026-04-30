@@ -67,7 +67,17 @@ export async function handlePeriodicCrawlJob(
           continue;
         }
 
-        await dependencies.jobService.enqueueObserveSourceJob(target.sourceId);
+        const enqueueResult =
+          await dependencies.jobService.enqueueObserveSourceJob(
+            target.sourceId,
+          );
+
+        if (!enqueueResult.ok) {
+          throw new Error(
+            `Periodic crawl target disappeared before enqueue: ${target.sourceId}`,
+          );
+        }
+
         enqueuedCount += 1;
       }
       logger.info("observe job enqueued.", {

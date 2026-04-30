@@ -5,7 +5,6 @@ import {
   DuplicateSourceUrlHashError,
 } from "../../../db/source-repository.js";
 import type { JobService } from "../../../service/job-service.js";
-import { SourceNotFoundError } from "../../../service/job-service.js";
 import type {
   InspectSourceError,
   SourceInspectService,
@@ -126,27 +125,23 @@ export function registerSourceRoutes(
   });
 
   app.post("/api/v1/sources/:sourceId/observe", async (context) => {
-    try {
-      const job = await jobService.enqueueObserveSourceJob(
-        context.req.param("sourceId"),
-      );
+    const result = await jobService.enqueueObserveSourceJob(
+      context.req.param("sourceId"),
+    );
 
-      return context.json({ data: job }, 202);
-    } catch (error) {
-      if (error instanceof SourceNotFoundError) {
-        return context.json(
-          {
-            error: {
-              code: "source_not_found",
-              message: "Source not found.",
-            },
+    if (!result.ok) {
+      return context.json(
+        {
+          error: {
+            code: result.error.code,
+            message: result.error.message,
           },
-          404,
-        );
-      }
-
-      throw error;
+        },
+        404,
+      );
     }
+
+    return context.json({ data: result.value }, 202);
   });
 
   app.patch("/api/v1/sources/:sourceId/collector-settings", async (context) => {
