@@ -21,8 +21,6 @@ export type ApiError = {
   message: string;
 };
 
-export type Result<T, E> = { ok: true; value: T } | { error: E; ok: false };
-
 export type SourceListItem = {
   collectorSettingsVersion: number | null;
   periodicCrawlEnabled: boolean;
@@ -171,7 +169,7 @@ export async function createSource(
 
 export async function inspectSource(
   request: InspectSourceRequest,
-): Promise<Result<InspectSourceDraft, ApiError>> {
+): Promise<InspectSourceDraft> {
   const response = await fetch("/api/v1/sources/inspect", {
     body: JSON.stringify(request),
     headers: {
@@ -184,26 +182,14 @@ export async function inspectSource(
     | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
-    return {
-      error: payload.error,
-      ok: false,
-    };
+    throw new Error(payload.error.message);
   }
 
   if ("data" in payload) {
-    return {
-      ok: true,
-      value: payload.data,
-    };
+    return payload.data;
   }
 
-  return {
-    error: {
-      code: "source_inspect_failed",
-      message: "Source inspect failed.",
-    },
-    ok: false,
-  };
+  throw new Error("Source inspect failed.");
 }
 
 export async function observeSource(sourceId: string): Promise<JobListItem> {

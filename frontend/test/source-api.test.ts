@@ -37,17 +37,14 @@ describe("inspectSource", () => {
         url: "https://example.com/feed.xml",
       }),
     ).resolves.toEqual({
-      ok: true,
-      value: {
-        description: "Weekly notes",
-        sourceSlug: "example-podcast-123456789abc",
-        title: "Example Podcast",
-        url: "https://example.com/feed.xml",
-      },
+      description: "Weekly notes",
+      sourceSlug: "example-podcast-123456789abc",
+      title: "Example Podcast",
+      url: "https://example.com/feed.xml",
     });
   });
 
-  it("returns an inspect error on failure", async () => {
+  it("throws an inspect error on failure", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(() =>
@@ -74,13 +71,7 @@ describe("inspectSource", () => {
       inspectSource({
         url: "https://example.com/feed.xml",
       }),
-    ).resolves.toEqual({
-      error: {
-        code: "source_inspect_unrecognized",
-        message: "The given URL is not a supported RSS feed.",
-      },
-      ok: false,
-    });
+    ).rejects.toThrow("The given URL is not a supported RSS feed.");
   });
 });
 

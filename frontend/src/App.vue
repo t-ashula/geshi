@@ -183,22 +183,19 @@ async function inspectCurrentSource(): Promise<void> {
   inspectErrorMessage.value = null;
 
   try {
-    const result = await inspectSource({
+    const draft = await inspectSource({
       url: trimmedUrl,
     });
-
-    if (!result.ok) {
-      inspectErrorMessage.value = result.error.message;
-      return;
-    }
-
     form.value = {
-      description: result.value.description ?? "",
-      sourceSlug: result.value.sourceSlug,
-      title: result.value.title ?? "",
-      url: result.value.url,
+      description: draft.description ?? "",
+      sourceSlug: draft.sourceSlug,
+      title: draft.title ?? "",
+      url: draft.url,
     };
-    lastInspectedUrl.value = result.value.url;
+    lastInspectedUrl.value = draft.url;
+  } catch (error) {
+    inspectErrorMessage.value =
+      error instanceof Error ? error.message : "Source inspect failed.";
   } finally {
     isInspecting.value = false;
   }
