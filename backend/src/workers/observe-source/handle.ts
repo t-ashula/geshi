@@ -32,10 +32,12 @@ export async function handleObserveSourceJob(
   await dependencies.jobRepository.markRunning(payload.jobId);
   logger.info("observe job started.");
 
+  const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
+  const abortController = new AbortController();
+  let observedContents;
+
   try {
-    const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
-    const abortController = new AbortController();
-    const observedContents = await plugin.observe({
+    observedContents = await plugin.observe({
       abortSignal: abortController.signal,
       config: payload.collector.config,
       logger: logger.child({
@@ -43,7 +45,12 @@ export async function handleObserveSourceJob(
       }),
       sourceUrl: payload.source.url,
     });
+  } catch (error) {
+    await failObserveSourceJob(payload.jobId, dependencies, logger, error);
+    throw error;
+  }
 
+  try {
     for (const observedContent of observedContents) {
       const storedContent =
         await dependencies.contentService.createObservedContent({
@@ -138,23 +145,29 @@ export async function handleObserveSourceJob(
         );
       }
     }
-    await dependencies.jobRepository.markSucceeded(payload.jobId);
-    logger.info("observe job completed.", {
-      observedContentCount: observedContents.length,
-    });
   } catch (error) {
-    const failureMessage =
-      error instanceof Error ? error.message : "Observe source job failed.";
-
-    await dependencies.jobRepository.markFailed(
-      payload.jobId,
-      failureMessage,
-      true,
-    );
-    logger.error("observe job failed.", {
-      error,
-      failureMessage,
-    });
+    await failObserveSourceJob(payload.jobId, dependencies, logger, error);
     throw error;
   }
+
+  await dependencies.jobRepository.markSucceeded(payload.jobId);
+  logger.info("observe job completed.", {
+    observedContentCount: observedContents.length,
+  });
+}
+
+async function failObserveSourceJob(
+  jobId: string,
+  dependencies: HandleObserveSourceJobDependencies,
+  logger: Logger,
+  error: unknown,
+): Promise<void> {
+  const failureMessage =
+    error instanceof Error ? error.message : "Observe source job failed.";
+
+  await dependencies.jobRepository.markFailed(jobId, failureMessage, true);
+  logger.error("observe job failed.", {
+    error,
+    failureMessage,
+  });
 }

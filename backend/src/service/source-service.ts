@@ -22,6 +22,11 @@ export type SourceUrlError = {
   message: string;
 };
 
+export type UpdateSourceCollectorSettingsError = {
+  code: "source_not_found";
+  message: string;
+};
+
 export class SourceService {
   public constructor(private readonly sourceRepository: SourceRepository) {}
 
@@ -71,12 +76,24 @@ export class SourceService {
     sourceId: string,
     settings: SourcePeriodicCrawlSettings,
     baseVersion: number,
-  ): Promise<SourceListItem | null> {
-    return this.sourceRepository.updateSourceCollectorSettings(
+  ): Promise<Result<SourceListItem, UpdateSourceCollectorSettingsError>> {
+    const source = await this.sourceRepository.updateSourceCollectorSettings(
       sourceId,
       settings,
       baseVersion,
     );
+
+    if (source === null) {
+      return err({
+        code: "source_not_found",
+        message: "Source not found.",
+      });
+    }
+
+    return {
+      ok: true,
+      value: source,
+    };
   }
 
   public async listPeriodicCrawlTargets(): Promise<

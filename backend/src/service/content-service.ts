@@ -6,6 +6,13 @@ import type {
   CreateObservedContentResult,
   ImportObservedContentInput,
 } from "../db/content-repository.js";
+import type { Result } from "../lib/result.js";
+import { err, ok } from "../lib/result.js";
+
+export type FindContentDetailError = {
+  code: "content_not_found";
+  message: string;
+};
 
 export class ContentService {
   public constructor(private readonly contentRepository: ContentRepository) {}
@@ -41,7 +48,16 @@ export class ContentService {
 
   public async findContentDetail(
     contentId: string,
-  ): Promise<ContentDetailItem | null> {
-    return this.contentRepository.findContentDetail(contentId);
+  ): Promise<Result<ContentDetailItem, FindContentDetailError>> {
+    const content = await this.contentRepository.findContentDetail(contentId);
+
+    if (content === null) {
+      return err({
+        code: "content_not_found",
+        message: "Content was not found.",
+      });
+    }
+
+    return ok(content);
   }
 }

@@ -100,6 +100,32 @@ describe("/api/v1/contents", () => {
     }
   });
 
+  it("returns 404 when content detail is missing", async () => {
+    const testDatabase = await createTestDatabase();
+    const storageRootDir = await mkdtemp(join(tmpdir(), "geshi-content-404-"));
+
+    try {
+      const app = createTestApp(testDatabase, storageRootDir);
+      const response = await app.request(
+        "/api/v1/contents/00000000-0000-0000-0000-000000000999",
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        error: {
+          code: "content_not_found",
+          message: "Content was not found.",
+        },
+      });
+    } finally {
+      await destroyTestDatabase(testDatabase);
+      await rm(storageRootDir, {
+        force: true,
+        recursive: true,
+      });
+    }
+  });
+
   it("serves stored media bodies from /media/assets/{asset-id}.{ext}", async () => {
     const testDatabase = await createTestDatabase();
     const storageRootDir = await mkdtemp(join(tmpdir(), "geshi-media-api-"));
@@ -149,6 +175,26 @@ describe("/api/v1/contents", () => {
 
       const response = await app.request(
         "/media/assets/00000000-0000-0000-0000-000000000300.ogg",
+      );
+
+      expect(response.status).toBe(404);
+    } finally {
+      await destroyTestDatabase(testDatabase);
+      await rm(storageRootDir, {
+        force: true,
+        recursive: true,
+      });
+    }
+  });
+
+  it("returns 404 when stored media asset is missing", async () => {
+    const testDatabase = await createTestDatabase();
+    const storageRootDir = await mkdtemp(join(tmpdir(), "geshi-media-miss-"));
+
+    try {
+      const app = createTestApp(testDatabase, storageRootDir);
+      const response = await app.request(
+        "/media/assets/00000000-0000-0000-0000-000000000399.mp3",
       );
 
       expect(response.status).toBe(404);

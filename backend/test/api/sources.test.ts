@@ -495,6 +495,38 @@ describe("/api/v1/sources", () => {
       await destroyTestDatabase(testDatabase);
     }
   });
+
+  it("returns 404 when updating crawl settings for a missing source", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      const app = createTestApp(testDatabase);
+      const response = await app.request(
+        "/api/v1/sources/00000000-0000-0000-0000-000000000000/collector-settings",
+        {
+          body: JSON.stringify({
+            baseVersion: 1,
+            enabled: true,
+            intervalMinutes: 90,
+          }),
+          headers: {
+            "content-type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        error: {
+          code: "source_not_found",
+          message: "Source not found.",
+        },
+      });
+    } finally {
+      await destroyTestDatabase(testDatabase);
+    }
+  });
 });
 
 function createTestApp(

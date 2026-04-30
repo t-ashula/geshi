@@ -6,14 +6,14 @@ type App = Hono;
 
 export function registerJobRoutes(app: App, jobService: JobService): void {
   app.get("/api/v1/jobs/:jobId", async (context) => {
-    const job = await jobService.findJobById(context.req.param("jobId"));
+    const result = await jobService.findJobById(context.req.param("jobId"));
 
-    if (job === null) {
+    if (!result.ok) {
       return context.json(
         {
           error: {
-            code: "job_not_found",
-            message: "Job not found.",
+            code: result.error.code,
+            message: result.error.message,
           },
         },
         404,
@@ -21,7 +21,7 @@ export function registerJobRoutes(app: App, jobService: JobService): void {
     }
 
     return context.json({
-      data: job,
+      data: result.value,
     });
   });
 }

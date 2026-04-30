@@ -12,6 +12,11 @@ export type EnqueueObserveSourceJobError = {
   message: string;
 };
 
+export type FindJobByIdError = {
+  code: "job_not_found";
+  message: string;
+};
+
 export class JobService {
   public constructor(
     private readonly sourceService: SourceService,
@@ -65,7 +70,18 @@ export class JobService {
     return ok(persistedJob);
   }
 
-  public async findJobById(id: string): Promise<JobListItem | null> {
-    return this.jobRepository.findJobById(id);
+  public async findJobById(
+    id: string,
+  ): Promise<Result<JobListItem, FindJobByIdError>> {
+    const job = await this.jobRepository.findJobById(id);
+
+    if (job === null) {
+      return err({
+        code: "job_not_found",
+        message: "Job not found.",
+      });
+    }
+
+    return ok(job);
   }
 }

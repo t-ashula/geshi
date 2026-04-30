@@ -33,10 +33,11 @@ export async function handleAcquireContentJob(
   await dependencies.jobRepository.markRunning(payload.jobId);
   logger.info("acquire job started.");
 
-  try {
-    const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
+  const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
+  let acquiredAsset;
 
-    const acquiredAsset = await plugin.acquire({
+  try {
+    acquiredAsset = await plugin.acquire({
       abortSignal: AbortSignal.timeout(30_000),
       asset: {
         kind: payload.asset.kind,
@@ -50,6 +51,12 @@ export async function handleAcquireContentJob(
         operation: "acquire",
       }),
     });
+  } catch (error) {
+    await failAcquireContentJob(payload, dependencies, logger, error);
+    throw error;
+  }
+
+  try {
     const storedAsset = await dependencies.storage.put({
       body: acquiredAsset.body,
       contentType: acquiredAsset.contentType,
@@ -77,24 +84,33 @@ export async function handleAcquireContentJob(
     await dependencies.jobRepository.markSucceeded(payload.jobId);
     logger.info("acquire job completed.");
   } catch (error) {
-    const failureMessage =
-      error instanceof Error ? error.message : "Acquire content job failed.";
-
-    await dependencies.contentService.markContentStatus(
-      payload.content.id,
-      "failed",
-    );
-    await dependencies.jobRepository.markFailed(
-      payload.jobId,
-      failureMessage,
-      true,
-    );
-    logger.error("acquire job failed.", {
-      error,
-      failureMessage,
-    });
+    await failAcquireContentJob(payload, dependencies, logger, error);
     throw error;
   }
+}
+
+async function failAcquireContentJob(
+  payload: AcquireContentJobPayload,
+  dependencies: HandleAcquireContentJobDependencies,
+  logger: Logger,
+  error: unknown,
+): Promise<void> {
+  const failureMessage =
+    error instanceof Error ? error.message : "Acquire content job failed.";
+
+  await dependencies.contentService.markContentStatus(
+    payload.content.id,
+    "failed",
+  );
+  await dependencies.jobRepository.markFailed(
+    payload.jobId,
+    failureMessage,
+    true,
+  );
+  logger.error("acquire job failed.", {
+    error,
+    failureMessage,
+  });
 }
 
 function createAssetKey(

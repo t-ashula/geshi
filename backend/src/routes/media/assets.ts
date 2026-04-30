@@ -18,12 +18,13 @@ export function registerMediaAssetRoutes(
       return context.notFound();
     }
 
-    const asset = await assetService.findStoredMediaById(parsed.assetId);
+    const result = await assetService.findStoredMediaById(parsed.assetId);
 
-    if (asset === null) {
+    if (!result.ok) {
       return context.notFound();
     }
 
+    const asset = result.value;
     const expectedExtension = contentTypeToExtension(asset.mimeType);
 
     if (expectedExtension === null || parsed.extension !== expectedExtension) {

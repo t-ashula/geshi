@@ -20,22 +20,23 @@ export function registerContentRoutes(
   });
 
   app.get("/api/v1/contents/:contentId", async (context) => {
-    const content = await contentService.findContentDetail(
+    const result = await contentService.findContentDetail(
       context.req.param("contentId"),
     );
 
-    if (content === null) {
+    if (!result.ok) {
       return context.json(
         {
           error: {
-            code: "content_not_found",
-            message: "Content was not found.",
+            code: result.error.code,
+            message: result.error.message,
           },
         },
         404,
       );
     }
 
+    const content = result.value;
     const assets = await assetService.listAssetsByContentId(content.id);
 
     return context.json({

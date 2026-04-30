@@ -179,7 +179,7 @@ export function registerSourceRoutes(
     }
 
     try {
-      const source = await sourceService.updateSourceCollectorSettings(
+      const result = await sourceService.updateSourceCollectorSettings(
         context.req.param("sourceId"),
         {
           enabled: body.enabled,
@@ -188,12 +188,12 @@ export function registerSourceRoutes(
         body.baseVersion,
       );
 
-      if (source === null) {
+      if (!result.ok) {
         return context.json(
           {
             error: {
-              code: "source_not_found",
-              message: "Source not found.",
+              code: result.error.code,
+              message: result.error.message,
             },
           },
           404,
@@ -201,7 +201,7 @@ export function registerSourceRoutes(
       }
 
       return context.json({
-        data: source,
+        data: result.value,
       });
     } catch (error) {
       if (error instanceof CollectorSettingsVersionConflictError) {

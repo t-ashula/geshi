@@ -8,6 +8,13 @@ import type {
   StoredAssetMedia,
   UpsertStoredAssetInput,
 } from "../db/asset-repository.js";
+import type { Result } from "../lib/result.js";
+import { err, ok } from "../lib/result.js";
+
+export type FindStoredMediaByIdError = {
+  code: "asset_media_not_found";
+  message: string;
+};
 
 export class AssetService {
   public constructor(private readonly assetRepository: AssetRepository) {}
@@ -46,7 +53,16 @@ export class AssetService {
 
   public async findStoredMediaById(
     assetId: string,
-  ): Promise<StoredAssetMedia | null> {
-    return this.assetRepository.findStoredMediaById(assetId);
+  ): Promise<Result<StoredAssetMedia, FindStoredMediaByIdError>> {
+    const asset = await this.assetRepository.findStoredMediaById(assetId);
+
+    if (asset === null) {
+      return err({
+        code: "asset_media_not_found",
+        message: "Stored media asset was not found.",
+      });
+    }
+
+    return ok(asset);
   }
 }
