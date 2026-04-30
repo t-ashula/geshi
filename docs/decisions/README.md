@@ -27,3 +27,5 @@
 - [ADR-0024: web ui frontend の source 登録フローを 2 段階化する](./0024-source-registration-preview-ui-flow.md)
 - [ADR-0025: crawl job は worker 実行に必要な情報を enqueue 時点で持つ](./0025-crawl-worker-input-interface.md)
 - [ADR-0026: asset と asset snapshot の責務を current state と履歴に分ける](./0026-asset-and-asset-snapshot-boundary.md)
+- [ADR-0027: web ui frontend の browse state を URL に写す](./0027-web-ui-browse-state-routing.md)
+- [ADR-0028: 保存済み asset の参照と再生に backend API を追加する](./0028-stored-asset-playback-api.md)

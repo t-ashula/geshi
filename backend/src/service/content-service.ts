@@ -1,5 +1,6 @@
 import type {
   AcquireTargetContent,
+  ContentDetailItem,
   ContentListItem,
   ContentRepository,
   CreateObservedContentResult,
@@ -36,5 +37,11 @@ export class ContentService {
 
   public async listContents(): Promise<ContentListItem[]> {
     return this.contentRepository.listContents();
+  }
+
+  public async findContentDetail(
+    contentId: string,
+  ): Promise<ContentDetailItem | null> {
+    return this.contentRepository.findContentDetail(contentId);
   }
 }

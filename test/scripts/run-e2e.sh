@@ -10,9 +10,9 @@ source_server_log="$log_dir/source-server.log"
 observe_worker_log="$log_dir/observe-worker.log"
 acquire_worker_log="$log_dir/acquire-worker.log"
 
-frontend_port="${E2E_FRONTEND_PORT:-4173}"
-backend_port="${E2E_BACKEND_PORT:-3000}"
-source_server_port="${E2E_SOURCE_SERVER_PORT:-3401}"
+frontend_port="${E2E_FRONTEND_PORT:-4273}"
+backend_port="${E2E_BACKEND_PORT:-3300}"
+source_server_port="${E2E_SOURCE_SERVER_PORT:-3501}"
 storage_root_dir="$root_dir/.data/e2e-storage"
 
 mkdir -p "$log_dir" "$storage_root_dir"
@@ -70,21 +70,25 @@ E2E_SOURCE_SERVER_PORT="$source_server_port" \
 source_server_pid=$!
 
 PGDATABASE=geshi_test \
+PGPORT=55433 \
 PORT="$backend_port" \
 GESHI_STORAGE_ROOT_DIR="$storage_root_dir" \
 npm run -s backend:start >"$backend_log" 2>&1 &
 backend_pid=$!
 
 PGDATABASE=geshi_test \
+PGPORT=55433 \
 GESHI_STORAGE_ROOT_DIR="$storage_root_dir" \
 npm run -s worker:observe-source >"$observe_worker_log" 2>&1 &
 worker_pid=$!
 
 PGDATABASE=geshi_test \
+PGPORT=55433 \
 GESHI_STORAGE_ROOT_DIR="$storage_root_dir" \
 npm run -s worker:acquire-content >"$acquire_worker_log" 2>&1 &
 acquire_worker_pid=$!
 
+GESHI_BACKEND_ORIGIN="http://127.0.0.1:$backend_port" \
 npm run frontend:dev -- --host 127.0.0.1 --port "$frontend_port" >"$frontend_log" 2>&1 &
 frontend_pid=$!
 

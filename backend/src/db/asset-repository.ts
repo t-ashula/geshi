@@ -34,6 +34,23 @@ export type AcquireTargetAsset = {
   sourceUrl: string | null;
 };
 
+export type ContentDetailAsset = {
+  byteSize: number | null;
+  id: string;
+  kind: string;
+  mimeType: string | null;
+  primary: boolean;
+  sourceUrl: string | null;
+  storageKey: string | null;
+};
+
+export type StoredAssetMedia = {
+  byteSize: number | null;
+  id: string;
+  mimeType: string;
+  storageKey: string;
+};
+
 export type AssetListItem = {
   acquiredFingerprint: string | null;
   acquiredAt: Date | null;
@@ -298,6 +315,69 @@ export class AssetRepository {
       observedFingerprint: asset.observed_fingerprint,
       primary: asset.is_primary,
       sourceUrl: latestSnapshot.source_url,
+    };
+  }
+
+  public async listAssetsByContentId(
+    contentId: string,
+  ): Promise<ContentDetailAsset[]> {
+    const assets = await this.database
+      .selectFrom("assets")
+      .selectAll()
+      .where("content_id", "=", contentId)
+      .orderBy("created_at", "asc")
+      .execute();
+
+    return Promise.all(
+      assets.map(async (asset) => {
+        const latestSnapshot = await findLatestAssetSnapshot(
+          this.database,
+          asset.id,
+        );
+
+        return {
+          byteSize: latestSnapshot.byte_size,
+          id: asset.id,
+          kind: asset.kind,
+          mimeType: latestSnapshot.mime_type,
+          primary: asset.is_primary,
+          sourceUrl: latestSnapshot.source_url,
+          storageKey: latestSnapshot.storage_key,
+        };
+      }),
+    );
+  }
+
+  public async findStoredMediaById(
+    assetId: string,
+  ): Promise<StoredAssetMedia | null> {
+    const asset = await this.database
+      .selectFrom("assets")
+      .select(["id"])
+      .where("id", "=", assetId)
+      .executeTakeFirst();
+
+    if (asset === undefined) {
+      return null;
+    }
+
+    const latestSnapshot = await findLatestAssetSnapshot(
+      this.database,
+      asset.id,
+    );
+
+    if (
+      latestSnapshot.mime_type === null ||
+      latestSnapshot.storage_key === null
+    ) {
+      return null;
+    }
+
+    return {
+      byteSize: latestSnapshot.byte_size,
+      id: asset.id,
+      mimeType: latestSnapshot.mime_type,
+      storageKey: latestSnapshot.storage_key,
     };
   }
 }

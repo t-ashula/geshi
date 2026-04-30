@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { Pool } from "pg";
 
 import { createApp } from "./app.js";
+import { AssetRepository } from "./db/asset-repository.js";
 import { ContentRepository } from "./db/content-repository.js";
 import { createDatabaseFromPool } from "./db/database.js";
 import { JobRepository } from "./db/job-repository.js";
@@ -14,10 +15,12 @@ import {
 } from "./job-queue/types.js";
 import { createLogger } from "./logger/index.js";
 import { getRuntimeConfig } from "./runtime-config.js";
+import { AssetService } from "./service/asset-service.js";
 import { ContentService } from "./service/content-service.js";
 import { JobService } from "./service/job-service.js";
 import { SourceInspectService } from "./service/source-inspect-service.js";
 import { SourceService } from "./service/source-service.js";
+import { FilesystemStorage } from "./storage/filesystem-storage.js";
 
 const runtimeConfig = getRuntimeConfig();
 const logger = createLogger({
@@ -32,6 +35,8 @@ const pool = new Pool({
 });
 const database = createDatabaseFromPool(pool);
 const boss = createPgBoss(runtimeConfig);
+const assetRepository = new AssetRepository(database);
+const assetService = new AssetService(assetRepository);
 const contentRepository = new ContentRepository(database);
 const contentService = new ContentService(contentRepository);
 const jobRepository = new JobRepository(database);
@@ -40,6 +45,7 @@ const sourceService = new SourceService(sourceRepository);
 const sourceInspectService = new SourceInspectService();
 const jobQueue = new PgBossJobQueue(boss);
 const jobService = new JobService(sourceService, jobRepository, jobQueue);
+const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
 
 boss.on("error", (error) => {
   logger.error("job queue runtime failed.", { error });
@@ -60,8 +66,10 @@ await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, {
 const app = createApp(
   sourceService,
   sourceInspectService,
+  assetService,
   contentService,
   jobService,
+  storage,
 );
 
 serve({

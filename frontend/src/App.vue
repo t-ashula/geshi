@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 
 import type {
+  ContentDetailAsset,
+  ContentDetailItem,
   ContentListItem,
   CreateSourceRequest,
-  JobListItem,
   SourceListItem,
 } from "./source-api.js";
 import {
   createSource,
-  getJob,
+  getContentDetail,
   inspectSource,
   listContents,
   listSources,
@@ -17,20 +18,31 @@ import {
 } from "./source-api.js";
 import { validateCreateSourceRequest } from "./source-form.js";
 
+type BrowseRouteState =
+  | { kind: "browse-index" }
+  | { feedSlug: string; kind: "browse-feed" }
+  | { entryId: string; kind: "browse-entry" }
+  | { kind: "not-found" };
+
 const contents = ref<ContentListItem[]>([]);
+const contentDetail = ref<ContentDetailItem | null>(null);
 const sources = ref<SourceListItem[]>([]);
 const isCreateFormVisible = ref(false);
 const isInspecting = ref(false);
 const isSubmitting = ref(false);
 const isObserveSubmitting = ref<string | null>(null);
-const isLoading = ref(true);
+const isSourcesLoading = ref(true);
 const isContentsLoading = ref(true);
+const isDetailLoading = ref(false);
 const errorMessage = ref<string | null>(null);
+const detailErrorMessage = ref<string | null>(null);
 const inspectErrorMessage = ref<string | null>(null);
 const observeErrorMessage = ref<string | null>(null);
-const latestJob = ref<JobListItem | null>(null);
 const validationMessage = ref<string | null>(null);
 const lastInspectedUrl = ref<string | null>(null);
+const routeState = ref<BrowseRouteState>(
+  normalizeRoute(window.location.pathname),
+);
 const form = ref<CreateSourceRequest>({
   description: "",
   sourceSlug: "",
@@ -38,10 +50,74 @@ const form = ref<CreateSourceRequest>({
   url: "",
 });
 
-onMounted(async () => {
-  await refreshSources();
-  await refreshContents();
+const selectedSourceSlug = computed(() => {
+  switch (routeState.value.kind) {
+    case "browse-feed": {
+      return routeState.value.feedSlug;
+    }
+
+    case "browse-entry": {
+      return contentDetail.value?.source.slug ?? null;
+    }
+
+    default: {
+      return null;
+    }
+  }
 });
+
+const selectedSource = computed(
+  () =>
+    sources.value.find((source) => source.slug === selectedSourceSlug.value) ??
+    null,
+);
+
+const selectedContentId = computed(() =>
+  routeState.value.kind === "browse-entry" ? routeState.value.entryId : null,
+);
+
+const visibleContents = computed(() => {
+  if (selectedSource.value === null) {
+    return contents.value;
+  }
+
+  return contents.value.filter(
+    (content) => content.sourceId === selectedSource.value?.id,
+  );
+});
+
+const routeHeadline = computed(() => {
+  if (routeState.value.kind === "not-found") {
+    return "Page not found";
+  }
+
+  if (selectedSource.value !== null) {
+    return selectedSource.value.title ?? selectedSource.value.slug;
+  }
+
+  return "All entries";
+});
+
+onMounted(async () => {
+  if (window.location.pathname === "/") {
+    replaceLocation("/browse");
+    routeState.value = normalizeRoute("/browse");
+  }
+
+  window.addEventListener("popstate", syncRouteFromLocation);
+
+  await Promise.all([refreshSources(), refreshContents()]);
+  await syncDetailWithRoute();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("popstate", syncRouteFromLocation);
+});
+
+function syncRouteFromLocation(): void {
+  routeState.value = normalizeRoute(window.location.pathname);
+  void syncDetailWithRoute();
+}
 
 function openCreateForm(): void {
   isCreateFormVisible.value = true;
@@ -108,7 +184,8 @@ async function submitSource(): Promise<void> {
   errorMessage.value = null;
 
   try {
-    await createSource(form.value);
+    const source = await createSource(form.value);
+
     await refreshSources();
     form.value = {
       description: "",
@@ -117,6 +194,7 @@ async function submitSource(): Promise<void> {
       url: "",
     };
     closeCreateForm();
+    navigateTo(`/browse/feed/${encodeURIComponent(source.slug)}`);
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Source registration failed.";
@@ -130,10 +208,9 @@ async function runObserve(sourceId: string): Promise<void> {
   observeErrorMessage.value = null;
 
   try {
-    const job = await observeSource(sourceId);
-    latestJob.value = job;
-    await refreshJob(job.id);
+    await observeSource(sourceId);
     await refreshContents();
+    await syncDetailWithRoute();
   } catch (error) {
     observeErrorMessage.value =
       error instanceof Error ? error.message : "Observe job enqueue failed.";
@@ -142,12 +219,8 @@ async function runObserve(sourceId: string): Promise<void> {
   }
 }
 
-async function refreshJob(jobId: string): Promise<void> {
-  latestJob.value = await getJob(jobId);
-}
-
 async function refreshSources(): Promise<void> {
-  isLoading.value = true;
+  isSourcesLoading.value = true;
 
   try {
     sources.value = await listSources();
@@ -155,7 +228,7 @@ async function refreshSources(): Promise<void> {
     errorMessage.value =
       error instanceof Error ? error.message : "Failed to load sources.";
   } finally {
-    isLoading.value = false;
+    isSourcesLoading.value = false;
   }
 }
 
@@ -171,27 +244,131 @@ async function refreshContents(): Promise<void> {
     isContentsLoading.value = false;
   }
 }
+
+async function syncDetailWithRoute(): Promise<void> {
+  if (routeState.value.kind !== "browse-entry") {
+    contentDetail.value = null;
+    detailErrorMessage.value = null;
+    isDetailLoading.value = false;
+    return;
+  }
+
+  isDetailLoading.value = true;
+  detailErrorMessage.value = null;
+
+  try {
+    contentDetail.value = await getContentDetail(routeState.value.entryId);
+  } catch (error) {
+    contentDetail.value = null;
+    detailErrorMessage.value =
+      error instanceof Error ? error.message : "Failed to load content detail.";
+  } finally {
+    isDetailLoading.value = false;
+  }
+}
+
+function navigateTo(pathname: string): void {
+  if (window.location.pathname === pathname) {
+    return;
+  }
+
+  window.history.pushState({}, "", pathname);
+  routeState.value = normalizeRoute(pathname);
+  void syncDetailWithRoute();
+}
+
+function replaceLocation(pathname: string): void {
+  window.history.replaceState({}, "", pathname);
+}
+
+function openFeed(source: SourceListItem): void {
+  navigateTo(`/browse/feed/${encodeURIComponent(source.slug)}`);
+}
+
+function openEntry(content: ContentListItem): void {
+  navigateTo(`/browse/entry/${content.id}`);
+}
+
+function normalizeRoute(pathname: string): BrowseRouteState {
+  if (pathname === "/browse") {
+    return {
+      kind: "browse-index",
+    };
+  }
+
+  const feedMatch = pathname.match(/^\/browse\/feed\/([^/]+)$/u);
+
+  if (feedMatch?.[1]) {
+    return {
+      feedSlug: decodeURIComponent(feedMatch[1]),
+      kind: "browse-feed",
+    };
+  }
+
+  const entryMatch = pathname.match(/^\/browse\/entry\/([^/.][^/]*)$/u);
+
+  if (entryMatch?.[1]) {
+    return {
+      entryId: decodeURIComponent(entryMatch[1]),
+      kind: "browse-entry",
+    };
+  }
+
+  return {
+    kind: "not-found",
+  };
+}
+
+function isSourceSelected(source: SourceListItem): boolean {
+  return selectedSource.value?.id === source.id;
+}
+
+function isContentSelected(content: ContentListItem): boolean {
+  return selectedContentId.value === content.id;
+}
+
+function formatDate(value: string | null): string {
+  if (value === null) {
+    return "Unknown date";
+  }
+
+  return new Date(value).toLocaleString();
+}
+
+function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
+  return detail.assets.filter((asset) => asset.url !== null);
+}
 </script>
 
 <template>
-  <main class="page">
-    <section class="panel">
-      <header class="panel-header">
+  <main class="workspace">
+    <header class="workspace-header">
+      <div>
+        <p class="eyebrow">Geshi</p>
+        <h1>Browse Archive</h1>
+      </div>
+      <button class="primary-button" type="button" @click="openCreateForm">
+        Add source
+      </button>
+    </header>
+
+    <p v-if="errorMessage" class="feedback error">{{ errorMessage }}</p>
+    <p v-if="observeErrorMessage" class="feedback error">
+      {{ observeErrorMessage }}
+    </p>
+
+    <section v-if="isCreateFormVisible" class="create-shell">
+      <div class="create-shell-header">
         <div>
-          <p class="eyebrow">Source Registry</p>
-          <h1>Podcast RSS Sources</h1>
+          <p class="eyebrow">Register source</p>
+          <h2>Add podcast feed</h2>
         </div>
-        <button class="create-button" type="button" @click="openCreateForm">
-          +
+        <button class="ghost-button" type="button" @click="closeCreateForm">
+          Close
         </button>
-      </header>
+      </div>
 
-      <p v-if="errorMessage" class="feedback error">{{ errorMessage }}</p>
-      <p v-if="observeErrorMessage" class="feedback error">
-        {{ observeErrorMessage }}
-      </p>
-
-      <div v-if="isCreateFormVisible" class="create-form">
+      <div class="create-grid">
         <label>
           <span>RSS URL</span>
           <input
@@ -223,7 +400,7 @@ async function refreshContents(): Promise<void> {
           />
         </label>
 
-        <label>
+        <label class="create-grid-wide">
           <span>Description</span>
           <textarea
             v-model="form.description"
@@ -232,128 +409,238 @@ async function refreshContents(): Promise<void> {
             placeholder="Optional"
           ></textarea>
         </label>
-
-        <p v-if="inspectErrorMessage" class="feedback error">
-          {{ inspectErrorMessage }}
-        </p>
-        <p v-if="validationMessage" class="feedback error">
-          {{ validationMessage }}
-        </p>
-
-        <div class="actions">
-          <button
-            type="button"
-            class="secondary-button"
-            @click="closeCreateForm"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            class="primary-button"
-            :disabled="isInspecting || isSubmitting"
-            @click="submitSource"
-          >
-            {{
-              isSubmitting
-                ? "Registering..."
-                : isInspecting
-                  ? "Inspecting..."
-                  : "Register"
-            }}
-          </button>
-        </div>
       </div>
 
-      <div v-if="isLoading" class="empty-state">Loading sources...</div>
+      <p v-if="inspectErrorMessage" class="feedback error">
+        {{ inspectErrorMessage }}
+      </p>
+      <p v-if="validationMessage" class="feedback error">
+        {{ validationMessage }}
+      </p>
 
-      <ul v-else-if="sources.length > 0" class="source-list">
-        <li v-for="source in sources" :key="source.id" class="source-card">
-          <div class="source-card-header">
-            <h2>{{ source.title ?? source.slug }}</h2>
-            <span class="kind">{{ source.kind }}</span>
+      <div class="actions">
+        <button type="button" class="secondary-button" @click="closeCreateForm">
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="primary-button"
+          :disabled="isInspecting || isSubmitting"
+          @click="submitSource"
+        >
+          {{
+            isSubmitting
+              ? "Registering..."
+              : isInspecting
+                ? "Inspecting..."
+                : "Register"
+          }}
+        </button>
+      </div>
+    </section>
+
+    <section class="browser-shell">
+      <aside class="pane pane-sources">
+        <div class="pane-header">
+          <div>
+            <p class="eyebrow">Feeds</p>
+            <h2>Sources</h2>
           </div>
-          <p v-if="source.description" class="description">
-            {{ source.description }}
-          </p>
-          <a :href="source.url" target="_blank" rel="noreferrer">{{
-            source.url
-          }}</a>
-          <div class="source-actions">
+        </div>
+
+        <div v-if="isSourcesLoading" class="empty-state">
+          Loading sources...
+        </div>
+
+        <ul v-else-if="sources.length > 0" class="source-list">
+          <li v-for="source in sources" :key="source.id">
             <button
               type="button"
-              class="primary-button"
-              :disabled="isObserveSubmitting === source.id"
-              @click="runObserve(source.id)"
+              class="source-row"
+              :class="{ selected: isSourceSelected(source) }"
+              @click="openFeed(source)"
             >
-              {{
-                isObserveSubmitting === source.id ? "Running..." : "Run Observe"
-              }}
+              <span class="source-row-title">
+                {{ source.title ?? source.slug }}
+              </span>
+              <span class="source-row-url">{{ source.url }}</span>
+              <span class="source-row-meta">{{ source.kind }}</span>
             </button>
-          </div>
-        </li>
-      </ul>
-
-      <div v-else class="empty-state">
-        No sources registered yet. Use the + button to add one.
-      </div>
-
-      <section class="subpanel">
-        <div class="subpanel-header">
-          <h2>Latest Job</h2>
-        </div>
-
-        <div v-if="latestJob" class="job-card">
-          <p><strong>Status:</strong> {{ latestJob.status }}</p>
-          <p><strong>Kind:</strong> {{ latestJob.kind }}</p>
-          <p><strong>Attempts:</strong> {{ latestJob.attemptCount }}</p>
-          <p v-if="latestJob.failureMessage" class="failure-message">
-            {{ latestJob.failureMessage }}
-          </p>
-        </div>
-
-        <div v-else class="empty-state">No observe job has run yet.</div>
-      </section>
-
-      <section class="subpanel">
-        <div class="subpanel-header">
-          <h2>Contents</h2>
-          <button
-            type="button"
-            class="secondary-button"
-            @click="refreshContents"
-          >
-            Refresh
-          </button>
-        </div>
-
-        <div v-if="isContentsLoading" class="empty-state">
-          Loading contents...
-        </div>
-
-        <ul v-else-if="contents.length > 0" class="content-list">
-          <li
-            v-for="content in contents"
-            :key="content.id"
-            class="content-card"
-          >
-            <div class="content-card-header">
-              <h3>{{ content.title ?? content.id }}</h3>
-              <span class="kind">{{ content.status }}</span>
-            </div>
-            <p v-if="content.summary" class="description">
-              {{ content.summary }}
-            </p>
-            <p class="meta">
-              source={{ content.sourceId }} / published={{
-                content.publishedAt ?? "unknown"
-              }}
-            </p>
           </li>
         </ul>
 
         <div v-else class="empty-state">
-          No contents collected yet. Run observe on a source.
+          No sources registered yet. Add a feed to get started.
+        </div>
+      </aside>
+
+      <section class="pane pane-contents">
+        <div class="pane-header">
+          <div>
+            <p class="eyebrow">Entries</p>
+            <h2>{{ routeHeadline }}</h2>
+          </div>
+          <div class="pane-actions">
+            <button type="button" class="ghost-button" @click="refreshContents">
+              Refresh
+            </button>
+            <button
+              v-if="selectedSource"
+              type="button"
+              class="secondary-button"
+              :disabled="isObserveSubmitting === selectedSource.id"
+              @click="runObserve(selectedSource.id)"
+            >
+              {{
+                isObserveSubmitting === selectedSource.id
+                  ? "Running..."
+                  : "Observe"
+              }}
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="
+            routeState.kind === 'browse-feed' &&
+            selectedSource === null &&
+            !isSourcesLoading
+          "
+          class="empty-state"
+        >
+          Feed not found.
+        </div>
+
+        <div v-else-if="routeState.kind === 'not-found'" class="empty-state">
+          This browse URL does not exist.
+        </div>
+
+        <div v-else-if="isContentsLoading" class="empty-state">
+          Loading contents...
+        </div>
+
+        <ul v-else-if="visibleContents.length > 0" class="content-list">
+          <li v-for="content in visibleContents" :key="content.id">
+            <button
+              type="button"
+              class="content-row"
+              :class="{ selected: isContentSelected(content) }"
+              @click="openEntry(content)"
+            >
+              <span class="content-row-title">
+                {{ content.title ?? content.id }}
+              </span>
+              <span class="content-row-summary">
+                {{ content.summary ?? "No summary." }}
+              </span>
+              <span class="content-row-meta">
+                {{ formatDate(content.publishedAt) }} · {{ content.status }}
+              </span>
+            </button>
+          </li>
+        </ul>
+
+        <div v-else class="empty-state">No contents collected yet.</div>
+      </section>
+
+      <section class="pane pane-detail">
+        <div class="pane-header">
+          <div>
+            <p class="eyebrow">Detail</p>
+            <h2>
+              {{
+                contentDetail?.title ??
+                (selectedSource ? "Select an entry" : "Select a feed")
+              }}
+            </h2>
+          </div>
+        </div>
+
+        <div v-if="routeState.kind === 'not-found'" class="empty-state">
+          Nothing to show for this URL.
+        </div>
+
+        <div
+          v-else-if="routeState.kind === 'browse-entry' && isDetailLoading"
+          class="empty-state"
+        >
+          Loading detail...
+        </div>
+
+        <div
+          v-else-if="routeState.kind === 'browse-entry' && detailErrorMessage"
+          class="empty-state"
+        >
+          {{ detailErrorMessage }}
+        </div>
+
+        <article v-else-if="contentDetail" class="detail-card">
+          <div class="detail-meta">
+            <span>{{
+              contentDetail.source.title ?? contentDetail.source.slug
+            }}</span>
+            <span>{{ formatDate(contentDetail.publishedAt) }}</span>
+            <span>{{ contentDetail.status }}</span>
+          </div>
+
+          <p v-if="contentDetail.summary" class="detail-summary">
+            {{ contentDetail.summary }}
+          </p>
+
+          <section class="detail-section">
+            <div class="detail-section-header">
+              <h3>Playable assets</h3>
+              <span class="detail-count">
+                {{ detailPlayableAssets(contentDetail).length }}
+              </span>
+            </div>
+
+            <div
+              v-if="detailPlayableAssets(contentDetail).length === 0"
+              class="empty-inline"
+            >
+              No saved audio available yet.
+            </div>
+
+            <ul v-else class="asset-list">
+              <li
+                v-for="asset in detailPlayableAssets(contentDetail)"
+                :key="asset.id"
+                class="asset-card"
+              >
+                <div class="asset-card-header">
+                  <strong>{{ asset.kind }}</strong>
+                  <span>{{ asset.mimeType ?? "unknown" }}</span>
+                </div>
+                <audio
+                  v-if="asset.mimeType?.startsWith('audio/')"
+                  controls
+                  preload="none"
+                  :src="asset.url ?? undefined"
+                ></audio>
+                <a
+                  v-else-if="asset.url !== null"
+                  class="asset-link"
+                  :href="asset.url"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open asset
+                </a>
+                <p class="asset-meta">
+                  {{
+                    asset.byteSize === null
+                      ? "Size unknown"
+                      : `${asset.byteSize.toLocaleString()} bytes`
+                  }}
+                </p>
+              </li>
+            </ul>
+          </section>
+        </article>
+
+        <div v-else class="empty-state">
+          Select an entry to view details and play saved audio.
         </div>
       </section>
     </section>

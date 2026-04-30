@@ -40,6 +40,22 @@ export type ContentListItem = {
   kind: string;
   publishedAt: Date | null;
   sourceId: string;
+  sourceSlug: string;
+  status: "discovered" | "stored" | "failed";
+  summary: string | null;
+  title: string | null;
+};
+
+export type ContentDetailItem = {
+  collectedAt: Date;
+  id: string;
+  kind: string;
+  publishedAt: Date | null;
+  source: {
+    id: string;
+    slug: string;
+    title: string | null;
+  };
   status: "discovered" | "stored" | "failed";
   summary: string | null;
   title: string | null;
@@ -194,9 +210,19 @@ export class ContentRepository {
   public async listContents(): Promise<ContentListItem[]> {
     const contents = await this.database
       .selectFrom("contents")
-      .selectAll()
-      .orderBy("published_at", "desc")
-      .orderBy("created_at", "desc")
+      .innerJoin("sources", "sources.id", "contents.source_id")
+      .select([
+        "contents.collected_at",
+        "contents.created_at",
+        "contents.id",
+        "contents.kind",
+        "contents.published_at",
+        "contents.source_id",
+        "contents.status",
+        "sources.slug as source_slug",
+      ])
+      .orderBy("contents.published_at", "desc")
+      .orderBy("contents.created_at", "desc")
       .execute();
     const snapshots = await this.database
       .selectFrom("content_snapshots")
@@ -225,11 +251,63 @@ export class ContentRepository {
         kind: content.kind,
         publishedAt: content.published_at,
         sourceId: content.source_id,
+        sourceSlug: content.source_slug,
         status: content.status,
         summary: snapshot?.summary ?? null,
         title: snapshot?.title ?? null,
       };
     });
+  }
+
+  public async findContentDetail(
+    contentId: string,
+  ): Promise<ContentDetailItem | null> {
+    const content = await this.database
+      .selectFrom("contents")
+      .innerJoin("sources", "sources.id", "contents.source_id")
+      .select([
+        "contents.collected_at",
+        "contents.id",
+        "contents.kind",
+        "contents.published_at",
+        "contents.source_id",
+        "contents.status",
+        "sources.slug as source_slug",
+      ])
+      .where("contents.id", "=", contentId)
+      .executeTakeFirst();
+
+    if (content === undefined) {
+      return null;
+    }
+
+    const contentSnapshot = await this.database
+      .selectFrom("content_snapshots")
+      .selectAll()
+      .where("content_id", "=", contentId)
+      .orderBy("version", "desc")
+      .executeTakeFirst();
+    const sourceSnapshot = await this.database
+      .selectFrom("source_snapshots")
+      .selectAll()
+      .where("source_id", "=", content.source_id)
+      .orderBy("version", "desc")
+      .executeTakeFirst();
+
+    return {
+      collectedAt: content.collected_at,
+      id: content.id,
+      kind: content.kind,
+      publishedAt: content.published_at,
+      source: {
+        id: content.source_id,
+        slug: content.source_slug,
+        title: sourceSnapshot?.title ?? null,
+      },
+      status: content.status,
+      summary: contentSnapshot?.summary ?? null,
+      title: contentSnapshot?.title ?? null,
+    };
   }
 }
 
