@@ -41,12 +41,15 @@ describe("handleAcquireContentJob", () => {
         url: "https://example.com/feed.xml",
         urlHash: "hash-1",
       });
+      if (!source.ok) {
+        throw source.error;
+      }
       const content = await contentService.createObservedContent({
         contentFingerprints: ["2026-04-28:ep-1"],
         externalId: "ep-1",
         kind: "podcast-episode",
         publishedAt: new Date("2024-01-01T00:00:00Z"),
-        sourceId: source.id,
+        sourceId: source.value.id,
         status: "discovered",
         summary: "Hello",
         title: "Episode 1",
@@ -81,7 +84,10 @@ describe("handleAcquireContentJob", () => {
         throw createdAssetsResult.error;
       }
       const createdAssets = await assetRepository.listAssets();
-      const firstAssetId = createdAssets[0]?.id;
+      if (!createdAssets.ok) {
+        throw createdAssets.error;
+      }
+      const firstAssetId = createdAssets.value[0]?.id;
 
       const jobId = crypto.randomUUID();
 
@@ -89,7 +95,7 @@ describe("handleAcquireContentJob", () => {
         id: jobId,
         kind: "acquire-content",
         retryable: true,
-        sourceId: source.id,
+        sourceId: source.value.id,
       });
       if (!createdJob.ok) {
         throw createdJob.error;
@@ -162,8 +168,8 @@ describe("handleAcquireContentJob", () => {
           },
           jobId,
           source: {
-            id: source.id,
-            slug: source.slug,
+            id: source.value.id,
+            slug: source.value.slug,
           },
         },
         {
@@ -177,7 +183,12 @@ describe("handleAcquireContentJob", () => {
       expect(result.ok).toBe(true);
 
       const assets = await assetRepository.listAssets();
-      const updatedAsset = assets.find((asset) => asset.id === firstAssetId);
+      if (!assets.ok) {
+        throw assets.error;
+      }
+      const updatedAsset = assets.value.find(
+        (asset) => asset.id === firstAssetId,
+      );
       const contents = await contentRepository.listContents();
       const job = await jobRepository.findJobById(jobId);
 
@@ -216,12 +227,15 @@ describe("handleAcquireContentJob", () => {
         url: "https://example.com/feed.xml",
         urlHash: "hash-2",
       });
+      if (!source.ok) {
+        throw source.error;
+      }
       const content = await contentService.createObservedContent({
         contentFingerprints: ["2026-04-28:ep-2"],
         externalId: "ep-2",
         kind: "podcast-episode",
         publishedAt: new Date("2024-01-02T00:00:00Z"),
-        sourceId: source.id,
+        sourceId: source.value.id,
         status: "discovered",
         summary: "World",
         title: "Episode 2",
@@ -245,14 +259,18 @@ describe("handleAcquireContentJob", () => {
       if (!createdAssetsResult.ok) {
         throw createdAssetsResult.error;
       }
-      const asset = (await assetRepository.listAssets())[0];
+      const assets = await assetRepository.listAssets();
+      if (!assets.ok) {
+        throw assets.error;
+      }
+      const asset = assets.value[0];
       const jobId = crypto.randomUUID();
 
       const createdJob = await jobRepository.createJob({
         id: jobId,
         kind: "acquire-content",
         retryable: true,
-        sourceId: source.id,
+        sourceId: source.value.id,
       });
       if (!createdJob.ok) {
         throw createdJob.error;
@@ -295,8 +313,8 @@ describe("handleAcquireContentJob", () => {
           },
           jobId,
           source: {
-            id: source.id,
-            slug: source.slug,
+            id: source.value.id,
+            slug: source.value.slug,
           },
         },
         {
@@ -345,12 +363,15 @@ describe("handleAcquireContentJob", () => {
         url: "https://example.com/feed.xml",
         urlHash: "hash-3",
       });
+      if (!source.ok) {
+        throw source.error;
+      }
       const content = await contentService.createObservedContent({
         contentFingerprints: ["2026-04-28:ep-3"],
         externalId: "ep-3",
         kind: "podcast-episode",
         publishedAt: new Date("2024-01-03T00:00:00Z"),
-        sourceId: source.id,
+        sourceId: source.value.id,
         status: "discovered",
         summary: "Missing sourceUrl",
         title: "Episode 3",
@@ -372,14 +393,18 @@ describe("handleAcquireContentJob", () => {
       if (!createdAssetsResult.ok) {
         throw createdAssetsResult.error;
       }
-      const asset = (await assetRepository.listAssets())[0];
+      const assets = await assetRepository.listAssets();
+      if (!assets.ok) {
+        throw assets.error;
+      }
+      const asset = assets.value[0];
       const jobId = crypto.randomUUID();
 
       const createdJob = await jobRepository.createJob({
         id: jobId,
         kind: "acquire-content",
         retryable: true,
-        sourceId: source.id,
+        sourceId: source.value.id,
       });
       if (!createdJob.ok) {
         throw createdJob.error;
@@ -411,8 +436,8 @@ describe("handleAcquireContentJob", () => {
           },
           jobId,
           source: {
-            id: source.id,
-            slug: source.slug,
+            id: source.value.id,
+            slug: source.value.slug,
           },
         },
         {

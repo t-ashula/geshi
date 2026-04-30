@@ -41,7 +41,7 @@ export class AssetService {
 
   public async listPendingAssetsByContentId(
     contentId: string,
-  ): Promise<AcquireTargetAsset[]> {
+  ): Promise<Result<AcquireTargetAsset[], AssetServiceError>> {
     return this.assetRepository.listPendingAssetsByContentId(contentId);
   }
 
@@ -60,7 +60,9 @@ export class AssetService {
     return ok(asset);
   }
 
-  public async listAssets(): Promise<AssetListItem[]> {
+  public async listAssets(): Promise<
+    Result<AssetListItem[], AssetServiceError>
+  > {
     return this.assetRepository.listAssets();
   }
 

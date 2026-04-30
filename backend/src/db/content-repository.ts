@@ -1,4 +1,5 @@
-import type { Insertable, Kysely, Selectable } from "kysely";
+import type { Insertable, Kysely } from "kysely";
+import { sql } from "kysely";
 
 import { findLatestFingerprint } from "../lib/fingerprint.js";
 import type { Result } from "../lib/result.js";
@@ -238,9 +239,15 @@ export class ContentRepository {
   }
 
   public async listContents(): Promise<ContentListItem[]> {
+    const latestContentSnapshots = latestContentSnapshotsQuery(this.database);
     const contents = await this.database
       .selectFrom("contents")
       .innerJoin("sources", "sources.id", "contents.source_id")
+      .leftJoin(
+        latestContentSnapshots.as("latest_content_snapshots"),
+        "latest_content_snapshots.content_id",
+        "contents.id",
+      )
       .select([
         "contents.collected_at",
         "contents.created_at",
@@ -249,44 +256,25 @@ export class ContentRepository {
         "contents.published_at",
         "contents.source_id",
         "contents.status",
+        "latest_content_snapshots.summary",
+        "latest_content_snapshots.title",
         "sources.slug as source_slug",
       ])
       .orderBy("contents.published_at", "desc")
       .orderBy("contents.created_at", "desc")
       .execute();
-    const snapshots = await this.database
-      .selectFrom("content_snapshots")
-      .selectAll()
-      .orderBy("content_id", "asc")
-      .orderBy("version", "desc")
-      .execute();
 
-    const latestSnapshotByContentId = new Map<
-      string,
-      Selectable<ContentSnapshotTable>
-    >();
-
-    for (const snapshot of snapshots) {
-      if (!latestSnapshotByContentId.has(snapshot.content_id)) {
-        latestSnapshotByContentId.set(snapshot.content_id, snapshot);
-      }
-    }
-
-    return contents.map((content) => {
-      const snapshot = latestSnapshotByContentId.get(content.id) ?? null;
-
-      return {
-        collectedAt: content.collected_at,
-        id: content.id,
-        kind: content.kind,
-        publishedAt: content.published_at,
-        sourceId: content.source_id,
-        sourceSlug: content.source_slug,
-        status: content.status,
-        summary: snapshot?.summary ?? null,
-        title: snapshot?.title ?? null,
-      };
-    });
+    return contents.map((content) => ({
+      collectedAt: content.collected_at,
+      id: content.id,
+      kind: content.kind,
+      publishedAt: content.published_at,
+      sourceId: content.source_id,
+      sourceSlug: content.source_slug,
+      status: content.status,
+      summary: content.summary,
+      title: content.title,
+    }));
   }
 
   public async findContentDetail(
@@ -369,4 +357,33 @@ function toContentSnapshotInsert(
     title: input.title,
     version,
   };
+}
+
+function latestContentSnapshotsQuery(database: Kysely<GeshiDatabase>) {
+  return database
+    .selectFrom("content_snapshots as content_snapshots")
+    .innerJoin(
+      database
+        .selectFrom("content_snapshots")
+        .select(["content_id", sql<number>`max(version)`.as("version")])
+        .groupBy("content_id")
+        .as("latest_content_snapshot_versions"),
+      (join) =>
+        join
+          .onRef(
+            "content_snapshots.content_id",
+            "=",
+            "latest_content_snapshot_versions.content_id",
+          )
+          .onRef(
+            "content_snapshots.version",
+            "=",
+            "latest_content_snapshot_versions.version",
+          ),
+    )
+    .select([
+      "content_snapshots.content_id",
+      "content_snapshots.summary",
+      "content_snapshots.title",
+    ]);
 }

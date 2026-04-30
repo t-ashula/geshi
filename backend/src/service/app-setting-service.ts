@@ -1,6 +1,9 @@
-import type { AppSettingRepository } from "../db/app-setting-repository.js";
+import type {
+  AppSettingRepository,
+  AppSettingRepositoryError,
+} from "../db/app-setting-repository.js";
 import type { Result } from "../lib/result.js";
-import { err, ok } from "../lib/result.js";
+import { ok } from "../lib/result.js";
 import type { PeriodicCrawlAppSettings } from "./periodic-crawl-settings.js";
 import {
   defaultPeriodicCrawlAppSettings,
@@ -15,54 +18,59 @@ export class AppSettingService {
   ) {}
 
   public async getPeriodicCrawlSettings(): Promise<
-    Result<PeriodicCrawlAppSettings, Error>
+    Result<PeriodicCrawlAppSettings, AppSettingRepositoryError>
   > {
-    try {
-      const appSetting = await this.appSettingRepository.findLatestByProfile(
+    const appSetting = await this.appSettingRepository.findLatestByProfile(
+      DEFAULT_APP_SETTINGS_PROFILE_SLUG,
+    );
+
+    if (!appSetting.ok) {
+      return appSetting;
+    }
+
+    if (appSetting.value === null) {
+      const defaults = defaultPeriodicCrawlAppSettings();
+      const upsertResult = await this.appSettingRepository.upsert(
         DEFAULT_APP_SETTINGS_PROFILE_SLUG,
+        defaults,
       );
 
-      if (appSetting === null) {
-        const defaults = defaultPeriodicCrawlAppSettings();
-
-        await this.appSettingRepository.upsert(
-          DEFAULT_APP_SETTINGS_PROFILE_SLUG,
-          defaults,
-        );
-
-        return ok(defaults);
+      if (!upsertResult.ok) {
+        return upsertResult;
       }
 
-      return ok(
-        normalizePeriodicCrawlAppSettings({
-          enabled: appSetting.enabled,
-          intervalMinutes: appSetting.intervalMinutes,
-        }),
-      );
-    } catch (error) {
-      return err(
-        error instanceof Error
-          ? error
-          : new Error("Failed to get periodic crawl settings."),
-      );
+      return ok(defaults);
     }
+
+    return ok(
+      normalizePeriodicCrawlAppSettings({
+        enabled: appSetting.value.enabled,
+        intervalMinutes: appSetting.value.intervalMinutes,
+      }),
+    );
   }
 
   public async updatePeriodicCrawlSettings(
     settings: PeriodicCrawlAppSettings,
-  ): Promise<PeriodicCrawlAppSettings> {
+  ): Promise<Result<PeriodicCrawlAppSettings, AppSettingRepositoryError>> {
     const normalizedSettings = normalizePeriodicCrawlAppSettings(settings);
 
-    await this.appSettingRepository.upsert(
+    const upsertResult = await this.appSettingRepository.upsert(
       DEFAULT_APP_SETTINGS_PROFILE_SLUG,
       normalizedSettings,
     );
 
-    return normalizedSettings;
+    if (!upsertResult.ok) {
+      return upsertResult;
+    }
+
+    return ok(normalizedSettings);
   }
 
-  public async ensureDefaultProfile(): Promise<void> {
-    await this.appSettingRepository.ensureProfile(
+  public async ensureDefaultProfile(): Promise<
+    Result<void, AppSettingRepositoryError>
+  > {
+    return this.appSettingRepository.ensureProfile(
       DEFAULT_APP_SETTINGS_PROFILE_SLUG,
     );
   }

@@ -66,8 +66,20 @@ export function registerSettingRoutes(
       intervalMinutes: body.intervalMinutes,
     });
 
+    if (!settings.ok) {
+      return context.json(
+        {
+          error: {
+            code: "periodic_crawl_settings_update_failed",
+            message: settings.error.message,
+          },
+        },
+        500,
+      );
+    }
+
     return context.json({
-      data: settings,
+      data: settings.value,
     });
   });
 }

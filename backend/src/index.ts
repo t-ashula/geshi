@@ -68,7 +68,12 @@ await boss.start();
 await ensureQueue(boss, OBSERVE_SOURCE_JOB_NAME, queueOptions);
 await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, queueOptions);
 await ensureQueue(boss, PERIODIC_CRAWL_JOB_NAME, queueOptions);
-await appSettingService.ensureDefaultProfile();
+const ensureDefaultProfileResult =
+  await appSettingService.ensureDefaultProfile();
+
+if (!ensureDefaultProfileResult.ok) {
+  throw ensureDefaultProfileResult.error;
+}
 
 const app = createApp(
   sourceService,

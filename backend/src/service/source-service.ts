@@ -1,8 +1,11 @@
 import type {
+  CollectorSettingsVersionConflictError,
+  DuplicateSourceUrlHashError,
   ObserveSourceTarget,
   PeriodicCrawlSourceTarget,
   SourceListItem,
   SourceRepository,
+  SourceRepositoryError,
 } from "../db/source-repository.js";
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
@@ -21,6 +24,10 @@ export type SourceUrlError = {
   code: "source_url_required" | "source_url_invalid";
   message: string;
 };
+export type CreateSourceError =
+  | SourceUrlError
+  | DuplicateSourceUrlHashError
+  | SourceRepositoryError;
 
 export type UpdateSourceCollectorSettingsError = {
   code: "source_not_found";
@@ -37,7 +44,7 @@ export class SourceService {
 
   public async createSource(
     request: CreateSourceRequest,
-  ): Promise<Result<SourceListItem, SourceUrlError>> {
+  ): Promise<Result<SourceListItem, CreateSourceError>> {
     const normalizedUrlResult = normalizeSourceUrl(request.url);
 
     if (!normalizedUrlResult.ok) {
@@ -49,76 +56,88 @@ export class SourceService {
       normalizeOptionalSlug(request.sourceSlug) ??
       createSourceSlug(normalizedUrl, request.title);
 
-    return ok(
-      await this.sourceRepository.createSource({
-        collectorSettingId: crypto.randomUUID(),
-        collectorSettingSnapshotId: crypto.randomUUID(),
-        description: normalizeOptionalString(request.description),
-        id: crypto.randomUUID(),
-        kind: "podcast",
-        pluginSlug: "podcast-rss",
-        slug,
-        snapshotId: crypto.randomUUID(),
-        title: normalizeOptionalString(request.title),
-        url: normalizedUrl,
-        urlHash: createUrlHash(normalizedUrl),
-      }),
-    );
+    return this.sourceRepository.createSource({
+      collectorSettingId: crypto.randomUUID(),
+      collectorSettingSnapshotId: crypto.randomUUID(),
+      description: normalizeOptionalString(request.description),
+      id: crypto.randomUUID(),
+      kind: "podcast",
+      pluginSlug: "podcast-rss",
+      slug,
+      snapshotId: crypto.randomUUID(),
+      title: normalizeOptionalString(request.title),
+      url: normalizedUrl,
+      urlHash: createUrlHash(normalizedUrl),
+    });
   }
 
-  public async listSources(): Promise<SourceListItem[]> {
+  public async listSources(): Promise<
+    Result<SourceListItem[], SourceRepositoryError>
+  > {
     return this.sourceRepository.listSources();
   }
 
   public async findObserveSourceTarget(
     sourceId: string,
-  ): Promise<Result<ObserveSourceTarget, FindObserveSourceTargetError>> {
+  ): Promise<
+    Result<
+      ObserveSourceTarget,
+      FindObserveSourceTargetError | SourceRepositoryError
+    >
+  > {
     const source =
       await this.sourceRepository.findObserveSourceTarget(sourceId);
 
-    if (source === null) {
+    if (!source.ok) {
+      return source;
+    }
+
+    if (source.value === null) {
       return err({
         code: "source_not_found",
         message: "Source not found.",
       });
     }
 
-    return ok(source);
+    return ok(source.value);
   }
 
   public async updateSourceCollectorSettings(
     sourceId: string,
     settings: SourcePeriodicCrawlSettings,
     baseVersion: number,
-  ): Promise<Result<SourceListItem, UpdateSourceCollectorSettingsError>> {
+  ): Promise<
+    Result<
+      SourceListItem,
+      | UpdateSourceCollectorSettingsError
+      | CollectorSettingsVersionConflictError
+      | SourceRepositoryError
+    >
+  > {
     const source = await this.sourceRepository.updateSourceCollectorSettings(
       sourceId,
       settings,
       baseVersion,
     );
 
-    if (source === null) {
+    if (!source.ok) {
+      return source;
+    }
+
+    if (source.value === null) {
       return err({
         code: "source_not_found",
         message: "Source not found.",
       });
     }
 
-    return ok(source);
+    return ok(source.value);
   }
 
   public async listPeriodicCrawlTargets(): Promise<
-    Result<PeriodicCrawlSourceTarget[], Error>
+    Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
   > {
-    try {
-      return ok(await this.sourceRepository.listPeriodicCrawlTargets());
-    } catch (error) {
-      return err(
-        error instanceof Error
-          ? error
-          : new Error("Failed to list periodic crawl targets."),
-      );
-    }
+    return this.sourceRepository.listPeriodicCrawlTargets();
   }
 }
 

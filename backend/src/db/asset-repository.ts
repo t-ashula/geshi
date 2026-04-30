@@ -1,4 +1,5 @@
 import type { Insertable, Kysely, Selectable } from "kysely";
+import { sql } from "kysely";
 
 import { findLatestFingerprint } from "../lib/fingerprint.js";
 import type { Result } from "../lib/result.js";
@@ -251,67 +252,102 @@ export class AssetRepository {
     }
   }
 
-  public async listAssets(): Promise<AssetListItem[]> {
-    const assets = await this.database
-      .selectFrom("assets")
-      .selectAll()
-      .orderBy("created_at", "asc")
-      .execute();
+  public async listAssets(): Promise<
+    Result<AssetListItem[], AssetRepositoryError>
+  > {
+    try {
+      const latestAssetSnapshots = latestAssetSnapshotsQuery(this.database);
+      const assets = await this.database
+        .selectFrom("assets")
+        .innerJoin(
+          latestAssetSnapshots.as("latest_asset_snapshots"),
+          "latest_asset_snapshots.asset_id",
+          "assets.id",
+        )
+        .select([
+          "assets.acquired_at",
+          "assets.acquired_fingerprint",
+          "assets.content_id",
+          "assets.created_at",
+          "assets.id",
+          "assets.is_primary",
+          "assets.kind",
+          "assets.observed_fingerprint",
+          "latest_asset_snapshots.byte_size",
+          "latest_asset_snapshots.checksum",
+          "latest_asset_snapshots.mime_type",
+          "latest_asset_snapshots.source_url",
+          "latest_asset_snapshots.storage_key",
+        ])
+        .orderBy("created_at", "asc")
+        .execute();
 
-    return Promise.all(
-      assets.map(async (asset) => {
-        const latestSnapshot = await findLatestAssetSnapshot(
-          this.database,
-          asset.id,
-        );
-
-        return {
+      return ok(
+        assets.map((asset) => ({
+          acquiredAt: asset.acquired_at,
           acquiredFingerprint: asset.acquired_fingerprint,
-          byteSize: latestSnapshot.byte_size,
-          checksum: latestSnapshot.checksum,
+          byteSize: asset.byte_size,
+          checksum: asset.checksum,
           contentId: asset.content_id,
           createdAt: asset.created_at,
-          acquiredAt: asset.acquired_at,
           id: asset.id,
           kind: asset.kind,
-          mimeType: latestSnapshot.mime_type,
+          mimeType: asset.mime_type,
           observedFingerprint: asset.observed_fingerprint,
           primary: asset.is_primary,
-          sourceUrl: latestSnapshot.source_url,
-          storageKey: latestSnapshot.storage_key,
-        };
-      }),
-    );
+          sourceUrl: asset.source_url,
+          storageKey: asset.storage_key,
+        })),
+      );
+    } catch (error) {
+      return err(
+        error instanceof Error ? error : new Error("Failed to list assets."),
+      );
+    }
   }
 
   public async listPendingAssetsByContentId(
     contentId: string,
-  ): Promise<AcquireTargetAsset[]> {
-    const assets = await this.database
-      .selectFrom("assets")
-      .selectAll()
-      .where("content_id", "=", contentId)
-      .where("acquired_fingerprint", "is", null)
-      .orderBy("created_at", "asc")
-      .execute();
+  ): Promise<Result<AcquireTargetAsset[], AssetRepositoryError>> {
+    try {
+      const latestAssetSnapshots = latestAssetSnapshotsQuery(this.database);
+      const assets = await this.database
+        .selectFrom("assets")
+        .innerJoin(
+          latestAssetSnapshots.as("latest_asset_snapshots"),
+          "latest_asset_snapshots.asset_id",
+          "assets.id",
+        )
+        .select([
+          "assets.acquired_fingerprint",
+          "assets.id",
+          "assets.is_primary",
+          "assets.kind",
+          "assets.observed_fingerprint",
+          "latest_asset_snapshots.source_url",
+        ])
+        .where("content_id", "=", contentId)
+        .where("acquired_fingerprint", "is", null)
+        .orderBy("created_at", "asc")
+        .execute();
 
-    return Promise.all(
-      assets.map(async (asset) => {
-        const latestSnapshot = await findLatestAssetSnapshot(
-          this.database,
-          asset.id,
-        );
-
-        return {
+      return ok(
+        assets.map((asset) => ({
           acquiredFingerprint: asset.acquired_fingerprint,
           id: asset.id,
           kind: asset.kind,
           observedFingerprint: asset.observed_fingerprint,
           primary: asset.is_primary,
-          sourceUrl: latestSnapshot.source_url,
-        };
-      }),
-    );
+          sourceUrl: asset.source_url,
+        })),
+      );
+    } catch (error) {
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to list pending assets by content."),
+      );
+    }
   }
 
   public async findAcquireTargetById(
@@ -486,4 +522,36 @@ function requireLatestFingerprint(
   }
 
   return latestFingerprint;
+}
+
+function latestAssetSnapshotsQuery(database: Kysely<GeshiDatabase>) {
+  return database
+    .selectFrom("asset_snapshots as asset_snapshots")
+    .innerJoin(
+      database
+        .selectFrom("asset_snapshots")
+        .select(["asset_id", sql<number>`max(version)`.as("version")])
+        .groupBy("asset_id")
+        .as("latest_asset_snapshot_versions"),
+      (join) =>
+        join
+          .onRef(
+            "asset_snapshots.asset_id",
+            "=",
+            "latest_asset_snapshot_versions.asset_id",
+          )
+          .onRef(
+            "asset_snapshots.version",
+            "=",
+            "latest_asset_snapshot_versions.version",
+          ),
+    )
+    .select([
+      "asset_snapshots.asset_id",
+      "asset_snapshots.byte_size",
+      "asset_snapshots.checksum",
+      "asset_snapshots.mime_type",
+      "asset_snapshots.source_url",
+      "asset_snapshots.storage_key",
+    ]);
 }

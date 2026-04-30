@@ -51,19 +51,31 @@ describe("handlePeriodicCrawlJob", () => {
       url: "https://example.com/feed.xml",
       urlHash: "hash-1",
     });
+    if (!source.ok) {
+      throw source.error;
+    }
 
-    await sourceRepository.updateSourceCollectorSettings(
-      source.id,
+    const updatedSource = await sourceRepository.updateSourceCollectorSettings(
+      source.value.id,
       {
         enabled: true,
         intervalMinutes: 30,
       },
-      source.collectorSettingsVersion ?? 1,
+      source.value.collectorSettingsVersion ?? 1,
     );
-    await appSettingService.updatePeriodicCrawlSettings({
-      enabled: true,
-      intervalMinutes: 5,
-    });
+    if (!updatedSource.ok) {
+      throw updatedSource.error;
+    }
+
+    const updatedSettings = await appSettingService.updatePeriodicCrawlSettings(
+      {
+        enabled: true,
+        intervalMinutes: 5,
+      },
+    );
+    if (!updatedSettings.ok) {
+      throw updatedSettings.error;
+    }
 
     const periodicJob = await jobRepository.createJob({
       id: uuidv7(),

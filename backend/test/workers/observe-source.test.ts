@@ -49,6 +49,9 @@ describe("handleObserveSourceJob", () => {
       url: "https://example.com/feed.xml",
       urlHash: "hash-1",
     });
+    if (!source.ok) {
+      throw source.error;
+    }
 
     const jobId = crypto.randomUUID();
 
@@ -56,7 +59,7 @@ describe("handleObserveSourceJob", () => {
       id: jobId,
       kind: "observe-source",
       retryable: true,
-      sourceId: source.id,
+      sourceId: source.value.id,
     });
     if (!createdJob.ok) {
       throw createdJob.error;
@@ -97,10 +100,10 @@ describe("handleObserveSourceJob", () => {
         },
         jobId,
         source: {
-          id: source.id,
+          id: source.value.id,
           kind: "podcast",
-          slug: source.slug,
-          url: source.url,
+          slug: source.value.slug,
+          url: source.value.url,
         },
       },
       {
@@ -123,16 +126,19 @@ describe("handleObserveSourceJob", () => {
     expect(result.ok).toBe(true);
 
     const assets = await assetRepository.listAssets();
+    if (!assets.ok) {
+      throw assets.error;
+    }
     const contents = await contentRepository.listContents();
     const job = await jobRepository.findJobById(jobId);
 
     expect(contents).toHaveLength(1);
     expect(contents[0]).toMatchObject({
-      sourceId: source.id,
+      sourceId: source.value.id,
       status: "discovered",
       title: "Episode 1",
     });
-    expect(assets).toEqual(
+    expect(assets.value).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           acquiredAt: null,
@@ -153,11 +159,11 @@ describe("handleObserveSourceJob", () => {
       ]),
     );
     expect(
-      assets.every((asset) =>
+      assets.value.every((asset) =>
         /^2026-04-28:[0-9a-f]{64}$/.test(asset.observedFingerprint),
       ),
     ).toBe(true);
-    expect(assets.every((asset) => asset.storageKey === null)).toBe(true);
+    expect(assets.value.every((asset) => asset.storageKey === null)).toBe(true);
     expect(enqueuedJobs).toHaveLength(2);
     expect(
       enqueuedJobs.every((job) => job.name === ACQUIRE_CONTENT_JOB_NAME),
@@ -168,7 +174,7 @@ describe("handleObserveSourceJob", () => {
 
     expect(acquirePayload).toMatchObject({
       asset: {
-        id: assets.find((asset) => asset.kind === "html")?.id,
+        id: assets.value.find((asset) => asset.kind === "html")?.id,
         kind: "html",
         primary: true,
         sourceUrl: "https://example.com/episodes/1",
@@ -188,15 +194,15 @@ describe("handleObserveSourceJob", () => {
         title: "Episode 1",
       },
       source: {
-        id: source.id,
-        slug: source.slug,
+        id: source.value.id,
+        slug: source.value.slug,
       },
     });
     expect(
       enqueuedJobs.map(
         (job) => (job.payload as AcquireContentJobPayload).asset.id,
       ),
-    ).toEqual(expect.arrayContaining(assets.map((asset) => asset.id)));
+    ).toEqual(expect.arrayContaining(assets.value.map((asset) => asset.id)));
     expect(job?.status).toBe("succeeded");
   });
 
@@ -215,6 +221,9 @@ describe("handleObserveSourceJob", () => {
       url: "https://example.com/fail.xml",
       urlHash: "hash-2",
     });
+    if (!source.ok) {
+      throw source.error;
+    }
 
     const jobId = crypto.randomUUID();
 
@@ -222,7 +231,7 @@ describe("handleObserveSourceJob", () => {
       id: jobId,
       kind: "observe-source",
       retryable: true,
-      sourceId: source.id,
+      sourceId: source.value.id,
     });
     if (!createdJob.ok) {
       throw createdJob.error;
@@ -248,10 +257,10 @@ describe("handleObserveSourceJob", () => {
         },
         jobId,
         source: {
-          id: source.id,
+          id: source.value.id,
           kind: "podcast",
-          slug: source.slug,
-          url: source.url,
+          slug: source.value.slug,
+          url: source.value.url,
         },
       },
       {
@@ -293,6 +302,9 @@ describe("handleObserveSourceJob", () => {
       url: "https://example.com/missing-asset.xml",
       urlHash: "hash-3",
     });
+    if (!source.ok) {
+      throw source.error;
+    }
 
     const jobId = crypto.randomUUID();
 
@@ -300,7 +312,7 @@ describe("handleObserveSourceJob", () => {
       id: jobId,
       kind: "observe-source",
       retryable: true,
-      sourceId: source.id,
+      sourceId: source.value.id,
     });
     if (!createdJob.ok) {
       throw createdJob.error;
@@ -335,10 +347,10 @@ describe("handleObserveSourceJob", () => {
         },
         jobId,
         source: {
-          id: source.id,
+          id: source.value.id,
           kind: "podcast",
-          slug: source.slug,
-          url: source.url,
+          slug: source.value.slug,
+          url: source.value.url,
         },
       },
       {

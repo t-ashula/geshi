@@ -22,8 +22,20 @@ export function registerSourceRoutes(
   app.get("/api/v1/sources", async (context) => {
     const sources = await sourceService.listSources();
 
+    if (!sources.ok) {
+      return context.json(
+        {
+          error: {
+            code: "source_list_failed",
+            message: sources.error.message,
+          },
+        },
+        500,
+      );
+    }
+
     return context.json({
-      data: sources,
+      data: sources.value,
     });
   });
 
@@ -44,34 +56,15 @@ export function registerSourceRoutes(
 
     const body = json as Record<string, unknown>;
 
-    try {
-      const result = await sourceService.createSource({
-        description: toOptionalString(body.description),
-        sourceSlug: toOptionalString(body.sourceSlug),
-        title: toOptionalString(body.title),
-        url: toOptionalString(body.url) ?? "",
-      });
+    const result = await sourceService.createSource({
+      description: toOptionalString(body.description),
+      sourceSlug: toOptionalString(body.sourceSlug),
+      title: toOptionalString(body.title),
+      url: toOptionalString(body.url) ?? "",
+    });
 
-      if (!result.ok) {
-        return context.json(
-          {
-            error: {
-              code: result.error.code,
-              message: result.error.message,
-            },
-          },
-          422,
-        );
-      }
-
-      return context.json(
-        {
-          data: result.value,
-        },
-        201,
-      );
-    } catch (error) {
-      if (error instanceof DuplicateSourceUrlHashError) {
+    if (!result.ok) {
+      if (result.error instanceof DuplicateSourceUrlHashError) {
         return context.json(
           {
             error: {
@@ -83,8 +76,35 @@ export function registerSourceRoutes(
         );
       }
 
-      throw error;
+      if (result.error instanceof Error) {
+        return context.json(
+          {
+            error: {
+              code: "source_create_failed",
+              message: result.error.message,
+            },
+          },
+          500,
+        );
+      }
+
+      return context.json(
+        {
+          error: {
+            code: result.error.code,
+            message: result.error.message,
+          },
+        },
+        422,
+      );
     }
+
+    return context.json(
+      {
+        data: result.value,
+      },
+      201,
+    );
   });
 
   app.post("/api/v1/sources/inspect", async (context) => {
@@ -190,33 +210,17 @@ export function registerSourceRoutes(
       );
     }
 
-    try {
-      const result = await sourceService.updateSourceCollectorSettings(
-        context.req.param("sourceId"),
-        {
-          enabled: body.enabled,
-          intervalMinutes: body.intervalMinutes,
-        },
-        body.baseVersion,
-      );
+    const result = await sourceService.updateSourceCollectorSettings(
+      context.req.param("sourceId"),
+      {
+        enabled: body.enabled,
+        intervalMinutes: body.intervalMinutes,
+      },
+      body.baseVersion,
+    );
 
-      if (!result.ok) {
-        return context.json(
-          {
-            error: {
-              code: result.error.code,
-              message: result.error.message,
-            },
-          },
-          404,
-        );
-      }
-
-      return context.json({
-        data: result.value,
-      });
-    } catch (error) {
-      if (error instanceof CollectorSettingsVersionConflictError) {
+    if (!result.ok) {
+      if (result.error instanceof CollectorSettingsVersionConflictError) {
         return context.json(
           {
             error: {
@@ -228,8 +232,32 @@ export function registerSourceRoutes(
         );
       }
 
-      throw error;
+      if (result.error instanceof Error) {
+        return context.json(
+          {
+            error: {
+              code: "collector_settings_update_failed",
+              message: result.error.message,
+            },
+          },
+          500,
+        );
+      }
+
+      return context.json(
+        {
+          error: {
+            code: result.error.code,
+            message: result.error.message,
+          },
+        },
+        404,
+      );
     }
+
+    return context.json({
+      data: result.value,
+    });
   });
 }
 

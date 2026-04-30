@@ -37,10 +37,14 @@ describe("SourceRepository", () => {
       urlHash: "sha256:feed-1",
     });
 
-    expect(createdSource.slug).toBe("example-podcast");
-    expect(createdSource.title).toBe("Example Podcast");
-    expect(createdSource.url).toBe("https://example.com/feed.xml");
-    expect(createdSource.version).toBe(1);
+    expect(createdSource.ok).toBe(true);
+    if (!createdSource.ok) {
+      throw createdSource.error;
+    }
+    expect(createdSource.value.slug).toBe("example-podcast");
+    expect(createdSource.value.title).toBe("Example Podcast");
+    expect(createdSource.value.url).toBe("https://example.com/feed.xml");
+    expect(createdSource.value.version).toBe(1);
   });
 
   it("lists sources with their latest snapshot", async () => {
@@ -82,8 +86,12 @@ describe("SourceRepository", () => {
 
     const sources = await repository.listSources();
 
-    expect(sources).toHaveLength(1);
-    expect(sources[0]).toMatchObject({
+    expect(sources.ok).toBe(true);
+    if (!sources.ok) {
+      throw sources.error;
+    }
+    expect(sources.value).toHaveLength(1);
+    expect(sources.value[0]).toMatchObject({
       description: "Second description",
       slug: "latest-podcast",
       title: "Second title",
@@ -92,7 +100,7 @@ describe("SourceRepository", () => {
   });
 
   it("rejects duplicate url hashes", async () => {
-    await repository.createSource({
+    const firstSource = await repository.createSource({
       collectorSettingId: uuidv7(),
       collectorSettingSnapshotId: uuidv7(),
       id: uuidv7(),
@@ -103,19 +111,26 @@ describe("SourceRepository", () => {
       url: "https://example.com/duplicate-one.xml",
       urlHash: "sha256:feed-duplicate",
     });
+    if (!firstSource.ok) {
+      throw firstSource.error;
+    }
 
-    await expect(
-      repository.createSource({
-        collectorSettingId: uuidv7(),
-        collectorSettingSnapshotId: uuidv7(),
-        id: uuidv7(),
-        kind: "podcast",
-        pluginSlug: "podcast-rss",
-        slug: "duplicate-two",
-        snapshotId: uuidv7(),
-        url: "https://example.com/duplicate-two.xml",
-        urlHash: "sha256:feed-duplicate",
-      }),
-    ).rejects.toThrow(DuplicateSourceUrlHashError);
+    const duplicateSource = await repository.createSource({
+      collectorSettingId: uuidv7(),
+      collectorSettingSnapshotId: uuidv7(),
+      id: uuidv7(),
+      kind: "podcast",
+      pluginSlug: "podcast-rss",
+      slug: "duplicate-two",
+      snapshotId: uuidv7(),
+      url: "https://example.com/duplicate-two.xml",
+      urlHash: "sha256:feed-duplicate",
+    });
+
+    expect(duplicateSource.ok).toBe(false);
+    if (duplicateSource.ok) {
+      throw new Error("Expected duplicate source creation to fail.");
+    }
+    expect(duplicateSource.error).toBeInstanceOf(DuplicateSourceUrlHashError);
   });
 });

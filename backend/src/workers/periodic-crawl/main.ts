@@ -59,7 +59,12 @@ await ensureQueue(boss, PERIODIC_CRAWL_JOB_NAME, {
   retryDelay: 5,
   retryLimit: 2,
 });
-await appSettingService.ensureDefaultProfile();
+const ensureDefaultProfileResult =
+  await appSettingService.ensureDefaultProfile();
+
+if (!ensureDefaultProfileResult.ok) {
+  throw ensureDefaultProfileResult.error;
+}
 
 await seedPeriodicCrawlJob(jobRepository, jobQueue);
 

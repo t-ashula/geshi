@@ -95,7 +95,13 @@ describe("AssetRepository", () => {
       [uuidv7(), assetId, 1, "https://cdn.example.com/audio-old.mp3"],
     );
 
-    const existingAsset = (await repository.listAssets())[0];
+    const existingAssets = await repository.listAssets();
+
+    if (!existingAssets.ok) {
+      throw existingAssets.error;
+    }
+
+    const existingAsset = existingAssets.value[0];
 
     if (existingAsset === undefined) {
       throw new Error("Expected an existing asset.");
@@ -116,7 +122,12 @@ describe("AssetRepository", () => {
     }
 
     const assets = await repository.listAssets();
-    const storedAsset = assets.find((asset) => asset.id === existingAsset.id);
+    if (!assets.ok) {
+      throw assets.error;
+    }
+    const storedAsset = assets.value.find(
+      (asset) => asset.id === existingAsset.id,
+    );
 
     expect(result.value.assetIdsRequiringAcquire).toEqual([existingAsset.id]);
     expect(storedAsset).toMatchObject({
