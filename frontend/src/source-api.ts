@@ -42,6 +42,33 @@ export type ContentListItem = {
   kind: string;
   publishedAt: string | null;
   sourceId: string;
+  sourceSlug: string;
+  status: "discovered" | "stored" | "failed";
+  summary: string | null;
+  title: string | null;
+};
+
+export type ContentDetailAsset = {
+  byteSize: number | null;
+  id: string;
+  kind: string;
+  mimeType: string | null;
+  primary: boolean;
+  sourceUrl: string | null;
+  url: string | null;
+};
+
+export type ContentDetailItem = {
+  assets: ContentDetailAsset[];
+  collectedAt: string;
+  id: string;
+  kind: string;
+  publishedAt: string | null;
+  source: {
+    id: string;
+    slug: string;
+    title: string | null;
+  };
   status: "discovered" | "stored" | "failed";
   summary: string | null;
   title: string | null;
@@ -75,6 +102,10 @@ type ListSourcesResponse = {
 
 type ListContentsResponse = {
   data: ContentListItem[];
+};
+
+type ContentDetailResponse = {
+  data: ContentDetailItem;
 };
 
 type JobResponse = {
@@ -201,4 +232,23 @@ export async function listContents(): Promise<ContentListItem[]> {
   const payload = (await response.json()) as ListContentsResponse;
 
   return payload.data;
+}
+
+export async function getContentDetail(
+  contentId: string,
+): Promise<ContentDetailItem> {
+  const response = await fetch(`/api/v1/contents/${contentId}`);
+  const payload = (await response.json()) as
+    | ContentDetailResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to load content detail.");
 }

@@ -13,6 +13,9 @@ export default defineConfig({
       "/api": {
         target: backendOrigin,
       },
+      "/media": {
+        target: backendOrigin,
+      },
     },
   },
 });

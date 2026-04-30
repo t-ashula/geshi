@@ -2,8 +2,10 @@ import type {
   AcquireTargetAsset,
   AssetListItem,
   AssetRepository,
+  ContentDetailAsset,
   CreateObservedAssetInput,
   CreateObservedAssetsResult,
+  StoredAssetMedia,
   UpsertStoredAssetInput,
 } from "../db/asset-repository.js";
 
@@ -34,5 +36,17 @@ export class AssetService {
 
   public async listAssets(): Promise<AssetListItem[]> {
     return this.assetRepository.listAssets();
+  }
+
+  public async listAssetsByContentId(
+    contentId: string,
+  ): Promise<ContentDetailAsset[]> {
+    return this.assetRepository.listAssetsByContentId(contentId);
+  }
+
+  public async findStoredMediaById(
+    assetId: string,
+  ): Promise<StoredAssetMedia | null> {
+    return this.assetRepository.findStoredMediaById(assetId);
   }
 }

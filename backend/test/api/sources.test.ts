@@ -1,16 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../src/app.js";
+import { AssetRepository } from "../../src/db/asset-repository.js";
 import { ContentRepository } from "../../src/db/content-repository.js";
 import { JobRepository } from "../../src/db/job-repository.js";
 import { SourceRepository } from "../../src/db/source-repository.js";
 import type { JobPayload, JobQueue } from "../../src/job-queue/types.js";
 import type { ObserveSourceJobPayload } from "../../src/job-queue/types.js";
 import { OBSERVE_SOURCE_JOB_NAME } from "../../src/job-queue/types.js";
+import { AssetService } from "../../src/service/asset-service.js";
 import { ContentService } from "../../src/service/content-service.js";
 import { JobService } from "../../src/service/job-service.js";
 import { SourceInspectService } from "../../src/service/source-inspect-service.js";
 import { SourceService } from "../../src/service/source-service.js";
+import { FilesystemStorage } from "../../src/storage/filesystem-storage.js";
 import {
   createTestDatabase,
   destroyTestDatabase,
@@ -358,6 +361,8 @@ function createTestApp(
       Promise.resolve("queue-job-test"),
   },
 ) {
+  const assetRepository = new AssetRepository(testDatabase.database);
+  const assetService = new AssetService(assetRepository);
   const contentRepository = new ContentRepository(testDatabase.database);
   const contentService = new ContentService(contentRepository);
   const jobRepository = new JobRepository(testDatabase.database);
@@ -365,11 +370,14 @@ function createTestApp(
   const sourceService = new SourceService(sourceRepository);
   const sourceInspectService = new SourceInspectService();
   const jobService = new JobService(sourceService, jobRepository, jobQueue);
+  const storage = new FilesystemStorage("/tmp/geshi-test-storage");
 
   return createApp(
     sourceService,
     sourceInspectService,
+    assetService,
     contentService,
     jobService,
+    storage,
   );
 }

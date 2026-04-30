@@ -1,5 +1,6 @@
 import type { JobRepository } from "../../db/job-repository.js";
 import type { AcquireContentJobPayload } from "../../job-queue/types.js";
+import { contentTypeToExtension } from "../../lib/content-type-extension.js";
 import { findLatestFingerprint } from "../../lib/fingerprint.js";
 import { sha256ChecksumString } from "../../lib/hash.js";
 import type { Logger } from "../../logger/index.js";
@@ -115,29 +116,12 @@ function createAssetKey(
     acquiredAsset.kind,
     payload.asset.id,
     (payload.content.title ?? "").slice(0, 16),
-    `${latestAcquiredFingerprint.replace(":", "-")}${contentTypeToExtension(acquiredAsset.contentType)}`,
+    `${latestAcquiredFingerprint.replace(":", "-")}${toFileExtension(acquiredAsset.contentType)}`,
   );
 }
 
-function contentTypeToExtension(contentType: string | null): string {
-  switch (contentType) {
-    case "audio/aac":
-      return ".aac";
-    case "audio/flac":
-      return ".flac";
-    case "audio/mp4":
-    case "audio/x-m4a":
-      return ".m4a";
-    case "audio/mpeg":
-      return ".mp3";
-    case "audio/ogg":
-      return ".ogg";
-    case "audio/wav":
-    case "audio/x-wav":
-      return ".wav";
-    case "text/html":
-      return ".html";
-    default:
-      return "";
-  }
+function toFileExtension(contentType: string | null): string {
+  const extension = contentTypeToExtension(contentType);
+
+  return extension === null ? "" : `.${extension}`;
 }
