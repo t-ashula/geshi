@@ -56,6 +56,14 @@
 - 個別ディレクトリに散らばった独自コマンドだけに依存しない
 - schema migration と data migration の手順は [Migration](./migration.md) に従う
 
+### module / import
+
+- `index.ts` は，原則として再エクスポートや公開境界の集約だけに使う
+- `index.ts` に業務ロジックや初期化処理や状態管理を持ち込まない
+- 実装本体は `foo.ts` や `bar.ts` のような個別 module に置き，必要なら `index.ts` から公開する
+- `index.ts` を使うかどうかは module 境界を見て決めるが，「外向けの入口」であることを優先する
+- import 規約を lint で強制するかどうかは，module 境界が十分に固まってから判断する
+
 ## commit
 
 - メッセージは .commit-template.txt と関連する ADR に基づいて一貫性を保つ
