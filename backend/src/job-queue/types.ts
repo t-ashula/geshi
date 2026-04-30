@@ -1,5 +1,6 @@
 export const OBSERVE_SOURCE_JOB_NAME = "observe-source";
 export const ACQUIRE_CONTENT_JOB_NAME = "acquire-content";
+export const PERIODIC_CRAWL_JOB_NAME = "periodic-crawl";
 
 export type ObserveSourceJobPayload = {
   jobId: string;
@@ -47,8 +48,20 @@ export type AcquireContentJobPayload = {
   };
 };
 
-export type JobPayload = ObserveSourceJobPayload | AcquireContentJobPayload;
+export type PeriodicCrawlJobPayload = {
+  jobId: string;
+};
+
+export type JobPayload =
+  | ObserveSourceJobPayload
+  | AcquireContentJobPayload
+  | PeriodicCrawlJobPayload;
 
 export interface JobQueue {
   enqueue(name: string, payload: JobPayload): Promise<string | null>;
+  enqueueAfter(
+    name: string,
+    payload: JobPayload,
+    startAfter: Date,
+  ): Promise<string | null>;
 }

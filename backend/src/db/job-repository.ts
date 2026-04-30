@@ -6,7 +6,7 @@ export type CreateJobInput = {
   id: string;
   kind: string;
   retryable: boolean;
-  sourceId: string;
+  sourceId: string | null;
 };
 
 export type JobListItem = {
@@ -21,6 +21,11 @@ export type JobListItem = {
   sourceId: string | null;
   startedAt: Date | null;
   status: "queued" | "running" | "succeeded" | "failed";
+};
+
+export type LatestObserveJob = {
+  createdAt: Date;
+  sourceId: string;
 };
 
 export class JobRepository {
@@ -103,6 +108,67 @@ export class JobRepository {
       .selectFrom("jobs")
       .selectAll()
       .where("id", "=", id)
+      .executeTakeFirst();
+
+    return job === undefined ? null : toJobListItem(job);
+  }
+
+  public async listQueuedOrRunningObserveSourceIds(): Promise<Set<string>> {
+    const jobs = await this.database
+      .selectFrom("jobs")
+      .select(["source_id"])
+      .where("kind", "=", "observe-source")
+      .where("status", "in", ["queued", "running"])
+      .where("source_id", "is not", null)
+      .execute();
+
+    return new Set(
+      jobs
+        .map((job) => job.source_id)
+        .filter((sourceId): sourceId is string => sourceId !== null),
+    );
+  }
+
+  public async findLatestObserveJobsBySourceIds(
+    sourceIds: string[],
+  ): Promise<Map<string, LatestObserveJob>> {
+    if (sourceIds.length === 0) {
+      return new Map();
+    }
+
+    const jobs = await this.database
+      .selectFrom("jobs")
+      .select(["created_at", "source_id"])
+      .where("kind", "=", "observe-source")
+      .where("source_id", "in", sourceIds)
+      .orderBy("source_id", "asc")
+      .orderBy("created_at", "desc")
+      .execute();
+    const latestJobsBySourceId = new Map<string, LatestObserveJob>();
+
+    for (const job of jobs) {
+      if (job.source_id === null || latestJobsBySourceId.has(job.source_id)) {
+        continue;
+      }
+
+      latestJobsBySourceId.set(job.source_id, {
+        createdAt: job.created_at,
+        sourceId: job.source_id,
+      });
+    }
+
+    return latestJobsBySourceId;
+  }
+
+  public async findQueuedOrRunningJobByKind(
+    kind: string,
+  ): Promise<JobListItem | null> {
+    const job = await this.database
+      .selectFrom("jobs")
+      .selectAll()
+      .where("kind", "=", kind)
+      .where("status", "in", ["queued", "running"])
+      .orderBy("created_at", "desc")
       .executeTakeFirst();
 
     return job === undefined ? null : toJobListItem(job);

@@ -2,19 +2,25 @@ import { serve } from "@hono/node-server";
 import { Pool } from "pg";
 
 import { createApp } from "./app.js";
+import { AppSettingRepository } from "./db/app-setting-repository.js";
 import { AssetRepository } from "./db/asset-repository.js";
 import { ContentRepository } from "./db/content-repository.js";
 import { createDatabaseFromPool } from "./db/database.js";
 import { JobRepository } from "./db/job-repository.js";
 import { SourceRepository } from "./db/source-repository.js";
-import { ensureQueue, PgBossJobQueue } from "./job-queue/pg-boss.js";
-import { createPgBoss } from "./job-queue/pg-boss.js";
+import {
+  createPgBoss,
+  ensureQueue,
+  PgBossJobQueue,
+} from "./job-queue/pg-boss.js";
 import {
   ACQUIRE_CONTENT_JOB_NAME,
   OBSERVE_SOURCE_JOB_NAME,
+  PERIODIC_CRAWL_JOB_NAME,
 } from "./job-queue/types.js";
 import { createLogger } from "./logger/index.js";
 import { getRuntimeConfig } from "./runtime-config.js";
+import { AppSettingService } from "./service/app-setting-service.js";
 import { AssetService } from "./service/asset-service.js";
 import { ContentService } from "./service/content-service.js";
 import { JobService } from "./service/job-service.js";
@@ -35,6 +41,8 @@ const pool = new Pool({
 });
 const database = createDatabaseFromPool(pool);
 const boss = createPgBoss(runtimeConfig);
+const appSettingRepository = new AppSettingRepository(database);
+const appSettingService = new AppSettingService(appSettingRepository);
 const assetRepository = new AssetRepository(database);
 const assetService = new AssetService(assetRepository);
 const contentRepository = new ContentRepository(database);
@@ -51,17 +59,16 @@ boss.on("error", (error) => {
   logger.error("job queue runtime failed.", { error });
 });
 
+const queueOptions = {
+  retryBackoff: true,
+  retryDelay: 5,
+  retryLimit: 2,
+};
 await boss.start();
-await ensureQueue(boss, OBSERVE_SOURCE_JOB_NAME, {
-  retryBackoff: true,
-  retryDelay: 5,
-  retryLimit: 2,
-});
-await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, {
-  retryBackoff: true,
-  retryDelay: 5,
-  retryLimit: 2,
-});
+await ensureQueue(boss, OBSERVE_SOURCE_JOB_NAME, queueOptions);
+await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, queueOptions);
+await ensureQueue(boss, PERIODIC_CRAWL_JOB_NAME, queueOptions);
+await appSettingService.ensureDefaultProfile();
 
 const app = createApp(
   sourceService,
@@ -69,6 +76,7 @@ const app = createApp(
   assetService,
   contentService,
   jobService,
+  appSettingService,
   storage,
 );
 

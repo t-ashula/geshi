@@ -24,6 +24,9 @@ export type ApiError = {
 export type Result<T, E> = { ok: true; value: T } | { error: E; ok: false };
 
 export type SourceListItem = {
+  collectorSettingsVersion: number | null;
+  periodicCrawlEnabled: boolean;
+  periodicCrawlIntervalMinutes: number;
   createdAt: string;
   description: string | null;
   id: string;
@@ -34,6 +37,15 @@ export type SourceListItem = {
   url: string;
   urlHash: string;
   version: number | null;
+};
+
+export type PeriodicCrawlSettings = {
+  enabled: boolean;
+  intervalMinutes: number;
+};
+
+export type SourceCollectorSettingsUpdate = PeriodicCrawlSettings & {
+  baseVersion: number;
 };
 
 export type ContentListItem = {
@@ -114,6 +126,10 @@ type JobResponse = {
 
 type InspectSourceResponse = {
   data: InspectSourceDraft;
+};
+
+type PeriodicCrawlSettingsResponse = {
+  data: PeriodicCrawlSettings;
 };
 
 export async function listSources(): Promise<SourceListItem[]> {
@@ -251,4 +267,75 @@ export async function getContentDetail(
   }
 
   throw new Error("Failed to load content detail.");
+}
+
+export async function getPeriodicCrawlSettings(): Promise<PeriodicCrawlSettings> {
+  const response = await fetch("/api/v1/settings/periodic-crawl");
+  const payload = (await response.json()) as
+    | PeriodicCrawlSettingsResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to load autonomous crawl settings.");
+}
+
+export async function updatePeriodicCrawlSettings(
+  settings: PeriodicCrawlSettings,
+): Promise<PeriodicCrawlSettings> {
+  const response = await fetch("/api/v1/settings/periodic-crawl", {
+    body: JSON.stringify(settings),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "PATCH",
+  });
+  const payload = (await response.json()) as
+    | PeriodicCrawlSettingsResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to update autonomous crawl settings.");
+}
+
+export async function updateSourceCollectorSettings(
+  sourceId: string,
+  settings: SourceCollectorSettingsUpdate,
+): Promise<SourceListItem> {
+  const response = await fetch(
+    `/api/v1/sources/${sourceId}/collector-settings`,
+    {
+      body: JSON.stringify(settings),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "PATCH",
+    },
+  );
+  const payload = (await response.json()) as
+    | CreateSourceResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to update source collector settings.");
 }
