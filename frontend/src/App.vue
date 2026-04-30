@@ -20,6 +20,10 @@ import {
   updatePeriodicCrawlSettings,
   updateSourceCollectorSettings,
 } from "./source-api.js";
+import {
+  sanitizeContentSummary,
+  summarizeContentSummary,
+} from "./content-summary.js";
 import { validateCreateSourceRequest } from "./source-form.js";
 
 type RouteState =
@@ -434,6 +438,22 @@ function formatDate(value: string | null): string {
 function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
   return detail.assets.filter((asset) => asset.url !== null);
 }
+
+function renderContentSummary(summary: string | null): string {
+  if (summary === null) {
+    return "";
+  }
+
+  return sanitizeContentSummary(summary);
+}
+
+function renderContentSummaryPreview(summary: string | null): string {
+  if (summary === null) {
+    return "";
+  }
+
+  return summarizeContentSummary(summary);
+}
 </script>
 
 <template>
@@ -768,7 +788,7 @@ function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
                   {{ formatDate(content.publishedAt) }} · {{ content.status }}
                 </span>
                 <span v-if="content.summary" class="content-row-summary">
-                  {{ content.summary }}
+                  {{ renderContentSummaryPreview(content.summary) }}
                 </span>
               </button>
             </li>
@@ -811,9 +831,11 @@ function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
               <span>{{ formatDate(contentDetail.publishedAt) }}</span>
             </div>
 
-            <p v-if="contentDetail.summary" class="detail-summary">
-              {{ contentDetail.summary }}
-            </p>
+            <div
+              v-if="contentDetail.summary"
+              class="detail-summary"
+              v-html="renderContentSummary(contentDetail.summary)"
+            ></div>
 
             <section class="detail-section">
               <div class="detail-section-header">

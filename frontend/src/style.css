@@ -264,6 +264,38 @@ h1 {
   margin: 0;
   color: #304050;
   font-size: 1rem;
+  line-height: 1.7;
+}
+
+.detail-summary > :first-child {
+  margin-top: 0;
+}
+
+.detail-summary > :last-child {
+  margin-bottom: 0;
+}
+
+.detail-summary a {
+  color: #0d5f83;
+}
+
+.detail-summary code,
+.detail-summary pre {
+  font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+}
+
+.detail-summary pre {
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgb(216 227 235 / 0.45);
+}
+
+.detail-summary blockquote {
+  margin: 0;
+  padding-left: 16px;
+  border-left: 3px solid rgb(117 137 163 / 0.28);
+  color: #4a5d6d;
 }
 
 .detail-section {
