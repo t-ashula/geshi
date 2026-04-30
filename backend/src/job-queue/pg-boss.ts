@@ -1,10 +1,8 @@
 import type { QueueOptions } from "pg-boss";
 import { PgBoss } from "pg-boss";
 
-import type { getRuntimeConfig } from "../runtime-config.js";
+import type { RuntimeConfig } from "../runtime-config.js";
 import type { JobPayload, JobQueue } from "./types.js";
-
-type RuntimeConfig = ReturnType<typeof getRuntimeConfig>;
 
 export function createPgBoss(runtimeConfig: RuntimeConfig): PgBoss {
   return new PgBoss({
@@ -24,10 +22,31 @@ export class PgBossJobQueue implements JobQueue {
     name: string,
     payload: JobPayload,
   ): Promise<string | null> {
+    return this.enqueueWithOptions(name, payload);
+  }
+
+  public async enqueueAfter(
+    name: string,
+    payload: JobPayload,
+    startAfter: Date,
+  ): Promise<string | null> {
+    return this.enqueueWithOptions(name, payload, {
+      startAfter,
+    });
+  }
+
+  private async enqueueWithOptions(
+    name: string,
+    payload: JobPayload,
+    extraOptions?: {
+      startAfter?: Date;
+    },
+  ): Promise<string | null> {
     return this.boss.send(name, payload, {
       retryBackoff: true,
       retryDelay: 5,
       retryLimit: 2,
+      ...extraOptions,
     });
   }
 }

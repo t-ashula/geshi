@@ -1,5 +1,6 @@
 import type {
   ObserveSourceTarget,
+  PeriodicCrawlSourceTarget,
   SourceListItem,
   SourceRepository,
 } from "../db/source-repository.js";
@@ -7,6 +8,7 @@ import type { Result } from "../lib/result.js";
 import { err } from "../lib/result.js";
 import { createSourceSlug, normalizeOptionalSlug } from "../lib/source-slug.js";
 import { createUrlHash } from "../lib/url-hash.js";
+import type { SourcePeriodicCrawlSettings } from "./periodic-crawl-settings.js";
 
 export type CreateSourceRequest = {
   description?: string;
@@ -63,6 +65,24 @@ export class SourceService {
     sourceId: string,
   ): Promise<ObserveSourceTarget | null> {
     return this.sourceRepository.findObserveSourceTarget(sourceId);
+  }
+
+  public async updateSourceCollectorSettings(
+    sourceId: string,
+    settings: SourcePeriodicCrawlSettings,
+    baseVersion: number,
+  ): Promise<SourceListItem | null> {
+    return this.sourceRepository.updateSourceCollectorSettings(
+      sourceId,
+      settings,
+      baseVersion,
+    );
+  }
+
+  public async listPeriodicCrawlTargets(): Promise<
+    PeriodicCrawlSourceTarget[]
+  > {
+    return this.sourceRepository.listPeriodicCrawlTargets();
   }
 }
 

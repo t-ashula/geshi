@@ -1,6 +1,9 @@
 import type { Hono } from "hono";
 
-import { DuplicateSourceUrlHashError } from "../../../db/source-repository.js";
+import {
+  CollectorSettingsVersionConflictError,
+  DuplicateSourceUrlHashError,
+} from "../../../db/source-repository.js";
 import type { JobService } from "../../../service/job-service.js";
 import { SourceNotFoundError } from "../../../service/job-service.js";
 import type {
@@ -145,6 +148,82 @@ export function registerSourceRoutes(
       throw error;
     }
   });
+
+  app.patch("/api/v1/sources/:sourceId/collector-settings", async (context) => {
+    const json: unknown = await context.req.json().catch(() => null);
+
+    if (json === null || typeof json !== "object") {
+      return context.json(
+        {
+          error: {
+            code: "invalid_json",
+            message: "Request body must be a JSON object.",
+          },
+        },
+        400,
+      );
+    }
+
+    const body = json as Record<string, unknown>;
+
+    if (
+      typeof body.enabled !== "boolean" ||
+      !isPositiveInteger(body.intervalMinutes) ||
+      !isPositiveInteger(body.baseVersion)
+    ) {
+      return context.json(
+        {
+          error: {
+            code: "invalid_collector_settings",
+            message:
+              "Collector settings require boolean enabled and positive intervalMinutes and baseVersion.",
+          },
+        },
+        422,
+      );
+    }
+
+    try {
+      const source = await sourceService.updateSourceCollectorSettings(
+        context.req.param("sourceId"),
+        {
+          enabled: body.enabled,
+          intervalMinutes: body.intervalMinutes,
+        },
+        body.baseVersion,
+      );
+
+      if (source === null) {
+        return context.json(
+          {
+            error: {
+              code: "source_not_found",
+              message: "Source not found.",
+            },
+          },
+          404,
+        );
+      }
+
+      return context.json({
+        data: source,
+      });
+    } catch (error) {
+      if (error instanceof CollectorSettingsVersionConflictError) {
+        return context.json(
+          {
+            error: {
+              code: "collector_settings_conflict",
+              message: "Collector settings were updated by another request.",
+            },
+          },
+          409,
+        );
+      }
+
+      throw error;
+    }
+  });
 }
 
 function toOptionalString(value: unknown): string | undefined {
@@ -153,4 +232,8 @@ function toOptionalString(value: unknown): string | undefined {
 
 function inspectSourceStatus(_error: InspectSourceError): 422 {
   return 422;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }

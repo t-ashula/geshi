@@ -12,6 +12,7 @@ type NullableTimestampColumn = ColumnType<
 >;
 type GeneratedNumberColumn = ColumnType<number, number | undefined, number>;
 type GeneratedBooleanColumn = ColumnType<boolean, boolean | undefined, boolean>;
+type NumberColumn = ColumnType<number, number | undefined, number>;
 type JsonColumn = ColumnType<
   Record<string, unknown>,
   Record<string, unknown> | string | undefined,
@@ -48,6 +49,31 @@ export type CollectorSettingSnapshotTable = {
   config: JsonColumn;
   enabled: GeneratedBooleanColumn;
   id: string;
+  periodical: GeneratedBooleanColumn;
+  periodical_interval_minutes: NumberColumn;
+  recorded_at: TimestampColumn;
+  version: number;
+};
+
+export type AppSettingTable = {
+  created_at: TimestampColumn;
+  id: string;
+  profile_slug: string;
+};
+
+export type AppSettingSnapshotTable = {
+  app_setting_id: string;
+  enabled: ColumnType<
+    boolean | null,
+    boolean | null | undefined,
+    boolean | null
+  >;
+  id: string;
+  interval_minutes: ColumnType<
+    number | null,
+    number | null | undefined,
+    number | null
+  >;
   recorded_at: TimestampColumn;
   version: number;
 };
@@ -111,6 +137,8 @@ export type JobTable = {
 };
 
 export type GeshiDatabase = {
+  app_settings: AppSettingTable;
+  app_setting_snapshots: AppSettingSnapshotTable;
   assets: AssetTable;
   asset_snapshots: AssetSnapshotTable;
   collector_setting_snapshots: CollectorSettingSnapshotTable;

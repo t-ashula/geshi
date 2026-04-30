@@ -109,6 +109,8 @@ describe("handleObserveSourceJob", () => {
 
             return Promise.resolve(`queue-job-${queueJobSequence}`);
           },
+          enqueueAfter: (_name, _payload, _startAfter) =>
+            Promise.resolve("queue-job-after"),
         },
         jobRepository,
         logger: createNoopLogger(),
@@ -252,6 +254,7 @@ describe("handleObserveSourceJob", () => {
           ),
           jobQueue: {
             enqueue: () => Promise.resolve("queue-job-test"),
+            enqueueAfter: () => Promise.resolve("queue-job-after"),
           },
           jobRepository,
           logger: createNoopLogger(),

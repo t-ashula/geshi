@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../../src/app.js";
+import { AppSettingRepository } from "../../src/db/app-setting-repository.js";
 import { AssetRepository } from "../../src/db/asset-repository.js";
 import { ContentRepository } from "../../src/db/content-repository.js";
 import { JobRepository } from "../../src/db/job-repository.js";
@@ -8,6 +9,7 @@ import { SourceRepository } from "../../src/db/source-repository.js";
 import type { JobPayload, JobQueue } from "../../src/job-queue/types.js";
 import type { ObserveSourceJobPayload } from "../../src/job-queue/types.js";
 import { OBSERVE_SOURCE_JOB_NAME } from "../../src/job-queue/types.js";
+import { AppSettingService } from "../../src/service/app-setting-service.js";
 import { AssetService } from "../../src/service/asset-service.js";
 import { ContentService } from "../../src/service/content-service.js";
 import { JobService } from "../../src/service/job-service.js";
@@ -299,6 +301,8 @@ describe("/api/v1/sources", () => {
 
           return Promise.resolve("queue-job-1");
         },
+        enqueueAfter: (_name, _payload, _startAfter) =>
+          Promise.resolve("queue-job-after"),
       });
 
       const createResponse = await app.request("/api/v1/sources", {
@@ -352,12 +356,129 @@ describe("/api/v1/sources", () => {
       await destroyTestDatabase(testDatabase);
     }
   });
+
+  it("updates source crawl settings", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      const app = createTestApp(testDatabase);
+      const createResponse = await app.request("/api/v1/sources", {
+        body: JSON.stringify({
+          url: "https://example.com/feed.xml",
+        }),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+      const createdPayload = (await createResponse.json()) as {
+        data: {
+          collectorSettingsVersion: number;
+          periodicCrawlEnabled: boolean;
+          periodicCrawlIntervalMinutes: number;
+          id: string;
+        };
+      };
+      const updateResponse = await app.request(
+        `/api/v1/sources/${createdPayload.data.id}/collector-settings`,
+        {
+          body: JSON.stringify({
+            baseVersion: createdPayload.data.collectorSettingsVersion,
+            enabled: true,
+            intervalMinutes: 90,
+          }),
+          headers: {
+            "content-type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+
+      expect(createdPayload.data.periodicCrawlEnabled).toBe(true);
+      expect(createdPayload.data.periodicCrawlIntervalMinutes).toBe(60);
+      expect(updateResponse.status).toBe(200);
+      await expect(updateResponse.json()).resolves.toMatchObject({
+        data: {
+          collectorSettingsVersion: 2,
+          periodicCrawlEnabled: true,
+          periodicCrawlIntervalMinutes: 90,
+          id: createdPayload.data.id,
+        },
+      });
+    } finally {
+      await destroyTestDatabase(testDatabase);
+    }
+  });
+
+  it("rejects stale collector settings updates", async () => {
+    const testDatabase = await createTestDatabase();
+
+    try {
+      const app = createTestApp(testDatabase);
+      const createResponse = await app.request("/api/v1/sources", {
+        body: JSON.stringify({
+          url: "https://example.com/feed.xml",
+        }),
+        headers: {
+          "content-type": "application/json",
+        },
+        method: "POST",
+      });
+      const createdPayload = (await createResponse.json()) as {
+        data: {
+          collectorSettingsVersion: number;
+          id: string;
+        };
+      };
+      const firstUpdateResponse = await app.request(
+        `/api/v1/sources/${createdPayload.data.id}/collector-settings`,
+        {
+          body: JSON.stringify({
+            baseVersion: createdPayload.data.collectorSettingsVersion,
+            enabled: true,
+            intervalMinutes: 90,
+          }),
+          headers: {
+            "content-type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+      const staleUpdateResponse = await app.request(
+        `/api/v1/sources/${createdPayload.data.id}/collector-settings`,
+        {
+          body: JSON.stringify({
+            baseVersion: createdPayload.data.collectorSettingsVersion,
+            enabled: false,
+            intervalMinutes: 120,
+          }),
+          headers: {
+            "content-type": "application/json",
+          },
+          method: "PATCH",
+        },
+      );
+
+      expect(firstUpdateResponse.status).toBe(200);
+      expect(staleUpdateResponse.status).toBe(409);
+      await expect(staleUpdateResponse.json()).resolves.toEqual({
+        error: {
+          code: "collector_settings_conflict",
+          message: "Collector settings were updated by another request.",
+        },
+      });
+    } finally {
+      await destroyTestDatabase(testDatabase);
+    }
+  });
 });
 
 function createTestApp(
   testDatabase: Awaited<ReturnType<typeof createTestDatabase>>,
   jobQueue: JobQueue = {
     enqueue: (_name: string, _payload: JobPayload) =>
+      Promise.resolve("queue-job-test"),
+    enqueueAfter: (_name: string, _payload: JobPayload, _startAfter: Date) =>
       Promise.resolve("queue-job-test"),
   },
 ) {
@@ -366,6 +487,8 @@ function createTestApp(
   const contentRepository = new ContentRepository(testDatabase.database);
   const contentService = new ContentService(contentRepository);
   const jobRepository = new JobRepository(testDatabase.database);
+  const appSettingRepository = new AppSettingRepository(testDatabase.database);
+  const appSettingService = new AppSettingService(appSettingRepository);
   const sourceRepository = new SourceRepository(testDatabase.database);
   const sourceService = new SourceService(sourceRepository);
   const sourceInspectService = new SourceInspectService();
@@ -378,6 +501,7 @@ function createTestApp(
     assetService,
     contentService,
     jobService,
+    appSettingService,
     storage,
   );
 }

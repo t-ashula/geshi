@@ -5,11 +5,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../../src/app.js";
+import { AppSettingRepository } from "../../src/db/app-setting-repository.js";
 import { AssetRepository } from "../../src/db/asset-repository.js";
 import { ContentRepository } from "../../src/db/content-repository.js";
 import { JobRepository } from "../../src/db/job-repository.js";
 import { SourceRepository } from "../../src/db/source-repository.js";
 import type { JobPayload, JobQueue } from "../../src/job-queue/types.js";
+import { AppSettingService } from "../../src/service/app-setting-service.js";
 import { AssetService } from "../../src/service/asset-service.js";
 import { ContentService } from "../../src/service/content-service.js";
 import { JobService } from "../../src/service/job-service.js";
@@ -166,6 +168,8 @@ function createTestApp(
   jobQueue: JobQueue = {
     enqueue: (_name: string, _payload: JobPayload) =>
       Promise.resolve("queue-job-test"),
+    enqueueAfter: (_name: string, _payload: JobPayload, _startAfter: Date) =>
+      Promise.resolve("queue-job-test"),
   },
 ) {
   const assetRepository = new AssetRepository(testDatabase.database);
@@ -173,6 +177,8 @@ function createTestApp(
   const contentRepository = new ContentRepository(testDatabase.database);
   const contentService = new ContentService(contentRepository);
   const jobRepository = new JobRepository(testDatabase.database);
+  const appSettingRepository = new AppSettingRepository(testDatabase.database);
+  const appSettingService = new AppSettingService(appSettingRepository);
   const sourceRepository = new SourceRepository(testDatabase.database);
   const sourceService = new SourceService(sourceRepository);
   const sourceInspectService = new SourceInspectService();
@@ -185,6 +191,7 @@ function createTestApp(
     assetService,
     contentService,
     jobService,
+    appSettingService,
     storage,
   );
 }

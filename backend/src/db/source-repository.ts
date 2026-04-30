@@ -1,5 +1,7 @@
 import type { Insertable, Kysely, Selectable } from "kysely";
 
+import type { SourcePeriodicCrawlSettings } from "../service/periodic-crawl-settings.js";
+import { defaultSourcePeriodicCrawlSettings } from "../service/periodic-crawl-settings.js";
 import type {
   CollectorSettingSnapshotTable,
   CollectorSettingTable,
@@ -26,6 +28,8 @@ export type ObserveSourceTarget = {
   collectorSettingId: string;
   collectorSettingSnapshotId: string;
   config: Record<string, unknown>;
+  crawlEnabled: boolean;
+  crawlIntervalMinutes: number;
   pluginSlug: string;
   slug: string;
   sourceId: string;
@@ -34,6 +38,9 @@ export type ObserveSourceTarget = {
 };
 
 export type SourceListItem = {
+  collectorSettingsVersion: number | null;
+  periodicCrawlEnabled: boolean;
+  periodicCrawlIntervalMinutes: number;
   createdAt: Date;
   description: string | null;
   id: string;
@@ -46,10 +53,19 @@ export type SourceListItem = {
   version: number | null;
 };
 
+export type PeriodicCrawlSourceTarget = ObserveSourceTarget;
+
 export class DuplicateSourceUrlHashError extends Error {
   public constructor(urlHash: string) {
     super(`A source already exists for url hash: ${urlHash}`);
     this.name = "DuplicateSourceUrlHashError";
+  }
+}
+
+export class CollectorSettingsVersionConflictError extends Error {
+  public constructor() {
+    super("Collector settings were updated by another request.");
+    this.name = "CollectorSettingsVersionConflictError";
   }
 }
 
@@ -90,8 +106,14 @@ export class SourceRepository {
           .where("source_id", "=", input.id)
           .where("version", "=", 1)
           .executeTakeFirstOrThrow();
+        const collectorSettingSnapshot = await transaction
+          .selectFrom("collector_setting_snapshots")
+          .selectAll()
+          .where("collector_setting_id", "=", input.collectorSettingId)
+          .where("version", "=", 1)
+          .executeTakeFirstOrThrow();
 
-        return toSourceListItem(source, snapshot);
+        return toSourceListItem(source, snapshot, collectorSettingSnapshot);
       });
     } catch (error) {
       if (isDuplicateSourceUrlHashError(error)) {
@@ -119,6 +141,33 @@ export class SourceRepository {
       string,
       Selectable<SourceSnapshotTable>
     >();
+    const collectorSettings = await this.database
+      .selectFrom("collector_settings")
+      .selectAll()
+      .orderBy("created_at", "asc")
+      .execute();
+    const collectorSettingBySourceId = new Map<
+      string,
+      Selectable<CollectorSettingTable>
+    >();
+    for (const collectorSetting of collectorSettings) {
+      if (!collectorSettingBySourceId.has(collectorSetting.source_id)) {
+        collectorSettingBySourceId.set(
+          collectorSetting.source_id,
+          collectorSetting,
+        );
+      }
+    }
+    const collectorSnapshots = await this.database
+      .selectFrom("collector_setting_snapshots")
+      .selectAll()
+      .orderBy("collector_setting_id", "asc")
+      .orderBy("version", "desc")
+      .execute();
+    const latestCollectorSnapshotBySettingId = new Map<
+      string,
+      Selectable<CollectorSettingSnapshotTable>
+    >();
 
     for (const snapshot of snapshots) {
       if (!latestSnapshotBySourceId.has(snapshot.source_id)) {
@@ -126,8 +175,25 @@ export class SourceRepository {
       }
     }
 
+    for (const snapshot of collectorSnapshots) {
+      if (
+        !latestCollectorSnapshotBySettingId.has(snapshot.collector_setting_id)
+      ) {
+        latestCollectorSnapshotBySettingId.set(
+          snapshot.collector_setting_id,
+          snapshot,
+        );
+      }
+    }
+
     return sources.map((source) =>
-      toSourceListItem(source, latestSnapshotBySourceId.get(source.id) ?? null),
+      toSourceListItem(
+        source,
+        latestSnapshotBySourceId.get(source.id) ?? null,
+        latestCollectorSnapshotBySettingId.get(
+          collectorSettingBySourceId.get(source.id)?.id ?? "",
+        ) ?? null,
+      ),
     );
   }
 
@@ -175,6 +241,152 @@ export class SourceRepository {
       collectorSettingSnapshot,
     );
   }
+
+  public async listPeriodicCrawlTargets(): Promise<
+    PeriodicCrawlSourceTarget[]
+  > {
+    const rows = await this.database
+      .selectFrom("collector_setting_snapshots as css")
+      .innerJoin(
+        "collector_settings as cs",
+        "css.collector_setting_id",
+        "cs.id",
+      )
+      .innerJoin("sources as s", "cs.source_id", "s.id")
+      .select([
+        "css.collector_setting_id",
+        "css.config",
+        "css.enabled",
+        "css.id as collector_setting_snapshot_id",
+        "css.periodical",
+        "css.periodical_interval_minutes",
+        "cs.id as collector_setting_id",
+        "cs.plugin_slug",
+        "s.id as source_id",
+        "s.kind",
+        "s.slug",
+        "s.url",
+      ])
+      .orderBy("css.collector_setting_id", "asc")
+      .orderBy("css.version", "desc")
+      .execute();
+    const targets: PeriodicCrawlSourceTarget[] = [];
+    const seenCollectorSettingIds = new Set<string>();
+
+    for (const row of rows) {
+      if (seenCollectorSettingIds.has(row.collector_setting_id)) {
+        continue;
+      }
+
+      seenCollectorSettingIds.add(row.collector_setting_id);
+
+      if (!row.enabled || !row.periodical) {
+        continue;
+      }
+
+      targets.push({
+        collectorSettingId: row.collector_setting_id,
+        collectorSettingSnapshotId: row.collector_setting_snapshot_id,
+        config: row.config,
+        crawlEnabled: row.periodical,
+        crawlIntervalMinutes: row.periodical_interval_minutes,
+        pluginSlug: row.plugin_slug,
+        slug: row.slug,
+        sourceId: row.source_id,
+        sourceKind: row.kind,
+        url: row.url,
+      });
+    }
+
+    return targets;
+  }
+
+  public async updateSourceCollectorSettings(
+    sourceId: string,
+    settings: SourcePeriodicCrawlSettings,
+    baseVersion: number,
+  ): Promise<SourceListItem | null> {
+    try {
+      return await this.database.transaction().execute(async (transaction) => {
+        const currentSetting = await transaction
+          .selectFrom("collector_setting_snapshots as css")
+          .innerJoin(
+            "collector_settings as cs",
+            "css.collector_setting_id",
+            "cs.id",
+          )
+          .select([
+            "cs.id as collector_setting_id",
+            "css.config",
+            "css.enabled",
+            "css.periodical",
+            "css.periodical_interval_minutes",
+            "css.version as collector_setting_version",
+          ])
+          .where("cs.source_id", "=", sourceId)
+          .orderBy("css.version", "desc")
+          .limit(1)
+          .executeTakeFirst();
+
+        if (currentSetting === undefined) {
+          return null;
+        }
+
+        if (currentSetting.collector_setting_version !== baseVersion) {
+          throw new CollectorSettingsVersionConflictError();
+        }
+
+        const nextVersion = currentSetting.collector_setting_version + 1;
+        await transaction
+          .insertInto("collector_setting_snapshots")
+          .values({
+            collector_setting_id: currentSetting.collector_setting_id,
+            config: currentSetting.config,
+            enabled: currentSetting.enabled,
+            id: crypto.randomUUID(),
+            periodical: settings.enabled,
+            periodical_interval_minutes: settings.intervalMinutes,
+            recorded_at: new Date(),
+            version: nextVersion,
+          })
+          .executeTakeFirstOrThrow();
+
+        const source = await transaction
+          .selectFrom("sources")
+          .selectAll()
+          .where("id", "=", sourceId)
+          .executeTakeFirstOrThrow();
+        const sourceSnapshot = await transaction
+          .selectFrom("source_snapshots")
+          .selectAll()
+          .where("source_id", "=", sourceId)
+          .orderBy("version", "desc")
+          .executeTakeFirst();
+
+        return {
+          collectorSettingsVersion: nextVersion,
+          createdAt: source.created_at,
+          description: sourceSnapshot?.description ?? null,
+          id: source.id,
+          kind: source.kind,
+          periodicCrawlEnabled: settings.enabled,
+          periodicCrawlIntervalMinutes: settings.intervalMinutes,
+          recordedAt: sourceSnapshot?.recorded_at ?? null,
+          slug: source.slug,
+          title: sourceSnapshot?.title ?? null,
+          url: source.url,
+          urlHash: source.url_hash,
+          version: sourceSnapshot?.version ?? null,
+        };
+      });
+    } catch (error) {
+      if (isCollectorSettingsVersionConflictError(error)) {
+        throw new CollectorSettingsVersionConflictError();
+      }
+
+      throw error;
+    }
+  }
 }
 
 function isDuplicateSourceUrlHashError(error: unknown): boolean {
@@ -194,6 +406,30 @@ function isDuplicateSourceUrlHashError(error: unknown): boolean {
     errorWithCode.constraint === constraint ||
     error.message.includes(constraint) ||
     errorWithCode.detail?.includes(constraint) === true
+  );
+}
+
+function isCollectorSettingsVersionConflictError(error: unknown): boolean {
+  if (error instanceof CollectorSettingsVersionConflictError) {
+    return true;
+  }
+
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const constraint = "collector_setting_snapshots_setting_id_version_key";
+  const errorWithCode = error as Error & {
+    code?: string;
+    constraint?: string;
+    detail?: string;
+  };
+
+  return (
+    errorWithCode.code === "23505" &&
+    (errorWithCode.constraint === constraint ||
+      error.message.includes(constraint) ||
+      errorWithCode.detail?.includes(constraint) === true)
   );
 }
 
@@ -238,6 +474,9 @@ function toCollectorSettingSnapshotInsert(
     config: {},
     enabled: true,
     id: input.collectorSettingSnapshotId,
+    periodical: defaultSourcePeriodicCrawlSettings().enabled,
+    periodical_interval_minutes:
+      defaultSourcePeriodicCrawlSettings().intervalMinutes,
     recorded_at: new Date(),
     version: 1,
   };
@@ -246,8 +485,14 @@ function toCollectorSettingSnapshotInsert(
 function toSourceListItem(
   source: Selectable<SourceTable>,
   snapshot: Selectable<SourceSnapshotTable> | null,
+  collectorSettingSnapshot: Selectable<CollectorSettingSnapshotTable> | null,
 ): SourceListItem {
   return {
+    collectorSettingsVersion: collectorSettingSnapshot?.version ?? null,
+    periodicCrawlEnabled: collectorSettingSnapshot?.periodical ?? false,
+    periodicCrawlIntervalMinutes:
+      collectorSettingSnapshot?.periodical_interval_minutes ??
+      defaultSourcePeriodicCrawlSettings().intervalMinutes,
     createdAt: source.created_at,
     description: snapshot?.description ?? null,
     id: source.id,
@@ -270,6 +515,8 @@ function toObserveSourceTarget(
     collectorSettingId: collectorSetting.id,
     collectorSettingSnapshotId: collectorSettingSnapshot.id,
     config: collectorSettingSnapshot.config,
+    crawlEnabled: collectorSettingSnapshot.periodical,
+    crawlIntervalMinutes: collectorSettingSnapshot.periodical_interval_minutes,
     pluginSlug: collectorSetting.plugin_slug,
     slug: source.slug,
     sourceId: source.id,

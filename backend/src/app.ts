@@ -2,8 +2,10 @@ import { Hono } from "hono";
 
 import { registerContentRoutes } from "./routes/api/v1/contents.js";
 import { registerJobRoutes } from "./routes/api/v1/jobs.js";
+import { registerSettingRoutes } from "./routes/api/v1/settings.js";
 import { registerSourceRoutes } from "./routes/api/v1/sources.js";
 import { registerMediaAssetRoutes } from "./routes/media/assets.js";
+import type { AppSettingService } from "./service/app-setting-service.js";
 import type { AssetService } from "./service/asset-service.js";
 import type { ContentService } from "./service/content-service.js";
 import type { JobService } from "./service/job-service.js";
@@ -17,11 +19,13 @@ export function createApp(
   assetService: AssetService,
   contentService: ContentService,
   jobService: JobService,
+  appSettingService: AppSettingService,
   storage: Storage,
 ): Hono {
   const app = new Hono();
 
   registerSourceRoutes(app, sourceService, sourceInspectService, jobService);
+  registerSettingRoutes(app, appSettingService);
   registerContentRoutes(app, contentService, assetService);
   registerJobRoutes(app, jobService);
   registerMediaAssetRoutes(app, assetService, storage);
