@@ -1,42 +1,37 @@
-import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createGetContentDetailHandler,
-  createListContentsHandler,
-} from "../../src/handlers/api/v1/contents.js";
+  createGetContentDetailEndpoint,
+  createListContentsEndpoint,
+} from "../../src/endpoints/api/v1/contents.js";
 import { err, ok } from "../../src/lib/result.js";
 import type { AssetService } from "../../src/service/asset-service.js";
 import type { ContentService } from "../../src/service/content-service.js";
 import { createTestAppDependencies } from "../support/app-dependencies.js";
 
-describe("content handlers", () => {
+describe("content endpoints", () => {
   it("returns current content list shape", async () => {
-    const app = new Hono();
-    app.get(
-      "/",
-      createListContentsHandler(
-        createTestAppDependencies({
-          assetService: {} as unknown as AssetService,
-          contentService: {
-            listContents: vi.fn(() =>
-              Promise.resolve([{ id: "content-1", title: "Episode 1" }]),
-            ),
-          } as unknown as ContentService,
-        }),
-      ),
+    const endpoint = createListContentsEndpoint(
+      createTestAppDependencies({
+        assetService: {} as unknown as AssetService,
+        contentService: {
+          listContents: vi.fn(() =>
+            Promise.resolve([{ id: "content-1", title: "Episode 1" }]),
+          ),
+        } as unknown as ContentService,
+      }),
     );
 
-    const response = await app.request("/");
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      data: [{ id: "content-1", title: "Episode 1" }],
+    await expect(endpoint()).resolves.toEqual({
+      body: {
+        data: [{ id: "content-1", title: "Episode 1" }],
+      },
+      status: 200,
     });
   });
 
   it("returns content detail with media asset urls", async () => {
-    const handler = createGetContentDetailHandler(
+    const endpoint = createGetContentDetailEndpoint(
       createTestAppDependencies({
         assetService: {
           listAssetsByContentId: vi.fn(() =>
@@ -74,28 +69,26 @@ describe("content handlers", () => {
         } as unknown as ContentService,
       }),
     );
-    const app = new Hono();
-    app.get("/:contentId", handler);
 
-    const response = await app.request("/content-1");
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        assets: [
-          {
-            id: "asset-1",
-            url: "/media/assets/asset-1.mp3",
-          },
-        ],
-        id: "content-1",
-        title: "Episode 1",
+    await expect(endpoint("content-1")).resolves.toMatchObject({
+      body: {
+        data: {
+          assets: [
+            {
+              id: "asset-1",
+              url: "/media/assets/asset-1.mp3",
+            },
+          ],
+          id: "content-1",
+          title: "Episode 1",
+        },
       },
+      status: 200,
     });
   });
 
   it("preserves not-found responses", async () => {
-    const handler = createGetContentDetailHandler(
+    const endpoint = createGetContentDetailEndpoint(
       createTestAppDependencies({
         assetService: {
           listAssetsByContentId: vi.fn(),
@@ -111,17 +104,15 @@ describe("content handlers", () => {
         } as unknown as ContentService,
       }),
     );
-    const app = new Hono();
-    app.get("/:contentId", handler);
 
-    const response = await app.request("/missing");
-
-    expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({
-      error: {
-        code: "content_not_found",
-        message: "Content was not found.",
+    await expect(endpoint("missing")).resolves.toEqual({
+      body: {
+        error: {
+          code: "content_not_found",
+          message: "Content was not found.",
+        },
       },
+      status: 404,
     });
   });
 });

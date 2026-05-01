@@ -1,16 +1,15 @@
-import type { Context } from "hono";
-
 import type { AppDependencies } from "../../deps.js";
 import { contentTypeToExtension } from "../../lib/content-type-extension.js";
+import type { BinaryEndpointResult } from "../types.js";
 
-export function createGetMediaAssetHandler(dependencies: AppDependencies) {
-  return async (context: Context) => {
-    const parsed = parseAssetPath(
-      requireRouteParam(context, "assetIdWithExtension"),
-    );
+export function createGetMediaAssetEndpoint(dependencies: AppDependencies) {
+  return async (
+    assetIdWithExtension: string,
+  ): Promise<BinaryEndpointResult> => {
+    const parsed = parseAssetPath(assetIdWithExtension);
 
     if (parsed === null) {
-      return context.notFound();
+      return { body: null, status: 404 };
     }
 
     const result = await dependencies.assetService.findStoredMediaById(
@@ -18,21 +17,22 @@ export function createGetMediaAssetHandler(dependencies: AppDependencies) {
     );
 
     if (!result.ok) {
-      return context.notFound();
+      return { body: null, status: 404 };
     }
 
     const asset = result.value;
     const expectedExtension = contentTypeToExtension(asset.mimeType);
 
     if (expectedExtension === null || parsed.extension !== expectedExtension) {
-      return context.notFound();
+      return { body: null, status: 404 };
     }
 
     const body = await dependencies.storage.get(asset.storageKey);
 
     if (!body.ok) {
-      return context.notFound();
+      return { body: null, status: 404 };
     }
+
     const headers = new Headers({
       "Content-Type": asset.mimeType,
     });
@@ -45,9 +45,11 @@ export function createGetMediaAssetHandler(dependencies: AppDependencies) {
 
     responseBytes.set(body.value);
 
-    return new Response(responseBytes.buffer, {
+    return {
+      body: responseBytes,
       headers,
-    });
+      status: 200,
+    };
   };
 }
 
@@ -64,14 +66,4 @@ function parseAssetPath(
     assetId: assetIdWithExtension.slice(0, dotIndex),
     extension: assetIdWithExtension.slice(dotIndex + 1),
   };
-}
-
-function requireRouteParam(context: Context, name: string): string {
-  const value = context.req.param(name);
-
-  if (value === undefined) {
-    throw new Error(`Missing route param: ${name}`);
-  }
-
-  return value;
 }

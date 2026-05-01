@@ -1,14 +1,13 @@
-import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createGetJobHandler } from "../../src/handlers/api/v1/jobs.js";
+import { createGetJobEndpoint } from "../../src/endpoints/api/v1/jobs.js";
 import { ok } from "../../src/lib/result.js";
 import type { JobService } from "../../src/service/job-service.js";
 import { createTestAppDependencies } from "../support/app-dependencies.js";
 
-describe("job handlers", () => {
+describe("job endpoints", () => {
   it("returns the current job detail response", async () => {
-    const handler = createGetJobHandler(
+    const endpoint = createGetJobEndpoint(
       createTestAppDependencies({
         jobService: {
           findJobById: vi.fn(() =>
@@ -29,18 +28,16 @@ describe("job handlers", () => {
         } as unknown as JobService,
       }),
     );
-    const app = new Hono();
-    app.get("/:jobId", handler);
 
-    const response = await app.request("/job-1");
-
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject({
-      data: {
-        id: "job-1",
-        kind: "observe-source",
-        status: "queued",
+    await expect(endpoint("job-1")).resolves.toMatchObject({
+      body: {
+        data: {
+          id: "job-1",
+          kind: "observe-source",
+          status: "queued",
+        },
       },
+      status: 200,
     });
   });
 });

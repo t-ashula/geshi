@@ -1,15 +1,14 @@
-import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
-import { createGetMediaAssetHandler } from "../../src/handlers/media/assets.js";
+import { createGetMediaAssetEndpoint } from "../../src/endpoints/media/assets.js";
 import { ok } from "../../src/lib/result.js";
 import type { AssetService } from "../../src/service/asset-service.js";
 import type { Storage } from "../../src/storage/types.js";
 import { createTestAppDependencies } from "../support/app-dependencies.js";
 
-describe("media asset handlers", () => {
+describe("media asset endpoints", () => {
   it("returns stored media with content headers", async () => {
-    const handler = createGetMediaAssetHandler(
+    const endpoint = createGetMediaAssetEndpoint(
       createTestAppDependencies({
         assetService: {
           findStoredMediaById: vi.fn(() =>
@@ -28,16 +27,15 @@ describe("media asset handlers", () => {
         } as unknown as Storage,
       }),
     );
-    const app = new Hono();
-    app.get("/:assetIdWithExtension", handler);
 
-    const response = await app.request("/asset-1.mp3");
+    const result = await endpoint("asset-1.mp3");
 
-    expect(response.status).toBe(200);
-    expect(response.headers.get("content-type")).toBe("audio/mpeg");
-    expect(response.headers.get("content-length")).toBe("3");
-    await expect(response.arrayBuffer()).resolves.toEqual(
-      new Uint8Array([1, 2, 3]).buffer,
-    );
+    expect(result.status).toBe(200);
+    if (result.body === null) {
+      throw new Error("expected body");
+    }
+    expect(new Headers(result.headers).get("content-type")).toBe("audio/mpeg");
+    expect(new Headers(result.headers).get("content-length")).toBe("3");
+    expect(result.body).toEqual(new Uint8Array([1, 2, 3]));
   });
 });
