@@ -1,4 +1,4 @@
-# ADR-0034: 非 RSS HTML page を source 化する sample 外部 plugin を追加する
+# ADR-0034: 非 RSS HTML page を source 化する sample 外部 package plugin を追加する
 
 ## ステータス
 
@@ -10,17 +10,17 @@
 
 ## コンテキスト
 
-- [ADR-0033] により，source collector plugin 契約を `backend` から分離した package 境界として扱う方針を取る
-- ただし，外部 package 化の設計が妥当かどうかは，`podcast-rss` の横展開先を 1 つ定めないと判断しづらい
+- [ADR-0033] により，source collector plugin 契約を外部 package から参照できる公開境界として扱う方針を取る
+- ただし，公開拡張点の設計が妥当かどうかは，既存内蔵 plugin とは別に外部 package plugin の実例を 1 つ定めないと判断しづらい
 - `geshi` は RSS 以外の source も扱う前提であり，HTML page を直接読んで更新単位を抽出する plugin は代表的な検証対象である
 - sample として `go-jp-rss` 相当の package を用意すると，RSS feed が提供されていない page を source として扱う最小経路を確認できる
 - 一方で，HTML page 由来の source は RSS と違って item list や asset URL の構造が標準化されていないため，content identity と source metadata の決め方を先に定義しておく必要がある
 
 ## 決定
 
-- 外部 plugin 化の sample として，非 RSS HTML page を source 化する source collector plugin package を追加する方針にする
+- 外部 package から追加する sample plugin として，非 RSS HTML page を source 化する source collector plugin package を追加する方針にする
 - この sample plugin は，`go-jp-rss` 相当の用途を持つものとして，HTML page を取得し，そこから source metadata と content 候補を解釈する
-- sample plugin の役割は，一般 HTML 取得基盤を作ることではなく，「外部 package としての source collector plugin 境界が成立すること」を示すことに置く
+- sample plugin の役割は，一般 HTML 取得基盤を作ることではなく，「内蔵 plugin と共存する外部 package plugin 境界が成立すること」を示すことに置く
 
 ### sample plugin の責務
 
@@ -54,15 +54,15 @@
 
 ## 影響
 
-- RSS 以外の source を対象に，外部 plugin API の妥当性を早い段階で検証できる
+- RSS 以外の source を対象に，外部 package plugin API の妥当性を早い段階で検証できる
 - source metadata 解釈，content identity，asset 取得という plugin 責務を，HTML page でも同じ境界で扱えるかを確認できる
 - `podcast-rss` だけでは見えにくい plugin API の不足を洗い出しやすくなる
 - 一方で，sample plugin は対象 HTML 構造への依存が強く，汎用 collector と誤解されないよう文書化が必要になる
 
 ## 代替案
 
-- sample plugin を作らず，`podcast-rss` の外部 package 化だけで設計を確定する
-  - RSS に最適化された契約のままになるおそれがあり，非 RSS source への適用性を確認しづらいため採らない
+- sample plugin を作らず，内蔵 plugin だけで設計を確定する
+  - 公開拡張点として本当に足りるかを検証しづらいため採らない
 - sample として別の RSS 系 plugin を追加する
   - feed 由来の構造差分しか検証できず，HTML page 直読みによる設計圧を得にくいため採らない
 - HTML source は plugin ではなく backend 側の専用実装として扱う
@@ -73,7 +73,7 @@
 - [ADR-0011] ADR-0011: source クロールを plugin 境界で拡張可能にする
 - [ADR-0016] ADR-0016: source collector plugin は content と asset の fingerprint を返す
 - [ADR-0023] ADR-0023: source collector plugin に source 登録前 inspect API を追加する
-- [ADR-0033] ADR-0033: source collector plugin 契約を backend から分離した package 境界として定義する
+- [ADR-0033] ADR-0033: source collector plugin 契約を外部 package から参照できる公開境界として定義する
 - [plugin-doc] Plugin
 
 [ADR-0011]: ./0011-source-crawl-plugin-responsibilities.md
