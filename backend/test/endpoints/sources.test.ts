@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { SourceListItem } from "../../src/db/source-repository.js";
 import {
   CollectorSettingsVersionConflictError,
   DuplicateSourceUrlHashError,
@@ -90,22 +91,26 @@ describe("source endpoints", () => {
         },
         sourceService: {
           createSource: vi.fn(() =>
-            ok({
-              collectorSettingsVersion: 1,
-              createdAt: new Date("2026-05-01T00:00:00.000Z"),
-              description: "Weekly notes",
-              id: "source-1",
-              kind: "podcast",
-              periodicCrawlEnabled: true,
-              periodicCrawlIntervalMinutes: 60,
-              recordedAt: null,
-              slug: "example-feed",
-              title: "Example Feed",
-              url: "https://example.com/feed.xml",
-              urlHash: "hash-1",
-              version: 1,
-            }),
+            Promise.resolve(
+              ok({
+                collectorSettingsVersion: 1,
+                createdAt: new Date("2026-05-01T00:00:00.000Z"),
+                description: "Weekly notes",
+                id: "source-1",
+                kind: "podcast",
+                periodicCrawlEnabled: true,
+                periodicCrawlIntervalMinutes: 60,
+                recordedAt: null,
+                slug: "example-feed",
+                title: "Example Feed",
+                url: "https://example.com/feed.xml",
+                urlHash: "hash-1",
+                version: 1,
+              } satisfies SourceListItem),
+            ),
           ),
+          findObserveSourceTarget: vi.fn(),
+          listPeriodicCrawlTargets: vi.fn(),
           listSources: vi.fn(),
           updateSourceCollectorSettings: vi.fn(),
         } satisfies SourceService,
