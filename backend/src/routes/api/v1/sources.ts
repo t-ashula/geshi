@@ -69,7 +69,11 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
         { error: result.error },
         {
           status:
-            result.error.code === "source_inspect_fetch_failed" ? 502 : 422,
+            result.error.code === "source_inspect_fetch_failed"
+              ? 502
+              : result.error.code === "source_inspect_failed"
+                ? 500
+                : 422,
         },
       );
     }

@@ -14,7 +14,15 @@ export type InspectSourceRequest = {
   url: string;
 };
 
-export type InspectSourceError = SourceCollectorInspectError | SourceUrlError;
+export type InspectSourceUnknownError = {
+  code: "source_inspect_failed";
+  message: string;
+};
+
+export type InspectSourceError =
+  | InspectSourceUnknownError
+  | SourceCollectorInspectError
+  | SourceUrlError;
 
 export type InspectSourceResult = SourceMetadata & {
   sourceSlug: string;
@@ -60,7 +68,11 @@ export function createSourceInspectService(): SourceInspectService {
           return err(error);
         }
 
-        throw error;
+        return err({
+          code: "source_inspect_failed",
+          message:
+            error instanceof Error ? error.message : "Source inspect failed.",
+        });
       }
     },
   };

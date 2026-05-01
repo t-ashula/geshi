@@ -9,22 +9,20 @@ vi.mock("../../src/plugins/index.js", () => ({
 }));
 
 import { createSourceInspectService } from "../../src/service/source-inspect-service.js";
-import { assertOk } from "../support/result.js";
+import { assertErr, assertOk } from "../support/result.js";
 
 describe("source inspect service", () => {
   it("rejects invalid source urls before hitting the plugin", async () => {
     const service = createSourceInspectService();
 
-    await expect(
-      service.inspectSource({
-        url: "not-a-url",
-      }),
-    ).resolves.toEqual({
-      error: {
-        code: "source_url_invalid",
-        message: "RSS URL must be an absolute http or https URL.",
-      },
-      ok: false,
+    const result = await service.inspectSource({
+      url: "not-a-url",
+    });
+    expect(result.ok).toBe(false);
+    assertErr(result);
+    expect(result.error).toEqual({
+      code: "source_url_invalid",
+      message: "RSS URL must be an absolute http or https URL.",
     });
     expect(inspectMock).not.toHaveBeenCalled();
   });
@@ -63,27 +61,29 @@ describe("source inspect service", () => {
     });
     const service = createSourceInspectService();
 
-    await expect(
-      service.inspectSource({
-        url: "https://example.com/feed.xml",
-      }),
-    ).resolves.toEqual({
-      error: {
-        code: "source_inspect_fetch_failed",
-        message: "upstream failed",
-      },
-      ok: false,
+    const result = await service.inspectSource({
+      url: "https://example.com/feed.xml",
+    });
+    expect(result.ok).toBe(false);
+    assertErr(result);
+    expect(result.error).toEqual({
+      code: "source_inspect_fetch_failed",
+      message: "upstream failed",
     });
   });
 
-  it("rethrows unknown plugin failures", async () => {
+  it("returns unknown plugin failures as results", async () => {
     inspectMock.mockRejectedValueOnce(new Error("boom"));
     const service = createSourceInspectService();
 
-    await expect(
-      service.inspectSource({
-        url: "https://example.com/feed.xml",
-      }),
-    ).rejects.toThrow("boom");
+    const result = await service.inspectSource({
+      url: "https://example.com/feed.xml",
+    });
+
+    assertErr(result);
+    expect(result.error).toEqual({
+      code: "source_inspect_failed",
+      message: "boom",
+    });
   });
 });
