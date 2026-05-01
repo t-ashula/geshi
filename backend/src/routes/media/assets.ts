@@ -15,13 +15,21 @@ export function createMediaAssetRoutes(dependencies: AppDependencies): Hono {
       ),
     );
 
-    if (result.body === null) {
+    if (!result.ok) {
       return context.notFound();
     }
 
-    return new Response(Uint8Array.from(result.body).buffer, {
-      headers: result.headers,
-      status: result.status,
+    const headers = new Headers({
+      "Content-Type": result.value.mimeType,
+    });
+
+    if (result.value.byteSize !== null) {
+      headers.set("Content-Length", String(result.value.byteSize));
+    }
+
+    return new Response(Uint8Array.from(result.value.bytes).buffer, {
+      headers,
+      status: 200,
     });
   });
 

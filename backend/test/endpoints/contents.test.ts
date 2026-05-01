@@ -22,12 +22,9 @@ describe("content endpoints", () => {
       }),
     );
 
-    await expect(endpoint()).resolves.toEqual({
-      body: {
-        data: [{ id: "content-1", title: "Episode 1" }],
-      },
-      status: 200,
-    });
+    await expect(endpoint()).resolves.toEqual([
+      { id: "content-1", title: "Episode 1" },
+    ]);
   });
 
   it("returns content detail with media asset urls", async () => {
@@ -70,21 +67,18 @@ describe("content endpoints", () => {
       }),
     );
 
-    await expect(endpoint("content-1")).resolves.toMatchObject({
-      body: {
-        data: {
-          assets: [
-            {
-              id: "asset-1",
-              url: "/media/assets/asset-1.mp3",
-            },
-          ],
-          id: "content-1",
-          title: "Episode 1",
-        },
-      },
-      status: 200,
-    });
+    await expect(endpoint("content-1")).resolves.toMatchObject(
+      ok({
+        assets: [
+          {
+            id: "asset-1",
+            url: "/media/assets/asset-1.mp3",
+          },
+        ],
+        id: "content-1",
+        title: "Episode 1",
+      }),
+    );
   });
 
   it("preserves not-found responses", async () => {
@@ -105,14 +99,11 @@ describe("content endpoints", () => {
       }),
     );
 
-    await expect(endpoint("missing")).resolves.toEqual({
-      body: {
-        error: {
-          code: "content_not_found",
-          message: "Content was not found.",
-        },
-      },
-      status: 404,
-    });
+    await expect(endpoint("missing")).resolves.toEqual(
+      err({
+        code: "content_not_found",
+        message: "Content was not found.",
+      }),
+    );
   });
 });

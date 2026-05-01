@@ -29,15 +29,12 @@ describe("job endpoints", () => {
       }),
     );
 
-    await expect(endpoint("job-1")).resolves.toMatchObject({
-      body: {
-        data: {
-          id: "job-1",
-          kind: "observe-source",
-          status: "queued",
-        },
-      },
-      status: 200,
-    });
+    await expect(endpoint("job-1")).resolves.toMatchObject(
+      ok({
+        id: "job-1",
+        kind: "observe-source",
+        status: "queued",
+      }),
+    );
   });
 });

@@ -30,12 +30,12 @@ describe("media asset endpoints", () => {
 
     const result = await endpoint("asset-1.mp3");
 
-    expect(result.status).toBe(200);
-    if (result.body === null) {
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
       throw new Error("expected body");
     }
-    expect(new Headers(result.headers).get("content-type")).toBe("audio/mpeg");
-    expect(new Headers(result.headers).get("content-length")).toBe("3");
-    expect(result.body).toEqual(new Uint8Array([1, 2, 3]));
+    expect(result.value.mimeType).toBe("audio/mpeg");
+    expect(result.value.byteSize).toBe(3);
+    expect(result.value.bytes).toEqual(new Uint8Array([1, 2, 3]));
   });
 });

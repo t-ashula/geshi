@@ -1,162 +1,155 @@
+import type { JobListItem } from "../../../db/job-repository.js";
+import type { SourceListItem } from "../../../db/source-repository.js";
 import {
   CollectorSettingsVersionConflictError,
   DuplicateSourceUrlHashError,
 } from "../../../db/source-repository.js";
 import type { AppDependencies } from "../../../deps.js";
+import type { Result } from "../../../lib/result.js";
+import { err, ok } from "../../../lib/result.js";
 import type { InspectSourceError } from "../../../service/source-inspect-service.js";
-import type { JsonEndpointResult } from "../../types.js";
+import type { InspectSourceResult } from "../../../service/source-inspect-service.js";
+
+export type ListSourcesEndpointError = {
+  code: "source_list_failed";
+  message: string;
+};
+
+export type CreateSourceEndpointError =
+  | {
+      code: "duplicate_source";
+      message: string;
+    }
+  | {
+      code: "source_create_failed";
+      message: string;
+    }
+  | {
+      code: "source_url_required" | "source_url_invalid";
+      message: string;
+    };
+
+export type EnqueueObserveSourceEndpointError =
+  | {
+      code: "observe_enqueue_failed";
+      message: string;
+    }
+  | {
+      code: "source_not_found";
+      message: string;
+    };
+
+export type PatchSourceCollectorSettingsEndpointError =
+  | {
+      code: "collector_settings_conflict";
+      message: string;
+    }
+  | {
+      code: "collector_settings_update_failed";
+      message: string;
+    }
+  | {
+      code: "source_not_found";
+      message: string;
+    };
+
+export type CreateSourceEndpointInput = {
+  description?: string;
+  sourceSlug?: string;
+  title?: string;
+  url?: string;
+};
+
+export type InspectSourceEndpointInput = {
+  url?: string;
+};
+
+export type PatchSourceCollectorSettingsEndpointInput = {
+  baseVersion: number;
+  enabled: boolean;
+  intervalMinutes: number;
+};
 
 export function createListSourcesEndpoint(dependencies: AppDependencies) {
-  return async (): Promise<JsonEndpointResult> => {
+  return async (): Promise<
+    Result<SourceListItem[], ListSourcesEndpointError>
+  > => {
     const sources = await dependencies.sourceService.listSources();
 
     if (!sources.ok) {
-      return {
-        body: {
-          error: {
-            code: "source_list_failed",
-            message: sources.error.message,
-          },
-        },
-        status: 500,
-      };
+      return err({
+        code: "source_list_failed",
+        message: sources.error.message,
+      });
     }
 
-    return {
-      body: {
-        data: sources.value,
-      },
-      status: 200,
-    };
+    return sources;
   };
 }
 
 export function createCreateSourceEndpoint(dependencies: AppDependencies) {
-  return async (body: unknown): Promise<JsonEndpointResult> => {
-    if (body === null || typeof body !== "object") {
-      return invalidJsonResult();
-    }
-
-    const record = body as Record<string, unknown>;
+  return async (
+    input: CreateSourceEndpointInput,
+  ): Promise<Result<SourceListItem, CreateSourceEndpointError>> => {
     const result = await dependencies.sourceService.createSource({
-      description: toOptionalString(record.description),
-      sourceSlug: toOptionalString(record.sourceSlug),
-      title: toOptionalString(record.title),
-      url: toOptionalString(record.url) ?? "",
+      description: input.description,
+      sourceSlug: input.sourceSlug,
+      title: input.title,
+      url: input.url ?? "",
     });
 
     if (!result.ok) {
       if (result.error instanceof DuplicateSourceUrlHashError) {
-        return {
-          body: {
-            error: {
-              code: "duplicate_source",
-              message: "A source for this RSS URL already exists.",
-            },
-          },
-          status: 409,
-        };
+        return err({
+          code: "duplicate_source",
+          message: "A source for this RSS URL already exists.",
+        });
       }
 
       if (result.error instanceof Error) {
-        return {
-          body: {
-            error: {
-              code: "source_create_failed",
-              message: result.error.message,
-            },
-          },
-          status: 500,
-        };
+        return err({
+          code: "source_create_failed",
+          message: result.error.message,
+        });
       }
 
-      return {
-        body: {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        status: 422,
-      };
+      return err(result.error);
     }
 
-    return {
-      body: {
-        data: result.value,
-      },
-      status: 201,
-    };
+    return result;
   };
 }
 
 export function createInspectSourceEndpoint(dependencies: AppDependencies) {
-  return async (body: unknown): Promise<JsonEndpointResult> => {
-    if (body === null || typeof body !== "object") {
-      return invalidJsonResult();
-    }
-
-    const record = body as Record<string, unknown>;
-    const result = await dependencies.sourceInspectService.inspectSource({
-      url: toOptionalString(record.url) ?? "",
+  return async (
+    input: InspectSourceEndpointInput,
+  ): Promise<Result<InspectSourceResult, InspectSourceError>> =>
+    dependencies.sourceInspectService.inspectSource({
+      url: input.url ?? "",
     });
-
-    if (!result.ok) {
-      return {
-        body: {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        status: inspectSourceStatus(result.error),
-      };
-    }
-
-    return {
-      body: {
-        data: result.value,
-      },
-      status: 200,
-    };
-  };
 }
 
 export function createEnqueueObserveSourceEndpoint(
   dependencies: AppDependencies,
 ) {
-  return async (sourceId: string): Promise<JsonEndpointResult> => {
+  return async (
+    sourceId: string,
+  ): Promise<Result<JobListItem, EnqueueObserveSourceEndpointError>> => {
     const result =
       await dependencies.jobService.enqueueObserveSourceJob(sourceId);
 
     if (!result.ok) {
       if (result.error instanceof Error) {
-        return {
-          body: {
-            error: {
-              code: "observe_enqueue_failed",
-              message: result.error.message,
-            },
-          },
-          status: 500,
-        };
+        return err({
+          code: "observe_enqueue_failed",
+          message: result.error.message,
+        });
       }
 
-      return {
-        body: {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        status: 404,
-      };
+      return err(result.error);
     }
 
-    return {
-      body: { data: result.value },
-      status: 202,
-    };
+    return result;
   };
 }
 
@@ -165,106 +158,38 @@ export function createPatchSourceCollectorSettingsEndpoint(
 ) {
   return async (
     sourceId: string,
-    body: unknown,
-  ): Promise<JsonEndpointResult> => {
-    if (body === null || typeof body !== "object") {
-      return invalidJsonResult();
-    }
-
-    const record = body as Record<string, unknown>;
-
-    if (
-      typeof record.enabled !== "boolean" ||
-      !isPositiveInteger(record.intervalMinutes) ||
-      !isPositiveInteger(record.baseVersion)
-    ) {
-      return {
-        body: {
-          error: {
-            code: "invalid_collector_settings",
-            message:
-              "Collector settings require boolean enabled and positive intervalMinutes and baseVersion.",
-          },
-        },
-        status: 422,
-      };
-    }
-
+    input: PatchSourceCollectorSettingsEndpointInput,
+  ): Promise<
+    Result<SourceListItem, PatchSourceCollectorSettingsEndpointError>
+  > => {
     const result =
       await dependencies.sourceService.updateSourceCollectorSettings(
         sourceId,
         {
-          enabled: record.enabled,
-          intervalMinutes: record.intervalMinutes,
+          enabled: input.enabled,
+          intervalMinutes: input.intervalMinutes,
         },
-        record.baseVersion,
+        input.baseVersion,
       );
 
     if (!result.ok) {
       if (result.error instanceof CollectorSettingsVersionConflictError) {
-        return {
-          body: {
-            error: {
-              code: "collector_settings_conflict",
-              message: "Collector settings were updated by another request.",
-            },
-          },
-          status: 409,
-        };
+        return err({
+          code: "collector_settings_conflict",
+          message: "Collector settings were updated by another request.",
+        });
       }
 
       if (result.error instanceof Error) {
-        return {
-          body: {
-            error: {
-              code: "collector_settings_update_failed",
-              message: result.error.message,
-            },
-          },
-          status: 500,
-        };
+        return err({
+          code: "collector_settings_update_failed",
+          message: result.error.message,
+        });
       }
 
-      return {
-        body: {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        status: 404,
-      };
+      return err(result.error);
     }
 
-    return {
-      body: {
-        data: result.value,
-      },
-      status: 200,
-    };
+    return ok(result.value);
   };
-}
-
-function inspectSourceStatus(error: InspectSourceError): 422 | 502 {
-  return error.code === "source_inspect_fetch_failed" ? 502 : 422;
-}
-
-function invalidJsonResult(): JsonEndpointResult {
-  return {
-    body: {
-      error: {
-        code: "invalid_json",
-        message: "Request body must be a JSON object.",
-      },
-    },
-    status: 400,
-  };
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0;
-}
-
-function toOptionalString(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
 }

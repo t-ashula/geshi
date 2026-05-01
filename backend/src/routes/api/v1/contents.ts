@@ -12,16 +12,28 @@ export function createContentRoutes(dependencies: AppDependencies): Hono {
   const getContentDetail = createGetContentDetailEndpoint(dependencies);
 
   router.get("/", async (context) => {
-    const result = await listContents();
+    const data = await listContents();
 
-    return context.json(result.body, { status: result.status });
+    return context.json({ data });
   });
   router.get("/:contentId", async (context) => {
     const result = await getContentDetail(
       requireRouteParam(context.req.param("contentId"), "contentId"),
     );
 
-    return context.json(result.body, { status: result.status });
+    if (!result.ok) {
+      return context.json(
+        {
+          error: {
+            code: result.error.code,
+            message: result.error.message,
+          },
+        },
+        { status: 404 },
+      );
+    }
+
+    return context.json({ data: result.value });
   });
 
   return router;

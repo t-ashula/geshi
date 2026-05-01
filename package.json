@@ -13,6 +13,7 @@
     "frontend:dev": "vite --config frontend/vite.config.ts",
     "test:e2e": "sh test/scripts/run-e2e.sh",
     "test:e2e:cases": "playwright test --config test/playwright.config.ts",
+    "test:coverage": "vitest run --coverage",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "lint": "eslint .",

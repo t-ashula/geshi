@@ -8,7 +8,7 @@ import {
   createCreateSourceEndpoint,
   createPatchSourceCollectorSettingsEndpoint,
 } from "../../src/endpoints/api/v1/sources.js";
-import { ok } from "../../src/lib/result.js";
+import { err, ok } from "../../src/lib/result.js";
 import type { JobService } from "../../src/service/job-service.js";
 import type { SourceService } from "../../src/service/source-service.js";
 import { createTestAppDependencies } from "../support/app-dependencies.js";
@@ -53,16 +53,13 @@ describe("source endpoints", () => {
         title: "Example Feed",
         url: "https://example.com/feed.xml",
       }),
-    ).resolves.toMatchObject({
-      body: {
-        data: {
-          id: "source-1",
-          slug: "example-feed",
-          title: "Example Feed",
-        },
-      },
-      status: 201,
-    });
+    ).resolves.toMatchObject(
+      ok({
+        id: "source-1",
+        slug: "example-feed",
+        title: "Example Feed",
+      }),
+    );
   });
 
   it("preserves duplicate-source errors", async () => {
@@ -91,15 +88,12 @@ describe("source endpoints", () => {
       endpoint({
         url: "https://example.com/feed.xml",
       }),
-    ).resolves.toEqual({
-      body: {
-        error: {
-          code: "duplicate_source",
-          message: "A source for this RSS URL already exists.",
-        },
-      },
-      status: 409,
-    });
+    ).resolves.toEqual(
+      err({
+        code: "duplicate_source",
+        message: "A source for this RSS URL already exists.",
+      }),
+    );
   });
 
   it("preserves collector-settings conflict errors", async () => {
@@ -130,14 +124,11 @@ describe("source endpoints", () => {
         enabled: true,
         intervalMinutes: 60,
       }),
-    ).resolves.toEqual({
-      body: {
-        error: {
-          code: "collector_settings_conflict",
-          message: "Collector settings were updated by another request.",
-        },
-      },
-      status: 409,
-    });
+    ).resolves.toEqual(
+      err({
+        code: "collector_settings_conflict",
+        message: "Collector settings were updated by another request.",
+      }),
+    );
   });
 });

@@ -12,7 +12,19 @@ export function createJobRoutes(dependencies: AppDependencies): Hono {
       requireRouteParam(context.req.param("jobId"), "jobId"),
     );
 
-    return context.json(result.body, { status: result.status });
+    if (!result.ok) {
+      return context.json(
+        {
+          error: {
+            code: result.error.code,
+            message: result.error.message,
+          },
+        },
+        { status: 404 },
+      );
+    }
+
+    return context.json({ data: result.value });
   });
 
   return router;

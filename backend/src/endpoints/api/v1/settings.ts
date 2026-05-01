@@ -1,99 +1,61 @@
 import type { AppDependencies } from "../../../deps.js";
-import type { JsonEndpointResult } from "../../types.js";
+import type { Result } from "../../../lib/result.js";
+import { err } from "../../../lib/result.js";
+import type { PeriodicCrawlAppSettings } from "../../../service/periodic-crawl-settings.js";
+
+export type PeriodicCrawlSettingsEndpointError = {
+  code:
+    | "periodic_crawl_settings_load_failed"
+    | "periodic_crawl_settings_update_failed";
+  message: string;
+};
+
+export type PatchPeriodicCrawlSettingsInput = {
+  enabled: boolean;
+  intervalMinutes: number;
+};
 
 export function createGetPeriodicCrawlSettingsEndpoint(
   dependencies: AppDependencies,
 ) {
-  return async (): Promise<JsonEndpointResult> => {
+  return async (): Promise<
+    Result<PeriodicCrawlAppSettings, PeriodicCrawlSettingsEndpointError>
+  > => {
     const settings =
       await dependencies.appSettingService.getPeriodicCrawlSettings();
 
     if (!settings.ok) {
-      return {
-        body: {
-          error: {
-            code: "periodic_crawl_settings_load_failed",
-            message: settings.error.message,
-          },
-        },
-        status: 500,
-      };
+      return err({
+        code: "periodic_crawl_settings_load_failed",
+        message: settings.error.message,
+      });
     }
 
-    return {
-      body: {
-        data: settings.value,
-      },
-      status: 200,
-    };
+    return settings;
   };
 }
 
 export function createPatchPeriodicCrawlSettingsEndpoint(
   dependencies: AppDependencies,
 ) {
-  return async (body: unknown): Promise<JsonEndpointResult> => {
-    if (body === null || typeof body !== "object") {
-      return invalidJsonResult();
-    }
-
-    const record = body as Record<string, unknown>;
-
-    if (
-      typeof record.enabled !== "boolean" ||
-      !isPositiveInteger(record.intervalMinutes)
-    ) {
-      return {
-        body: {
-          error: {
-            code: "invalid_settings",
-            message:
-              "Periodic crawl settings require boolean enabled and positive intervalMinutes.",
-          },
-        },
-        status: 422,
-      };
-    }
-
+  return async (
+    input: PatchPeriodicCrawlSettingsInput,
+  ): Promise<
+    Result<PeriodicCrawlAppSettings, PeriodicCrawlSettingsEndpointError>
+  > => {
     const settings =
       await dependencies.appSettingService.updatePeriodicCrawlSettings({
-        enabled: record.enabled,
-        intervalMinutes: record.intervalMinutes,
+        enabled: input.enabled,
+        intervalMinutes: input.intervalMinutes,
       });
 
     if (!settings.ok) {
-      return {
-        body: {
-          error: {
-            code: "periodic_crawl_settings_update_failed",
-            message: settings.error.message,
-          },
-        },
-        status: 500,
-      };
+      return err({
+        code: "periodic_crawl_settings_update_failed",
+        message: settings.error.message,
+      });
     }
 
-    return {
-      body: {
-        data: settings.value,
-      },
-      status: 200,
-    };
+    return settings;
   };
-}
-
-export function invalidJsonResult(): JsonEndpointResult {
-  return {
-    body: {
-      error: {
-        code: "invalid_json",
-        message: "Request body must be a JSON object.",
-      },
-    },
-    status: 400,
-  };
-}
-
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }

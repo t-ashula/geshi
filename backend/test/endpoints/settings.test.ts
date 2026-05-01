@@ -26,23 +26,27 @@ describe("settings endpoints", () => {
       }),
     );
 
-    await expect(endpoint()).resolves.toEqual({
-      body: {
-        data: {
-          enabled: true,
-          intervalMinutes: 30,
-        },
-      },
-      status: 200,
-    });
+    await expect(endpoint()).resolves.toEqual(
+      ok({
+        enabled: true,
+        intervalMinutes: 30,
+      }),
+    );
   });
 
-  it("preserves invalid-settings errors", async () => {
+  it("returns updated settings", async () => {
     const endpoint = createPatchPeriodicCrawlSettingsEndpoint(
       createTestAppDependencies({
         appSettingService: {
           getPeriodicCrawlSettings: vi.fn(),
-          updatePeriodicCrawlSettings: vi.fn(),
+          updatePeriodicCrawlSettings: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                enabled: true,
+                intervalMinutes: 15,
+              }),
+            ),
+          ),
         } as unknown as AppSettingService,
       }),
     );
@@ -50,17 +54,13 @@ describe("settings endpoints", () => {
     await expect(
       endpoint({
         enabled: true,
-        intervalMinutes: 0,
+        intervalMinutes: 15,
       }),
-    ).resolves.toEqual({
-      body: {
-        error: {
-          code: "invalid_settings",
-          message:
-            "Periodic crawl settings require boolean enabled and positive intervalMinutes.",
-        },
-      },
-      status: 422,
-    });
+    ).resolves.toEqual(
+      ok({
+        enabled: true,
+        intervalMinutes: 15,
+      }),
+    );
   });
 });
