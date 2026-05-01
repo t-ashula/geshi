@@ -33,3 +33,5 @@
 - [ADR-0030: geshi 全体にかかる設定は source ごとの設定から分けて管理する](./0030-configuration-management.md)
 - [ADR-0031: route handler のテスト容易性を interface 境界と Hono 依存の隔離で高める](./0031-route-handler-testability-through-interface-boundaries.md)
 - [ADR-0032: source collector plugin 解決を registry interface 境界へ寄せる](./0032-source-collector-plugin-registry-boundary.md)
+- [ADR-0033: source collector plugin 契約を backend から分離した外部 package として定義する](./0033-source-collector-plugin-api-package-boundary.md)
+- [ADR-0034: 非 RSS HTML page を source 化する sample 外部 plugin を追加する](./0034-html-source-collector-sample-plugin.md)
