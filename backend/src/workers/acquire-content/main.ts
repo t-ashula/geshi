@@ -8,6 +8,7 @@ import { createPgBoss, ensureQueue } from "../../job-queue/pg-boss.js";
 import type { AcquireContentJobPayload } from "../../job-queue/types.js";
 import { ACQUIRE_CONTENT_JOB_NAME } from "../../job-queue/types.js";
 import { createLogger } from "../../logger/index.js";
+import { defaultSourceCollectorRegistry } from "../../plugins/index.js";
 import { getRuntimeConfig } from "../../runtime-config.js";
 import { createAssetService } from "../../service/asset-service.js";
 import { createContentService } from "../../service/content-service.js";
@@ -54,6 +55,7 @@ await boss.work<AcquireContentJobPayload>(
       contentService,
       jobRepository,
       logger,
+      sourceCollectorRegistry: defaultSourceCollectorRegistry,
       storage,
     });
 

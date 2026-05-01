@@ -1,19 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
-const inspectMock = vi.fn();
-
-vi.mock("../../src/plugins/index.js", () => ({
-  getSourceCollectorPlugin: vi.fn(() => ({
-    inspect: inspectMock,
-  })),
-}));
-
 import { createSourceInspectService } from "../../src/service/source-inspect-service.js";
 import { assertErr, assertOk } from "../support/result.js";
 
+const inspectMock = vi.fn();
+
 describe("source inspect service", () => {
   it("rejects invalid source urls before hitting the plugin", async () => {
-    const service = createSourceInspectService();
+    const service = createSourceInspectService({
+      sourceCollectorRegistry: {
+        get: vi.fn(() => ({
+          acquire: vi.fn(),
+          inspect: inspectMock,
+          observe: vi.fn(),
+        })),
+      },
+    });
 
     const result = await service.inspectSource({
       url: "not-a-url",
@@ -33,7 +35,15 @@ describe("source inspect service", () => {
       title: "Example Feed",
       url: "https://example.com/shows/example-feed",
     });
-    const service = createSourceInspectService();
+    const service = createSourceInspectService({
+      sourceCollectorRegistry: {
+        get: vi.fn(() => ({
+          acquire: vi.fn(),
+          inspect: inspectMock,
+          observe: vi.fn(),
+        })),
+      },
+    });
 
     const result = await service.inspectSource({
       url: " https://example.com/feed.xml ",
@@ -59,7 +69,15 @@ describe("source inspect service", () => {
       code: "source_inspect_fetch_failed",
       message: "upstream failed",
     });
-    const service = createSourceInspectService();
+    const service = createSourceInspectService({
+      sourceCollectorRegistry: {
+        get: vi.fn(() => ({
+          acquire: vi.fn(),
+          inspect: inspectMock,
+          observe: vi.fn(),
+        })),
+      },
+    });
 
     const result = await service.inspectSource({
       url: "https://example.com/feed.xml",
@@ -74,7 +92,15 @@ describe("source inspect service", () => {
 
   it("returns unknown plugin failures as results", async () => {
     inspectMock.mockRejectedValueOnce(new Error("boom"));
-    const service = createSourceInspectService();
+    const service = createSourceInspectService({
+      sourceCollectorRegistry: {
+        get: vi.fn(() => ({
+          acquire: vi.fn(),
+          inspect: inspectMock,
+          observe: vi.fn(),
+        })),
+      },
+    });
 
     const result = await service.inspectSource({
       url: "https://example.com/feed.xml",

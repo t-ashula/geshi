@@ -2,7 +2,8 @@ import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
 import { createSourceSlug } from "../lib/source-slug.js";
 import { createNoopLogger } from "../logger/index.js";
-import { getSourceCollectorPlugin } from "../plugins/index.js";
+import type { SourceCollectorRegistry } from "../plugins/index.js";
+import { defaultSourceCollectorRegistry } from "../plugins/index.js";
 import type {
   SourceCollectorInspectError,
   SourceMetadata,
@@ -34,7 +35,16 @@ export interface SourceInspectService {
   ): Promise<Result<InspectSourceResult, InspectSourceError>>;
 }
 
-export function createSourceInspectService(): SourceInspectService {
+export type CreateSourceInspectServiceDependencies = {
+  sourceCollectorRegistry?: SourceCollectorRegistry;
+};
+
+export function createSourceInspectService(
+  dependencies: CreateSourceInspectServiceDependencies = {},
+): SourceInspectService {
+  const sourceCollectorRegistry =
+    dependencies.sourceCollectorRegistry ?? defaultSourceCollectorRegistry;
+
   return {
     async inspectSource(
       request: InspectSourceRequest,
@@ -46,10 +56,9 @@ export function createSourceInspectService(): SourceInspectService {
       }
 
       const normalizedUrl = normalizedUrlResult.value;
+      const plugin = sourceCollectorRegistry.get("podcast-rss");
       try {
-        const sourceMetadata = await getSourceCollectorPlugin(
-          "podcast-rss",
-        ).inspect({
+        const sourceMetadata = await plugin.inspect({
           abortSignal: new AbortController().signal,
           config: {},
           logger: createNoopLogger(),

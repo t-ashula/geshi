@@ -32,3 +32,4 @@
 - [ADR-0029: 定期クロール job は source 設定を走査して observe-source を投入する](./0029-periodic-source-crawl-scheduling.md)
 - [ADR-0030: geshi 全体にかかる設定は source ごとの設定から分けて管理する](./0030-configuration-management.md)
 - [ADR-0031: route handler のテスト容易性を interface 境界と Hono 依存の隔離で高める](./0031-route-handler-testability-through-interface-boundaries.md)
+- [ADR-0032: source collector plugin 解決を registry interface 境界へ寄せる](./0032-source-collector-plugin-registry-boundary.md)

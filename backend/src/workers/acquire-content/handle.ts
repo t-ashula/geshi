@@ -6,7 +6,7 @@ import { sha256ChecksumString } from "../../lib/hash.js";
 import type { Result } from "../../lib/result.js";
 import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
-import { getSourceCollectorPlugin } from "../../plugins/index.js";
+import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import type { AcquiredAsset } from "../../plugins/types.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
@@ -17,6 +17,7 @@ type HandleAcquireContentJobDependencies = {
   contentService: ContentService;
   jobRepository: JobRepository;
   logger: Logger;
+  sourceCollectorRegistry: SourceCollectorRegistry;
   storage: Storage;
 };
 
@@ -41,7 +42,9 @@ export async function handleAcquireContentJob(
   }
   logger.info("acquire job started.");
 
-  const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
+  const plugin = dependencies.sourceCollectorRegistry.get(
+    payload.collector.pluginSlug,
+  );
   let acquiredAsset;
 
   try {

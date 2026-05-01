@@ -9,7 +9,7 @@ import { ACQUIRE_CONTENT_JOB_NAME } from "../../job-queue/types.js";
 import type { Result } from "../../lib/result.js";
 import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
-import { getSourceCollectorPlugin } from "../../plugins/index.js";
+import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
 
@@ -19,6 +19,7 @@ type HandleObserveSourceJobDependencies = {
   jobQueue: JobQueue;
   jobRepository: JobRepository;
   logger: Logger;
+  sourceCollectorRegistry: SourceCollectorRegistry;
 };
 
 export async function handleObserveSourceJob(
@@ -40,7 +41,9 @@ export async function handleObserveSourceJob(
   }
   logger.info("observe job started.");
 
-  const plugin = getSourceCollectorPlugin(payload.collector.pluginSlug);
+  const plugin = dependencies.sourceCollectorRegistry.get(
+    payload.collector.pluginSlug,
+  );
   const abortController = new AbortController();
   let observedContents;
 
