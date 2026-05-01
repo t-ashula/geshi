@@ -20,12 +20,12 @@ import {
 } from "./job-queue/types.js";
 import { createLogger } from "./logger/index.js";
 import { getRuntimeConfig } from "./runtime-config.js";
-import { AppSettingService } from "./service/app-setting-service.js";
-import { AssetService } from "./service/asset-service.js";
-import { ContentService } from "./service/content-service.js";
-import { JobService } from "./service/job-service.js";
-import { SourceInspectService } from "./service/source-inspect-service.js";
-import { SourceService } from "./service/source-service.js";
+import { createAppSettingService } from "./service/app-setting-service.js";
+import { createAssetService } from "./service/asset-service.js";
+import { createContentService } from "./service/content-service.js";
+import { createJobService } from "./service/job-service.js";
+import { createSourceInspectService } from "./service/source-inspect-service.js";
+import { createSourceService } from "./service/source-service.js";
 import { FilesystemStorage } from "./storage/filesystem-storage.js";
 
 const runtimeConfig = getRuntimeConfig();
@@ -42,17 +42,17 @@ const pool = new Pool({
 const database = createDatabaseFromPool(pool);
 const boss = createPgBoss(runtimeConfig);
 const appSettingRepository = new AppSettingRepository(database);
-const appSettingService = new AppSettingService(appSettingRepository);
+const appSettingService = createAppSettingService(appSettingRepository);
 const assetRepository = new AssetRepository(database);
-const assetService = new AssetService(assetRepository);
+const assetService = createAssetService(assetRepository);
 const contentRepository = new ContentRepository(database);
-const contentService = new ContentService(contentRepository);
+const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
 const sourceRepository = new SourceRepository(database);
-const sourceService = new SourceService(sourceRepository);
-const sourceInspectService = new SourceInspectService();
+const sourceService = createSourceService(sourceRepository);
+const sourceInspectService = createSourceInspectService();
 const jobQueue = new PgBossJobQueue(boss);
-const jobService = new JobService(sourceService, jobRepository, jobQueue);
+const jobService = createJobService(sourceService, jobRepository, jobQueue);
 const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
 
 boss.on("error", (error) => {
@@ -75,15 +75,15 @@ if (!ensureDefaultProfileResult.ok) {
   throw ensureDefaultProfileResult.error;
 }
 
-const app = createApp(
-  sourceService,
-  sourceInspectService,
+const app = createApp({
+  appSettingService,
   assetService,
   contentService,
   jobService,
-  appSettingService,
+  sourceInspectService,
+  sourceService,
   storage,
-);
+});
 
 serve({
   fetch: app.fetch,

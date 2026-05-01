@@ -1,263 +1,192 @@
-import type { Hono } from "hono";
+import type { Context } from "hono";
+import { Hono } from "hono";
 
-import {
-  CollectorSettingsVersionConflictError,
-  DuplicateSourceUrlHashError,
-} from "../../../db/source-repository.js";
-import type { JobService } from "../../../service/job-service.js";
+import type { AppDependencies } from "../../../deps.js";
 import type {
-  InspectSourceError,
-  SourceInspectService,
-} from "../../../service/source-inspect-service.js";
-import type { SourceService } from "../../../service/source-service.js";
+  CreateSourceEndpointInput,
+  InspectSourceEndpointInput,
+  PatchSourceCollectorSettingsEndpointInput,
+} from "../../../endpoints/api/v1/sources.js";
+import {
+  createCreateSourceEndpoint,
+  createEnqueueObserveSourceEndpoint,
+  createInspectSourceEndpoint,
+  createListSourcesEndpoint,
+  createPatchSourceCollectorSettingsEndpoint,
+} from "../../../endpoints/api/v1/sources.js";
+import type { Result } from "../../../lib/result.js";
+import { err, ok } from "../../../lib/result.js";
 
-type App = Hono;
+export function createSourceRoutes(dependencies: AppDependencies): Hono {
+  const router = new Hono();
+  const listSources = createListSourcesEndpoint(dependencies);
+  const createSource = createCreateSourceEndpoint(dependencies);
+  const inspectSource = createInspectSourceEndpoint(dependencies);
+  const enqueueObserveSource = createEnqueueObserveSourceEndpoint(dependencies);
+  const patchSourceCollectorSettings =
+    createPatchSourceCollectorSettingsEndpoint(dependencies);
 
-export function registerSourceRoutes(
-  app: App,
-  sourceService: SourceService,
-  sourceInspectService: SourceInspectService,
-  jobService: JobService,
-): void {
-  app.get("/api/v1/sources", async (context) => {
-    const sources = await sourceService.listSources();
-
-    if (!sources.ok) {
-      return context.json(
-        {
-          error: {
-            code: "source_list_failed",
-            message: sources.error.message,
-          },
-        },
-        500,
-      );
-    }
-
-    return context.json({
-      data: sources.value,
-    });
-  });
-
-  app.post("/api/v1/sources", async (context) => {
-    const json: unknown = await context.req.json().catch(() => null);
-
-    if (json === null || typeof json !== "object") {
-      return context.json(
-        {
-          error: {
-            code: "invalid_json",
-            message: "Request body must be a JSON object.",
-          },
-        },
-        400,
-      );
-    }
-
-    const body = json as Record<string, unknown>;
-
-    const result = await sourceService.createSource({
-      description: toOptionalString(body.description),
-      sourceSlug: toOptionalString(body.sourceSlug),
-      title: toOptionalString(body.title),
-      url: toOptionalString(body.url) ?? "",
-    });
+  router.get("/", async (context) => {
+    const result = await listSources();
 
     if (!result.ok) {
-      if (result.error instanceof DuplicateSourceUrlHashError) {
-        return context.json(
-          {
-            error: {
-              code: "duplicate_source",
-              message: "A source for this RSS URL already exists.",
-            },
-          },
-          409,
-        );
-      }
-
-      if (result.error instanceof Error) {
-        return context.json(
-          {
-            error: {
-              code: "source_create_failed",
-              message: result.error.message,
-            },
-          },
-          500,
-        );
-      }
-
-      return context.json(
-        {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        422,
-      );
+      return context.json({ error: result.error }, { status: 500 });
     }
 
-    return context.json(
-      {
-        data: result.value,
-      },
-      201,
-    );
+    return context.json({ data: result.value });
   });
+  router.post("/", async (context) => {
+    const json = await readJsonObject(context);
 
-  app.post("/api/v1/sources/inspect", async (context) => {
-    const json: unknown = await context.req.json().catch(() => null);
-
-    if (json === null || typeof json !== "object") {
-      return context.json(
-        {
-          error: {
-            code: "invalid_json",
-            message: "Request body must be a JSON object.",
-          },
-        },
-        400,
-      );
+    if (!json.ok) {
+      return context.json({ error: json.error }, { status: 400 });
     }
 
-    const body = json as Record<string, unknown>;
-    const result = await sourceInspectService.inspectSource({
-      url: toOptionalString(body.url) ?? "",
-    });
+    const input = toCreateSourceEndpointInput(json.value);
+    const result = await createSource(input);
 
     if (!result.ok) {
       return context.json(
-        {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        inspectSourceStatus(result.error),
+        { error: result.error },
+        { status: createSourceErrorStatus(result.error.code) },
       );
     }
 
-    return context.json({
-      data: result.value,
-    });
+    return context.json({ data: result.value }, { status: 201 });
   });
+  router.post("/inspect", async (context) => {
+    const json = await readJsonObject(context);
 
-  app.post("/api/v1/sources/:sourceId/observe", async (context) => {
-    const result = await jobService.enqueueObserveSourceJob(
-      context.req.param("sourceId"),
+    if (!json.ok) {
+      return context.json({ error: json.error }, { status: 400 });
+    }
+
+    const input = toInspectSourceEndpointInput(json.value);
+    const result = await inspectSource(input);
+
+    if (!result.ok) {
+      return context.json(
+        { error: result.error },
+        {
+          status:
+            result.error.code === "source_inspect_fetch_failed" ? 502 : 422,
+        },
+      );
+    }
+
+    return context.json({ data: result.value });
+  });
+  router.post("/:sourceId/observe", async (context) => {
+    const result = await enqueueObserveSource(
+      requireRouteParam(context.req.param("sourceId"), "sourceId"),
     );
 
     if (!result.ok) {
-      if (result.error instanceof Error) {
-        return context.json(
-          {
-            error: {
-              code: "observe_enqueue_failed",
-              message: result.error.message,
-            },
-          },
-          500,
-        );
-      }
-
       return context.json(
-        {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        404,
+        { error: result.error },
+        { status: result.error.code === "observe_enqueue_failed" ? 500 : 404 },
       );
     }
 
-    return context.json({ data: result.value }, 202);
+    return context.json({ data: result.value }, { status: 202 });
   });
+  router.patch("/:sourceId/collector-settings", async (context) => {
+    const json = await readJsonObject(context);
 
-  app.patch("/api/v1/sources/:sourceId/collector-settings", async (context) => {
-    const json: unknown = await context.req.json().catch(() => null);
-
-    if (json === null || typeof json !== "object") {
-      return context.json(
-        {
-          error: {
-            code: "invalid_json",
-            message: "Request body must be a JSON object.",
-          },
-        },
-        400,
-      );
+    if (!json.ok) {
+      return context.json({ error: json.error }, { status: 400 });
     }
 
-    const body = json as Record<string, unknown>;
+    const input = toPatchSourceCollectorSettingsEndpointInput(json.value);
 
-    if (
-      typeof body.enabled !== "boolean" ||
-      !isPositiveInteger(body.intervalMinutes) ||
-      !isPositiveInteger(body.baseVersion)
-    ) {
-      return context.json(
-        {
-          error: {
-            code: "invalid_collector_settings",
-            message:
-              "Collector settings require boolean enabled and positive intervalMinutes and baseVersion.",
-          },
-        },
-        422,
-      );
+    if (!input.ok) {
+      return context.json({ error: input.error }, { status: 422 });
     }
 
-    const result = await sourceService.updateSourceCollectorSettings(
-      context.req.param("sourceId"),
-      {
-        enabled: body.enabled,
-        intervalMinutes: body.intervalMinutes,
-      },
-      body.baseVersion,
+    const result = await patchSourceCollectorSettings(
+      requireRouteParam(context.req.param("sourceId"), "sourceId"),
+      input.value,
     );
 
     if (!result.ok) {
-      if (result.error instanceof CollectorSettingsVersionConflictError) {
-        return context.json(
-          {
-            error: {
-              code: "collector_settings_conflict",
-              message: "Collector settings were updated by another request.",
-            },
-          },
-          409,
-        );
-      }
-
-      if (result.error instanceof Error) {
-        return context.json(
-          {
-            error: {
-              code: "collector_settings_update_failed",
-              message: result.error.message,
-            },
-          },
-          500,
-        );
-      }
-
       return context.json(
-        {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        404,
+        { error: result.error },
+        { status: patchSourceCollectorSettingsErrorStatus(result.error.code) },
       );
     }
 
-    return context.json({
-      data: result.value,
+    return context.json({ data: result.value });
+  });
+
+  return router;
+}
+
+function requireRouteParam(value: string | undefined, name: string): string {
+  if (value === undefined) {
+    throw new Error(`Missing route param: ${name}`);
+  }
+
+  return value;
+}
+
+async function readJsonObject(
+  context: Context,
+): Promise<
+  Result<Record<string, unknown>, { code: "invalid_json"; message: string }>
+> {
+  const json: unknown = await context.req.json().catch(() => null);
+
+  if (json === null || typeof json !== "object") {
+    return err({
+      code: "invalid_json",
+      message: "Request body must be a JSON object.",
     });
+  }
+
+  return ok(json as Record<string, unknown>);
+}
+
+function toCreateSourceEndpointInput(
+  value: Record<string, unknown>,
+): CreateSourceEndpointInput {
+  return {
+    description: toOptionalString(value.description),
+    sourceSlug: toOptionalString(value.sourceSlug),
+    title: toOptionalString(value.title),
+    url: toOptionalString(value.url),
+  };
+}
+
+function toInspectSourceEndpointInput(
+  value: Record<string, unknown>,
+): InspectSourceEndpointInput {
+  return {
+    url: toOptionalString(value.url),
+  };
+}
+
+function toPatchSourceCollectorSettingsEndpointInput(
+  value: Record<string, unknown>,
+): Result<
+  PatchSourceCollectorSettingsEndpointInput,
+  { code: "invalid_collector_settings"; message: string }
+> {
+  if (
+    typeof value.enabled !== "boolean" ||
+    !isPositiveInteger(value.intervalMinutes) ||
+    !isPositiveInteger(value.baseVersion)
+  ) {
+    return err({
+      code: "invalid_collector_settings",
+      message:
+        "Collector settings require boolean enabled and positive intervalMinutes and baseVersion.",
+    });
+  }
+
+  return ok({
+    baseVersion: value.baseVersion,
+    enabled: value.enabled,
+    intervalMinutes: value.intervalMinutes,
   });
 }
 
@@ -265,10 +194,41 @@ function toOptionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function inspectSourceStatus(_error: InspectSourceError): 422 {
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function createSourceErrorStatus(
+  code:
+    | "duplicate_source"
+    | "source_create_failed"
+    | "source_url_required"
+    | "source_url_invalid",
+): 409 | 500 | 422 {
+  if (code === "duplicate_source") {
+    return 409;
+  }
+
+  if (code === "source_create_failed") {
+    return 500;
+  }
+
   return 422;
 }
 
-function isPositiveInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value > 0;
+function patchSourceCollectorSettingsErrorStatus(
+  code:
+    | "collector_settings_conflict"
+    | "collector_settings_update_failed"
+    | "source_not_found",
+): 409 | 500 | 404 {
+  if (code === "collector_settings_conflict") {
+    return 409;
+  }
+
+  if (code === "collector_settings_update_failed") {
+    return 500;
+  }
+
+  return 404;
 }

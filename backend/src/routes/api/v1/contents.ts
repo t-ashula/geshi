@@ -1,27 +1,24 @@
-import type { Hono } from "hono";
+import { Hono } from "hono";
 
-import { contentTypeToExtension } from "../../../lib/content-type-extension.js";
-import type { AssetService } from "../../../service/asset-service.js";
-import type { ContentService } from "../../../service/content-service.js";
+import type { AppDependencies } from "../../../deps.js";
+import {
+  createGetContentDetailEndpoint,
+  createListContentsEndpoint,
+} from "../../../endpoints/api/v1/contents.js";
 
-type App = Hono;
+export function createContentRoutes(dependencies: AppDependencies): Hono {
+  const router = new Hono();
+  const listContents = createListContentsEndpoint(dependencies);
+  const getContentDetail = createGetContentDetailEndpoint(dependencies);
 
-export function registerContentRoutes(
-  app: App,
-  contentService: ContentService,
-  assetService: AssetService,
-): void {
-  app.get("/api/v1/contents", async (context) => {
-    const contents = await contentService.listContents();
+  router.get("/", async (context) => {
+    const data = await listContents();
 
-    return context.json({
-      data: contents,
-    });
+    return context.json({ data });
   });
-
-  app.get("/api/v1/contents/:contentId", async (context) => {
-    const result = await contentService.findContentDetail(
-      context.req.param("contentId"),
+  router.get("/:contentId", async (context) => {
+    const result = await getContentDetail(
+      requireRouteParam(context.req.param("contentId"), "contentId"),
     );
 
     if (!result.ok) {
@@ -32,39 +29,20 @@ export function registerContentRoutes(
             message: result.error.message,
           },
         },
-        404,
+        { status: 404 },
       );
     }
 
-    const content = result.value;
-    const assets = await assetService.listAssetsByContentId(content.id);
-
-    return context.json({
-      data: {
-        ...content,
-        assets: assets.map((asset) => ({
-          byteSize: asset.byteSize,
-          id: asset.id,
-          kind: asset.kind,
-          mimeType: asset.mimeType,
-          primary: asset.primary,
-          sourceUrl: asset.sourceUrl,
-          url: buildAssetUrl(asset.id, asset.mimeType),
-        })),
-      },
-    });
+    return context.json({ data: result.value });
   });
+
+  return router;
 }
 
-function buildAssetUrl(
-  assetId: string,
-  mimeType: string | null,
-): string | null {
-  const extension = contentTypeToExtension(mimeType);
-
-  if (extension === null) {
-    return null;
+function requireRouteParam(value: string | undefined, name: string): string {
+  if (value === undefined) {
+    throw new Error(`Missing route param: ${name}`);
   }
 
-  return `/media/assets/${assetId}.${extension}`;
+  return value;
 }

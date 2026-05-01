@@ -20,42 +20,50 @@ export type InspectSourceResult = SourceMetadata & {
   sourceSlug: string;
 };
 
-export class SourceInspectService {
-  public async inspectSource(
+export interface SourceInspectService {
+  inspectSource(
     request: InspectSourceRequest,
-  ): Promise<Result<InspectSourceResult, InspectSourceError>> {
-    const normalizedUrlResult = normalizeSourceUrl(request.url);
+  ): Promise<Result<InspectSourceResult, InspectSourceError>>;
+}
 
-    if (!normalizedUrlResult.ok) {
-      return normalizedUrlResult;
-    }
+export function createSourceInspectService(): SourceInspectService {
+  return {
+    async inspectSource(
+      request: InspectSourceRequest,
+    ): Promise<Result<InspectSourceResult, InspectSourceError>> {
+      const normalizedUrlResult = normalizeSourceUrl(request.url);
 
-    const normalizedUrl = normalizedUrlResult.value;
-    try {
-      const sourceMetadata = await getSourceCollectorPlugin(
-        "podcast-rss",
-      ).inspect({
-        abortSignal: new AbortController().signal,
-        config: {},
-        logger: createNoopLogger(),
-        sourceUrl: normalizedUrl,
-      });
-
-      return ok({
-        ...sourceMetadata,
-        sourceSlug: createSourceSlug(
-          sourceMetadata.url,
-          sourceMetadata.title ?? undefined,
-        ),
-      });
-    } catch (error) {
-      if (isSourceCollectorInspectError(error)) {
-        return err(error);
+      if (!normalizedUrlResult.ok) {
+        return normalizedUrlResult;
       }
 
-      throw error;
-    }
-  }
+      const normalizedUrl = normalizedUrlResult.value;
+      try {
+        const sourceMetadata = await getSourceCollectorPlugin(
+          "podcast-rss",
+        ).inspect({
+          abortSignal: new AbortController().signal,
+          config: {},
+          logger: createNoopLogger(),
+          sourceUrl: normalizedUrl,
+        });
+
+        return ok({
+          ...sourceMetadata,
+          sourceSlug: createSourceSlug(
+            sourceMetadata.url,
+            sourceMetadata.title ?? undefined,
+          ),
+        });
+      } catch (error) {
+        if (isSourceCollectorInspectError(error)) {
+          return err(error);
+        }
+
+        throw error;
+      }
+    },
+  };
 }
 
 function isSourceCollectorInspectError(

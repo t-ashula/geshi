@@ -1,12 +1,16 @@
-import type { Hono } from "hono";
+import { Hono } from "hono";
 
-import type { JobService } from "../../../service/job-service.js";
+import type { AppDependencies } from "../../../deps.js";
+import { createGetJobEndpoint } from "../../../endpoints/api/v1/jobs.js";
 
-type App = Hono;
+export function createJobRoutes(dependencies: AppDependencies): Hono {
+  const router = new Hono();
+  const getJob = createGetJobEndpoint(dependencies);
 
-export function registerJobRoutes(app: App, jobService: JobService): void {
-  app.get("/api/v1/jobs/:jobId", async (context) => {
-    const result = await jobService.findJobById(context.req.param("jobId"));
+  router.get("/:jobId", async (context) => {
+    const result = await getJob(
+      requireRouteParam(context.req.param("jobId"), "jobId"),
+    );
 
     if (!result.ok) {
       return context.json(
@@ -16,12 +20,20 @@ export function registerJobRoutes(app: App, jobService: JobService): void {
             message: result.error.message,
           },
         },
-        404,
+        { status: 404 },
       );
     }
 
-    return context.json({
-      data: result.value,
-    });
+    return context.json({ data: result.value });
   });
+
+  return router;
+}
+
+function requireRouteParam(value: string | undefined, name: string): string {
+  if (value === undefined) {
+    throw new Error(`Missing route param: ${name}`);
+  }
+
+  return value;
 }

@@ -39,70 +39,23 @@ export type FindObserveSourceTargetError = {
   message: string;
 };
 
-export class SourceService {
-  public constructor(private readonly sourceRepository: SourceRepository) {}
-
-  public async createSource(
+export interface SourceService {
+  createSource(
     request: CreateSourceRequest,
-  ): Promise<Result<SourceListItem, CreateSourceError>> {
-    const normalizedUrlResult = normalizeSourceUrl(request.url);
-
-    if (!normalizedUrlResult.ok) {
-      return normalizedUrlResult;
-    }
-
-    const normalizedUrl = normalizedUrlResult.value;
-    const slug =
-      normalizeOptionalSlug(request.sourceSlug) ??
-      createSourceSlug(normalizedUrl, request.title);
-
-    return this.sourceRepository.createSource({
-      collectorSettingId: crypto.randomUUID(),
-      collectorSettingSnapshotId: crypto.randomUUID(),
-      description: normalizeOptionalString(request.description),
-      id: crypto.randomUUID(),
-      kind: "podcast",
-      pluginSlug: "podcast-rss",
-      slug,
-      snapshotId: crypto.randomUUID(),
-      title: normalizeOptionalString(request.title),
-      url: normalizedUrl,
-      urlHash: createUrlHash(normalizedUrl),
-    });
-  }
-
-  public async listSources(): Promise<
-    Result<SourceListItem[], SourceRepositoryError>
-  > {
-    return this.sourceRepository.listSources();
-  }
-
-  public async findObserveSourceTarget(
+  ): Promise<Result<SourceListItem, CreateSourceError>>;
+  findObserveSourceTarget(
     sourceId: string,
   ): Promise<
     Result<
       ObserveSourceTarget,
       FindObserveSourceTargetError | SourceRepositoryError
     >
-  > {
-    const source =
-      await this.sourceRepository.findObserveSourceTarget(sourceId);
-
-    if (!source.ok) {
-      return source;
-    }
-
-    if (source.value === null) {
-      return err({
-        code: "source_not_found",
-        message: "Source not found.",
-      });
-    }
-
-    return ok(source.value);
-  }
-
-  public async updateSourceCollectorSettings(
+  >;
+  listPeriodicCrawlTargets(): Promise<
+    Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
+  >;
+  listSources(): Promise<Result<SourceListItem[], SourceRepositoryError>>;
+  updateSourceCollectorSettings(
     sourceId: string,
     settings: SourcePeriodicCrawlSettings,
     baseVersion: number,
@@ -113,32 +66,110 @@ export class SourceService {
       | CollectorSettingsVersionConflictError
       | SourceRepositoryError
     >
-  > {
-    const source = await this.sourceRepository.updateSourceCollectorSettings(
-      sourceId,
-      settings,
-      baseVersion,
-    );
+  >;
+}
 
-    if (!source.ok) {
-      return source;
-    }
+export function createSourceService(
+  sourceRepository: SourceRepository,
+): SourceService {
+  return {
+    async createSource(
+      request: CreateSourceRequest,
+    ): Promise<Result<SourceListItem, CreateSourceError>> {
+      const normalizedUrlResult = normalizeSourceUrl(request.url);
 
-    if (source.value === null) {
-      return err({
-        code: "source_not_found",
-        message: "Source not found.",
+      if (!normalizedUrlResult.ok) {
+        return normalizedUrlResult;
+      }
+
+      const normalizedUrl = normalizedUrlResult.value;
+      const slug =
+        normalizeOptionalSlug(request.sourceSlug) ??
+        createSourceSlug(normalizedUrl, request.title);
+
+      return sourceRepository.createSource({
+        collectorSettingId: crypto.randomUUID(),
+        collectorSettingSnapshotId: crypto.randomUUID(),
+        description: normalizeOptionalString(request.description),
+        id: crypto.randomUUID(),
+        kind: "podcast",
+        pluginSlug: "podcast-rss",
+        slug,
+        snapshotId: crypto.randomUUID(),
+        title: normalizeOptionalString(request.title),
+        url: normalizedUrl,
+        urlHash: createUrlHash(normalizedUrl),
       });
-    }
+    },
 
-    return ok(source.value);
-  }
+    async findObserveSourceTarget(
+      sourceId: string,
+    ): Promise<
+      Result<
+        ObserveSourceTarget,
+        FindObserveSourceTargetError | SourceRepositoryError
+      >
+    > {
+      const source = await sourceRepository.findObserveSourceTarget(sourceId);
 
-  public async listPeriodicCrawlTargets(): Promise<
-    Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
-  > {
-    return this.sourceRepository.listPeriodicCrawlTargets();
-  }
+      if (!source.ok) {
+        return source;
+      }
+
+      if (source.value === null) {
+        return err({
+          code: "source_not_found",
+          message: "Source not found.",
+        });
+      }
+
+      return ok(source.value);
+    },
+
+    async listPeriodicCrawlTargets(): Promise<
+      Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
+    > {
+      return sourceRepository.listPeriodicCrawlTargets();
+    },
+
+    async listSources(): Promise<
+      Result<SourceListItem[], SourceRepositoryError>
+    > {
+      return sourceRepository.listSources();
+    },
+
+    async updateSourceCollectorSettings(
+      sourceId: string,
+      settings: SourcePeriodicCrawlSettings,
+      baseVersion: number,
+    ): Promise<
+      Result<
+        SourceListItem,
+        | UpdateSourceCollectorSettingsError
+        | CollectorSettingsVersionConflictError
+        | SourceRepositoryError
+      >
+    > {
+      const source = await sourceRepository.updateSourceCollectorSettings(
+        sourceId,
+        settings,
+        baseVersion,
+      );
+
+      if (!source.ok) {
+        return source;
+      }
+
+      if (source.value === null) {
+        return err({
+          code: "source_not_found",
+          message: "Source not found.",
+        });
+      }
+
+      return ok(source.value);
+    },
+  };
 }
 
 function normalizeOptionalString(

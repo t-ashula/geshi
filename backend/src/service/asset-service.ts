@@ -24,66 +24,86 @@ export type FindAcquireTargetByIdError = {
 
 export type AssetServiceError = AssetRepositoryError;
 
-export class AssetService {
-  public constructor(private readonly assetRepository: AssetRepository) {}
-
-  public async createObservedAssets(
+export interface AssetService {
+  createObservedAssets(
     inputs: CreateObservedAssetInput[],
-  ): Promise<Result<CreateObservedAssetsResult, AssetServiceError>> {
-    return this.assetRepository.createObservedAssets(inputs);
-  }
-
-  public async upsertStoredAsset(
+  ): Promise<Result<CreateObservedAssetsResult, AssetServiceError>>;
+  findAcquireTargetById(
+    assetId: string,
+  ): Promise<Result<AcquireTargetAsset, FindAcquireTargetByIdError>>;
+  findStoredMediaById(
+    assetId: string,
+  ): Promise<Result<StoredAssetMedia, FindStoredMediaByIdError>>;
+  listAssets(): Promise<Result<AssetListItem[], AssetServiceError>>;
+  listAssetsByContentId(contentId: string): Promise<ContentDetailAsset[]>;
+  listPendingAssetsByContentId(
+    contentId: string,
+  ): Promise<Result<AcquireTargetAsset[], AssetServiceError>>;
+  upsertStoredAsset(
     input: UpsertStoredAssetInput,
-  ): Promise<Result<void, AssetServiceError>> {
-    return this.assetRepository.upsertStoredAsset(input);
-  }
+  ): Promise<Result<void, AssetServiceError>>;
+}
 
-  public async listPendingAssetsByContentId(
-    contentId: string,
-  ): Promise<Result<AcquireTargetAsset[], AssetServiceError>> {
-    return this.assetRepository.listPendingAssetsByContentId(contentId);
-  }
+export function createAssetService(
+  assetRepository: AssetRepository,
+): AssetService {
+  return {
+    async createObservedAssets(
+      inputs: CreateObservedAssetInput[],
+    ): Promise<Result<CreateObservedAssetsResult, AssetServiceError>> {
+      return assetRepository.createObservedAssets(inputs);
+    },
 
-  public async findAcquireTargetById(
-    assetId: string,
-  ): Promise<Result<AcquireTargetAsset, FindAcquireTargetByIdError>> {
-    const asset = await this.assetRepository.findAcquireTargetById(assetId);
+    async findAcquireTargetById(
+      assetId: string,
+    ): Promise<Result<AcquireTargetAsset, FindAcquireTargetByIdError>> {
+      const asset = await assetRepository.findAcquireTargetById(assetId);
 
-    if (asset === null) {
-      return err({
-        code: "asset_not_found",
-        message: `Pending asset not found after observe: ${assetId}`,
-      });
-    }
+      if (asset === null) {
+        return err({
+          code: "asset_not_found",
+          message: `Pending asset not found after observe: ${assetId}`,
+        });
+      }
 
-    return ok(asset);
-  }
+      return ok(asset);
+    },
 
-  public async listAssets(): Promise<
-    Result<AssetListItem[], AssetServiceError>
-  > {
-    return this.assetRepository.listAssets();
-  }
+    async findStoredMediaById(
+      assetId: string,
+    ): Promise<Result<StoredAssetMedia, FindStoredMediaByIdError>> {
+      const asset = await assetRepository.findStoredMediaById(assetId);
 
-  public async listAssetsByContentId(
-    contentId: string,
-  ): Promise<ContentDetailAsset[]> {
-    return this.assetRepository.listAssetsByContentId(contentId);
-  }
+      if (asset === null) {
+        return err({
+          code: "asset_media_not_found",
+          message: "Stored media asset was not found.",
+        });
+      }
 
-  public async findStoredMediaById(
-    assetId: string,
-  ): Promise<Result<StoredAssetMedia, FindStoredMediaByIdError>> {
-    const asset = await this.assetRepository.findStoredMediaById(assetId);
+      return ok(asset);
+    },
 
-    if (asset === null) {
-      return err({
-        code: "asset_media_not_found",
-        message: "Stored media asset was not found.",
-      });
-    }
+    async listAssets(): Promise<Result<AssetListItem[], AssetServiceError>> {
+      return assetRepository.listAssets();
+    },
 
-    return ok(asset);
-  }
+    async listAssetsByContentId(
+      contentId: string,
+    ): Promise<ContentDetailAsset[]> {
+      return assetRepository.listAssetsByContentId(contentId);
+    },
+
+    async listPendingAssetsByContentId(
+      contentId: string,
+    ): Promise<Result<AcquireTargetAsset[], AssetServiceError>> {
+      return assetRepository.listPendingAssetsByContentId(contentId);
+    },
+
+    async upsertStoredAsset(
+      input: UpsertStoredAssetInput,
+    ): Promise<Result<void, AssetServiceError>> {
+      return assetRepository.upsertStoredAsset(input);
+    },
+  };
 }

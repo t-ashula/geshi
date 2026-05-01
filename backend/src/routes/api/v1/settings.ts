@@ -1,86 +1,109 @@
-import type { Hono } from "hono";
+import type { Context } from "hono";
+import { Hono } from "hono";
 
-import type { AppSettingService } from "../../../service/app-setting-service.js";
+import type { AppDependencies } from "../../../deps.js";
+import type { PatchPeriodicCrawlSettingsInput } from "../../../endpoints/api/v1/settings.js";
+import {
+  createGetPeriodicCrawlSettingsEndpoint,
+  createPatchPeriodicCrawlSettingsEndpoint,
+} from "../../../endpoints/api/v1/settings.js";
+import type { Result } from "../../../lib/result.js";
+import { err, ok } from "../../../lib/result.js";
 
-type App = Hono;
+export function createSettingRoutes(dependencies: AppDependencies): Hono {
+  const router = new Hono();
+  const getPeriodicCrawlSettings =
+    createGetPeriodicCrawlSettingsEndpoint(dependencies);
+  const patchPeriodicCrawlSettings =
+    createPatchPeriodicCrawlSettingsEndpoint(dependencies);
 
-export function registerSettingRoutes(
-  app: App,
-  appSettingService: AppSettingService,
-): void {
-  app.get("/api/v1/settings/periodic-crawl", async (context) => {
-    const settings = await appSettingService.getPeriodicCrawlSettings();
+  router.get("/periodic-crawl", async (context) => {
+    const result = await getPeriodicCrawlSettings();
 
-    if (!settings.ok) {
+    if (!result.ok) {
       return context.json(
         {
           error: {
-            code: "periodic_crawl_settings_load_failed",
-            message: settings.error.message,
+            code: result.error.code,
+            message: result.error.message,
           },
         },
-        500,
+        { status: 500 },
       );
     }
 
-    return context.json({
-      data: settings.value,
-    });
+    return context.json({ data: result.value });
+  });
+  router.patch("/periodic-crawl", async (context) => {
+    const json = await readJsonObject(context);
+
+    if (!json.ok) {
+      return context.json({ error: json.error }, { status: 400 });
+    }
+
+    const input = toPatchPeriodicCrawlSettingsInput(json.value);
+
+    if (!input.ok) {
+      return context.json({ error: input.error }, { status: 422 });
+    }
+
+    const result = await patchPeriodicCrawlSettings(input.value);
+
+    if (!result.ok) {
+      return context.json(
+        {
+          error: {
+            code: result.error.code,
+            message: result.error.message,
+          },
+        },
+        { status: 500 },
+      );
+    }
+
+    return context.json({ data: result.value });
   });
 
-  app.patch("/api/v1/settings/periodic-crawl", async (context) => {
-    const json: unknown = await context.req.json().catch(() => null);
+  return router;
+}
 
-    if (json === null || typeof json !== "object") {
-      return context.json(
-        {
-          error: {
-            code: "invalid_json",
-            message: "Request body must be a JSON object.",
-          },
-        },
-        400,
-      );
-    }
+async function readJsonObject(
+  context: Context,
+): Promise<
+  Result<Record<string, unknown>, { code: "invalid_json"; message: string }>
+> {
+  const json: unknown = await context.req.json().catch(() => null);
 
-    const body = json as Record<string, unknown>;
-
-    if (
-      typeof body.enabled !== "boolean" ||
-      !isPositiveInteger(body.intervalMinutes)
-    ) {
-      return context.json(
-        {
-          error: {
-            code: "invalid_settings",
-            message:
-              "Periodic crawl settings require boolean enabled and positive intervalMinutes.",
-          },
-        },
-        422,
-      );
-    }
-
-    const settings = await appSettingService.updatePeriodicCrawlSettings({
-      enabled: body.enabled,
-      intervalMinutes: body.intervalMinutes,
+  if (json === null || typeof json !== "object") {
+    return err({
+      code: "invalid_json",
+      message: "Request body must be a JSON object.",
     });
+  }
 
-    if (!settings.ok) {
-      return context.json(
-        {
-          error: {
-            code: "periodic_crawl_settings_update_failed",
-            message: settings.error.message,
-          },
-        },
-        500,
-      );
-    }
+  return ok(json as Record<string, unknown>);
+}
 
-    return context.json({
-      data: settings.value,
+function toPatchPeriodicCrawlSettingsInput(
+  value: Record<string, unknown>,
+): Result<
+  PatchPeriodicCrawlSettingsInput,
+  { code: "invalid_settings"; message: string }
+> {
+  if (
+    typeof value.enabled !== "boolean" ||
+    !isPositiveInteger(value.intervalMinutes)
+  ) {
+    return err({
+      code: "invalid_settings",
+      message:
+        "Periodic crawl settings require boolean enabled and positive intervalMinutes.",
     });
+  }
+
+  return ok({
+    enabled: value.enabled,
+    intervalMinutes: value.intervalMinutes,
   });
 }
 
