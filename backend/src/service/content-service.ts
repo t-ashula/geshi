@@ -17,50 +17,72 @@ export type FindContentDetailError = {
 
 export type ContentServiceError = ContentRepositoryError;
 
-export class ContentService {
-  public constructor(private readonly contentRepository: ContentRepository) {}
-
-  public async importObservedContents(
-    inputs: ImportObservedContentInput[],
-  ): Promise<Result<void, ContentServiceError>> {
-    return this.contentRepository.importObservedContents(inputs);
-  }
-
-  public async createObservedContent(
+export interface ContentService {
+  createObservedContent(
     input: ImportObservedContentInput,
-  ): Promise<Result<CreateObservedContentResult, ContentServiceError>> {
-    return this.contentRepository.createObservedContent(input);
-  }
-
-  public async markContentStatus(
+  ): Promise<Result<CreateObservedContentResult, ContentServiceError>>;
+  findContentAcquireTarget(
+    contentId: string,
+  ): Promise<AcquireTargetContent | null>;
+  findContentDetail(
+    contentId: string,
+  ): Promise<Result<ContentDetailItem, FindContentDetailError>>;
+  importObservedContents(
+    inputs: ImportObservedContentInput[],
+  ): Promise<Result<void, ContentServiceError>>;
+  listContents(): Promise<ContentListItem[]>;
+  markContentStatus(
     contentId: string,
     status: "discovered" | "stored" | "failed",
-  ): Promise<Result<void, ContentServiceError>> {
-    return this.contentRepository.markContentStatus(contentId, status);
-  }
+  ): Promise<Result<void, ContentServiceError>>;
+}
 
-  public async findContentAcquireTarget(
-    contentId: string,
-  ): Promise<AcquireTargetContent | null> {
-    return this.contentRepository.findContentAcquireTarget(contentId);
-  }
+export function createContentService(
+  contentRepository: ContentRepository,
+): ContentService {
+  return {
+    async createObservedContent(
+      input: ImportObservedContentInput,
+    ): Promise<Result<CreateObservedContentResult, ContentServiceError>> {
+      return contentRepository.createObservedContent(input);
+    },
 
-  public async listContents(): Promise<ContentListItem[]> {
-    return this.contentRepository.listContents();
-  }
+    async findContentAcquireTarget(
+      contentId: string,
+    ): Promise<AcquireTargetContent | null> {
+      return contentRepository.findContentAcquireTarget(contentId);
+    },
 
-  public async findContentDetail(
-    contentId: string,
-  ): Promise<Result<ContentDetailItem, FindContentDetailError>> {
-    const content = await this.contentRepository.findContentDetail(contentId);
+    async findContentDetail(
+      contentId: string,
+    ): Promise<Result<ContentDetailItem, FindContentDetailError>> {
+      const content = await contentRepository.findContentDetail(contentId);
 
-    if (content === null) {
-      return err({
-        code: "content_not_found",
-        message: "Content was not found.",
-      });
-    }
+      if (content === null) {
+        return err({
+          code: "content_not_found",
+          message: "Content was not found.",
+        });
+      }
 
-    return ok(content);
-  }
+      return ok(content);
+    },
+
+    async importObservedContents(
+      inputs: ImportObservedContentInput[],
+    ): Promise<Result<void, ContentServiceError>> {
+      return contentRepository.importObservedContents(inputs);
+    },
+
+    async listContents(): Promise<ContentListItem[]> {
+      return contentRepository.listContents();
+    },
+
+    async markContentStatus(
+      contentId: string,
+      status: "discovered" | "stored" | "failed",
+    ): Promise<Result<void, ContentServiceError>> {
+      return contentRepository.markContentStatus(contentId, status);
+    },
+  };
 }

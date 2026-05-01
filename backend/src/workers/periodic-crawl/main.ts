@@ -17,9 +17,9 @@ import {
 } from "../../job-queue/types.js";
 import { createLogger } from "../../logger/index.js";
 import { getRuntimeConfig } from "../../runtime-config.js";
-import { AppSettingService } from "../../service/app-setting-service.js";
-import { JobService } from "../../service/job-service.js";
-import { SourceService } from "../../service/source-service.js";
+import { createAppSettingService } from "../../service/app-setting-service.js";
+import { createJobService } from "../../service/job-service.js";
+import { createSourceService } from "../../service/source-service.js";
 import { handlePeriodicCrawlJob } from "./handle.js";
 
 const runtimeConfig = getRuntimeConfig();
@@ -37,12 +37,12 @@ const pool = new Pool({
 const database = createDatabaseFromPool(pool);
 const boss = createPgBoss(runtimeConfig);
 const appSettingRepository = new AppSettingRepository(database);
-const appSettingService = new AppSettingService(appSettingRepository);
+const appSettingService = createAppSettingService(appSettingRepository);
 const jobRepository = new JobRepository(database);
 const sourceRepository = new SourceRepository(database);
-const sourceService = new SourceService(sourceRepository);
+const sourceService = createSourceService(sourceRepository);
 const jobQueue = new PgBossJobQueue(boss);
-const jobService = new JobService(sourceService, jobRepository, jobQueue);
+const jobService = createJobService(sourceService, jobRepository, jobQueue);
 
 boss.on("error", (error) => {
   logger.error("job queue runtime failed.", { error });

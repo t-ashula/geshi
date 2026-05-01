@@ -1,0 +1,46 @@
+import { Hono } from "hono";
+import { describe, expect, it, vi } from "vitest";
+
+import { createGetJobHandler } from "../../src/handlers/api/v1/jobs.js";
+import { ok } from "../../src/lib/result.js";
+import type { JobService } from "../../src/service/job-service.js";
+import { createTestAppDependencies } from "../support/app-dependencies.js";
+
+describe("job handlers", () => {
+  it("returns the current job detail response", async () => {
+    const handler = createGetJobHandler(
+      createTestAppDependencies({
+        jobService: {
+          findJobById: vi.fn(() =>
+            ok({
+              attemptCount: 0,
+              createdAt: new Date("2026-05-01T00:00:00.000Z"),
+              failureMessage: null,
+              finishedAt: null,
+              id: "job-1",
+              kind: "observe-source",
+              queueJobId: "queue-1",
+              retryable: true,
+              sourceId: "source-1",
+              startedAt: null,
+              status: "queued",
+            }),
+          ),
+        } as unknown as JobService,
+      }),
+    );
+    const app = new Hono();
+    app.get("/:jobId", handler);
+
+    const response = await app.request("/job-1");
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      data: {
+        id: "job-1",
+        kind: "observe-source",
+        status: "queued",
+      },
+    });
+  });
+});

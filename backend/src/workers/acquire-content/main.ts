@@ -9,8 +9,8 @@ import type { AcquireContentJobPayload } from "../../job-queue/types.js";
 import { ACQUIRE_CONTENT_JOB_NAME } from "../../job-queue/types.js";
 import { createLogger } from "../../logger/index.js";
 import { getRuntimeConfig } from "../../runtime-config.js";
-import { AssetService } from "../../service/asset-service.js";
-import { ContentService } from "../../service/content-service.js";
+import { createAssetService } from "../../service/asset-service.js";
+import { createContentService } from "../../service/content-service.js";
 import { FilesystemStorage } from "../../storage/filesystem-storage.js";
 import { handleAcquireContentJob } from "./handle.js";
 
@@ -29,9 +29,9 @@ const pool = new Pool({
 const database = createDatabaseFromPool(pool);
 const boss = createPgBoss(runtimeConfig);
 const assetRepository = new AssetRepository(database);
-const assetService = new AssetService(assetRepository);
+const assetService = createAssetService(assetRepository);
 const contentRepository = new ContentRepository(database);
-const contentService = new ContentService(contentRepository);
+const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
 const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
 

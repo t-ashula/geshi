@@ -1,34 +1,20 @@
 import { Hono } from "hono";
 
-import { registerContentRoutes } from "./routes/api/v1/contents.js";
-import { registerJobRoutes } from "./routes/api/v1/jobs.js";
-import { registerSettingRoutes } from "./routes/api/v1/settings.js";
-import { registerSourceRoutes } from "./routes/api/v1/sources.js";
-import { registerMediaAssetRoutes } from "./routes/media/assets.js";
-import type { AppSettingService } from "./service/app-setting-service.js";
-import type { AssetService } from "./service/asset-service.js";
-import type { ContentService } from "./service/content-service.js";
-import type { JobService } from "./service/job-service.js";
-import type { SourceInspectService } from "./service/source-inspect-service.js";
-import type { SourceService } from "./service/source-service.js";
-import type { Storage } from "./storage/types.js";
+import type { AppDependencies } from "./deps.js";
+import { createContentRoutes } from "./routes/api/v1/contents.js";
+import { createJobRoutes } from "./routes/api/v1/jobs.js";
+import { createSettingRoutes } from "./routes/api/v1/settings.js";
+import { createSourceRoutes } from "./routes/api/v1/sources.js";
+import { createMediaAssetRoutes } from "./routes/media/assets.js";
 
-export function createApp(
-  sourceService: SourceService,
-  sourceInspectService: SourceInspectService,
-  assetService: AssetService,
-  contentService: ContentService,
-  jobService: JobService,
-  appSettingService: AppSettingService,
-  storage: Storage,
-): Hono {
+export function createApp(dependencies: AppDependencies): Hono {
   const app = new Hono();
 
-  registerSourceRoutes(app, sourceService, sourceInspectService, jobService);
-  registerSettingRoutes(app, appSettingService);
-  registerContentRoutes(app, contentService, assetService);
-  registerJobRoutes(app, jobService);
-  registerMediaAssetRoutes(app, assetService, storage);
+  app.route("/api/v1/sources", createSourceRoutes(dependencies));
+  app.route("/api/v1/settings", createSettingRoutes(dependencies));
+  app.route("/api/v1/contents", createContentRoutes(dependencies));
+  app.route("/api/v1/jobs", createJobRoutes(dependencies));
+  app.route("/media/assets", createMediaAssetRoutes(dependencies));
 
   return app;
 }

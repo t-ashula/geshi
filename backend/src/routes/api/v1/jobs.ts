@@ -1,27 +1,12 @@
-import type { Hono } from "hono";
+import { Hono } from "hono";
 
-import type { JobService } from "../../../service/job-service.js";
+import type { AppDependencies } from "../../../deps.js";
+import { createGetJobHandler } from "../../../handlers/api/v1/jobs.js";
 
-type App = Hono;
+export function createJobRoutes(dependencies: AppDependencies): Hono {
+  const router = new Hono();
 
-export function registerJobRoutes(app: App, jobService: JobService): void {
-  app.get("/api/v1/jobs/:jobId", async (context) => {
-    const result = await jobService.findJobById(context.req.param("jobId"));
+  router.get("/:jobId", createGetJobHandler(dependencies));
 
-    if (!result.ok) {
-      return context.json(
-        {
-          error: {
-            code: result.error.code,
-            message: result.error.message,
-          },
-        },
-        404,
-      );
-    }
-
-    return context.json({
-      data: result.value,
-    });
-  });
+  return router;
 }

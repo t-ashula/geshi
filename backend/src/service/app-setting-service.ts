@@ -12,66 +12,74 @@ import {
 
 const DEFAULT_APP_SETTINGS_PROFILE_SLUG = "default";
 
-export class AppSettingService {
-  public constructor(
-    private readonly appSettingRepository: AppSettingRepository,
-  ) {}
-
-  public async getPeriodicCrawlSettings(): Promise<
+export interface AppSettingService {
+  ensureDefaultProfile(): Promise<Result<void, AppSettingRepositoryError>>;
+  getPeriodicCrawlSettings(): Promise<
     Result<PeriodicCrawlAppSettings, AppSettingRepositoryError>
-  > {
-    const appSetting = await this.appSettingRepository.findLatestByProfile(
-      DEFAULT_APP_SETTINGS_PROFILE_SLUG,
-    );
+  >;
+  updatePeriodicCrawlSettings(
+    settings: PeriodicCrawlAppSettings,
+  ): Promise<Result<PeriodicCrawlAppSettings, AppSettingRepositoryError>>;
+}
 
-    if (!appSetting.ok) {
-      return appSetting;
-    }
-
-    if (appSetting.value === null) {
-      const defaults = defaultPeriodicCrawlAppSettings();
-      const upsertResult = await this.appSettingRepository.upsert(
+export function createAppSettingService(
+  appSettingRepository: AppSettingRepository,
+): AppSettingService {
+  return {
+    async ensureDefaultProfile(): Promise<
+      Result<void, AppSettingRepositoryError>
+    > {
+      return appSettingRepository.ensureProfile(
         DEFAULT_APP_SETTINGS_PROFILE_SLUG,
-        defaults,
+      );
+    },
+    async getPeriodicCrawlSettings(): Promise<
+      Result<PeriodicCrawlAppSettings, AppSettingRepositoryError>
+    > {
+      const appSetting = await appSettingRepository.findLatestByProfile(
+        DEFAULT_APP_SETTINGS_PROFILE_SLUG,
+      );
+
+      if (!appSetting.ok) {
+        return appSetting;
+      }
+
+      if (appSetting.value === null) {
+        const defaults = defaultPeriodicCrawlAppSettings();
+        const upsertResult = await appSettingRepository.upsert(
+          DEFAULT_APP_SETTINGS_PROFILE_SLUG,
+          defaults,
+        );
+
+        if (!upsertResult.ok) {
+          return upsertResult;
+        }
+
+        return ok(defaults);
+      }
+
+      return ok(
+        normalizePeriodicCrawlAppSettings({
+          enabled: appSetting.value.enabled,
+          intervalMinutes: appSetting.value.intervalMinutes,
+        }),
+      );
+    },
+    async updatePeriodicCrawlSettings(
+      settings: PeriodicCrawlAppSettings,
+    ): Promise<Result<PeriodicCrawlAppSettings, AppSettingRepositoryError>> {
+      const normalizedSettings = normalizePeriodicCrawlAppSettings(settings);
+
+      const upsertResult = await appSettingRepository.upsert(
+        DEFAULT_APP_SETTINGS_PROFILE_SLUG,
+        normalizedSettings,
       );
 
       if (!upsertResult.ok) {
         return upsertResult;
       }
 
-      return ok(defaults);
-    }
-
-    return ok(
-      normalizePeriodicCrawlAppSettings({
-        enabled: appSetting.value.enabled,
-        intervalMinutes: appSetting.value.intervalMinutes,
-      }),
-    );
-  }
-
-  public async updatePeriodicCrawlSettings(
-    settings: PeriodicCrawlAppSettings,
-  ): Promise<Result<PeriodicCrawlAppSettings, AppSettingRepositoryError>> {
-    const normalizedSettings = normalizePeriodicCrawlAppSettings(settings);
-
-    const upsertResult = await this.appSettingRepository.upsert(
-      DEFAULT_APP_SETTINGS_PROFILE_SLUG,
-      normalizedSettings,
-    );
-
-    if (!upsertResult.ok) {
-      return upsertResult;
-    }
-
-    return ok(normalizedSettings);
-  }
-
-  public async ensureDefaultProfile(): Promise<
-    Result<void, AppSettingRepositoryError>
-  > {
-    return this.appSettingRepository.ensureProfile(
-      DEFAULT_APP_SETTINGS_PROFILE_SLUG,
-    );
-  }
+      return ok(normalizedSettings);
+    },
+  };
 }
