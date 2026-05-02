@@ -161,7 +161,7 @@ describe("source endpoints", () => {
     ).resolves.toEqual(
       err({
         code: "duplicate_source",
-        message: "A source for this RSS URL already exists.",
+        message: "A source for this source URL already exists.",
       }),
     );
   });
@@ -201,7 +201,7 @@ describe("source endpoints", () => {
             Promise.resolve(
               err({
                 code: "source_url_invalid",
-                message: "RSS URL is invalid.",
+                message: "Source URL is invalid.",
               }),
             ),
           ),
@@ -218,7 +218,7 @@ describe("source endpoints", () => {
     assertErr(result);
     expect(result.error).toEqual({
       code: "source_url_invalid",
-      message: "RSS URL is invalid.",
+      message: "Source URL is invalid.",
     });
   });
 

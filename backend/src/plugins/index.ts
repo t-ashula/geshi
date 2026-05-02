@@ -1,8 +1,10 @@
+import { goJpRssPlugin } from "../../../packages/geshi-plugin-go-jp-rss/src/index.js";
 import { podcastRssPlugin } from "./collector/podcast-rss/index.js";
 import type { SourceCollectorPlugin } from "./types.js";
 
 const sourceCollectorPlugins = new Map<string, SourceCollectorPlugin>([
-  ["podcast-rss", podcastRssPlugin],
+  [goJpRssPlugin.pluginSlug, goJpRssPlugin],
+  [podcastRssPlugin.pluginSlug, podcastRssPlugin],
 ]);
 
 export interface SourceCollectorRegistry {

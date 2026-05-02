@@ -563,7 +563,7 @@ function renderContentSummaryPreview(summary: string | null): string {
 
         <div class="create-grid">
           <label>
-            <span>RSS URL</span>
+            <span>Source URL</span>
             <input
               v-model="form.url"
               :disabled="isInspecting || isSubmitting"

@@ -11,7 +11,7 @@ describe("validateCreateSourceRequest", () => {
         title: "",
         url: "   ",
       }),
-    ).toBe("RSS URL is required.");
+    ).toBe("Source URL is required.");
   });
 
   it("rejects non-http urls", () => {
@@ -22,7 +22,7 @@ describe("validateCreateSourceRequest", () => {
         title: "",
         url: "ftp://example.com/feed.xml",
       }),
-    ).toBe("RSS URL must be an absolute http or https URL.");
+    ).toBe("Source URL must be an absolute http or https URL.");
   });
 
   it("accepts valid http urls", () => {

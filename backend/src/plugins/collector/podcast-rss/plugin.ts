@@ -66,6 +66,9 @@ class SourceCollectorInspectPluginError extends Error {
 }
 
 export const podcastRssPlugin: SourceCollectorPlugin = {
+  pluginSlug: "podcast-rss",
+  sourceKind: "podcast",
+
   async inspect(input: SourceCollectorInspectInput) {
     const response = await fetch(input.sourceUrl, {
       signal: input.abortSignal,

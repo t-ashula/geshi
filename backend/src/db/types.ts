@@ -22,7 +22,7 @@ type JsonColumn = ColumnType<
 export type SourceTable = {
   created_at: TimestampColumn;
   id: string;
-  kind: "podcast";
+  kind: "feed" | "podcast";
   slug: string;
   url: string;
   url_hash: string;
@@ -52,6 +52,21 @@ export type CollectorSettingSnapshotTable = {
   periodical: GeneratedBooleanColumn;
   periodical_interval_minutes: NumberColumn;
   recorded_at: TimestampColumn;
+  version: number;
+};
+
+export type CollectorPluginStateTable = {
+  collector_setting_id: string;
+  created_at: TimestampColumn;
+  id: string;
+  plugin_slug: string;
+};
+
+export type CollectorPluginStateSnapshotTable = {
+  collector_plugin_state_id: string;
+  id: string;
+  recorded_at: TimestampColumn;
+  state: JsonColumn;
   version: number;
 };
 
@@ -141,6 +156,8 @@ export type GeshiDatabase = {
   app_setting_snapshots: AppSettingSnapshotTable;
   assets: AssetTable;
   asset_snapshots: AssetSnapshotTable;
+  collector_plugin_states: CollectorPluginStateTable;
+  collector_plugin_state_snapshots: CollectorPluginStateSnapshotTable;
   collector_setting_snapshots: CollectorSettingSnapshotTable;
   collector_settings: CollectorSettingTable;
   content_snapshots: ContentSnapshotTable;

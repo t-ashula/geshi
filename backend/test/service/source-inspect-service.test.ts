@@ -4,15 +4,20 @@ import { createSourceInspectService } from "../../src/service/source-inspect-ser
 import { assertErr, assertOk } from "../support/result.js";
 
 const inspectMock = vi.fn();
+const createRegistryPlugin = () => ({
+  acquire: vi.fn(),
+  inspect: inspectMock,
+  observe: vi.fn(),
+  pluginSlug: "podcast-rss" as const,
+  sourceKind: "podcast" as const,
+});
 
 describe("source inspect service", () => {
   it("rejects invalid source urls before hitting the plugin", async () => {
     const service = createSourceInspectService({
       sourceCollectorRegistry: {
         get: vi.fn(() => ({
-          acquire: vi.fn(),
-          inspect: inspectMock,
-          observe: vi.fn(),
+          ...createRegistryPlugin(),
         })),
       },
     });
@@ -24,7 +29,7 @@ describe("source inspect service", () => {
     assertErr(result);
     expect(result.error).toEqual({
       code: "source_url_invalid",
-      message: "RSS URL must be an absolute http or https URL.",
+      message: "Source URL must be an absolute http or https URL.",
     });
     expect(inspectMock).not.toHaveBeenCalled();
   });
@@ -38,9 +43,7 @@ describe("source inspect service", () => {
     const service = createSourceInspectService({
       sourceCollectorRegistry: {
         get: vi.fn(() => ({
-          acquire: vi.fn(),
-          inspect: inspectMock,
-          observe: vi.fn(),
+          ...createRegistryPlugin(),
         })),
       },
     });
@@ -72,9 +75,7 @@ describe("source inspect service", () => {
     const service = createSourceInspectService({
       sourceCollectorRegistry: {
         get: vi.fn(() => ({
-          acquire: vi.fn(),
-          inspect: inspectMock,
-          observe: vi.fn(),
+          ...createRegistryPlugin(),
         })),
       },
     });
@@ -95,9 +96,7 @@ describe("source inspect service", () => {
     const service = createSourceInspectService({
       sourceCollectorRegistry: {
         get: vi.fn(() => ({
-          acquire: vi.fn(),
-          inspect: inspectMock,
-          observe: vi.fn(),
+          ...createRegistryPlugin(),
         })),
       },
     });

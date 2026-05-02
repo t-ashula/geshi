@@ -1,11 +1,13 @@
 export type CreateSourceRequest = {
   description: string;
+  pluginSlug?: string;
   sourceSlug: string;
   title: string;
   url: string;
 };
 
 export type InspectSourceRequest = {
+  pluginSlug?: string;
   url: string;
 };
 
@@ -28,7 +30,7 @@ export type SourceListItem = {
   createdAt: string;
   description: string | null;
   id: string;
-  kind: "podcast";
+  kind: "feed" | "podcast";
   recordedAt: string | null;
   slug: string;
   title: string | null;

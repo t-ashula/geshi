@@ -55,12 +55,14 @@ export type PatchSourceCollectorSettingsEndpointError =
 
 export type CreateSourceEndpointInput = {
   description?: string;
+  pluginSlug?: string;
   sourceSlug?: string;
   title?: string;
   url?: string;
 };
 
 export type InspectSourceEndpointInput = {
+  pluginSlug?: string;
   url?: string;
 };
 
@@ -93,6 +95,7 @@ export function createCreateSourceEndpoint(dependencies: AppDependencies) {
   ): Promise<Result<SourceListItem, CreateSourceEndpointError>> => {
     const result = await dependencies.sourceService.createSource({
       description: input.description,
+      pluginSlug: input.pluginSlug,
       sourceSlug: input.sourceSlug,
       title: input.title,
       url: input.url ?? "",
@@ -102,7 +105,7 @@ export function createCreateSourceEndpoint(dependencies: AppDependencies) {
       if (result.error instanceof DuplicateSourceUrlHashError) {
         return err({
           code: "duplicate_source",
-          message: "A source for this RSS URL already exists.",
+          message: "A source for this source URL already exists.",
         });
       }
 
@@ -126,6 +129,7 @@ export function createInspectSourceEndpoint(dependencies: AppDependencies) {
   ): Promise<Result<InspectSourceResult, InspectSourceError>> =>
     dependencies.sourceInspectService.inspectSource({
       url: input.url ?? "",
+      pluginSlug: input.pluginSlug,
     });
 }
 

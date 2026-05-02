@@ -3,6 +3,7 @@ import { sql } from "kysely";
 
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
+import type { SourceCollectorSourceKind } from "../plugins/types.js";
 import type { SourcePeriodicCrawlSettings } from "../service/periodic-crawl-settings.js";
 import { defaultSourcePeriodicCrawlSettings } from "../service/periodic-crawl-settings.js";
 import type {
@@ -18,7 +19,7 @@ export type CreateSourceInput = {
   collectorSettingSnapshotId: string;
   description?: string | null;
   id: string;
-  kind: "podcast";
+  kind: SourceCollectorSourceKind;
   pluginSlug: string;
   slug: string;
   snapshotId: string;
@@ -36,7 +37,7 @@ export type ObserveSourceTarget = {
   pluginSlug: string;
   slug: string;
   sourceId: string;
-  sourceKind: "podcast";
+  sourceKind: SourceCollectorSourceKind;
   url: string;
 };
 
@@ -47,7 +48,7 @@ export type SourceListItem = {
   createdAt: Date;
   description: string | null;
   id: string;
-  kind: "podcast";
+  kind: SourceCollectorSourceKind;
   recordedAt: Date | null;
   slug: string;
   title: string | null;
@@ -547,7 +548,7 @@ function toJoinedSourceListItem(source: {
   description: string | null;
   enabled: boolean | null;
   id: string;
-  kind: "podcast";
+  kind: SourceCollectorSourceKind;
   periodical_interval_minutes: number | null;
   recorded_at: Date | null;
   slug: string;

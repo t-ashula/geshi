@@ -12,6 +12,7 @@ import type { SourceUrlError } from "./source-service.js";
 import { normalizeSourceUrl } from "./source-service.js";
 
 export type InspectSourceRequest = {
+  pluginSlug?: string;
   url: string;
 };
 
@@ -56,7 +57,9 @@ export function createSourceInspectService(
       }
 
       const normalizedUrl = normalizedUrlResult.value;
-      const plugin = sourceCollectorRegistry.get("podcast-rss");
+      const plugin = sourceCollectorRegistry.get(
+        request.pluginSlug ?? "podcast-rss",
+      );
       try {
         const sourceMetadata = await plugin.inspect({
           abortSignal: new AbortController().signal,
