@@ -11,6 +11,7 @@ import {
   createCreateSourceEndpoint,
   createEnqueueObserveSourceEndpoint,
   createInspectSourceEndpoint,
+  createListSourceCollectorPluginsEndpoint,
   createListSourcesEndpoint,
   createPatchSourceCollectorSettingsEndpoint,
 } from "../../../endpoints/api/v1/sources.js";
@@ -20,6 +21,8 @@ import { err, ok } from "../../../lib/result.js";
 export function createSourceRoutes(dependencies: AppDependencies): Hono {
   const router = new Hono();
   const listSources = createListSourcesEndpoint(dependencies);
+  const listSourceCollectorPlugins =
+    createListSourceCollectorPluginsEndpoint(dependencies);
   const createSource = createCreateSourceEndpoint(dependencies);
   const inspectSource = createInspectSourceEndpoint(dependencies);
   const enqueueObserveSource = createEnqueueObserveSourceEndpoint(dependencies);
@@ -28,6 +31,15 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
 
   router.get("/", async (context) => {
     const result = await listSources();
+
+    if (!result.ok) {
+      return context.json({ error: result.error }, { status: 500 });
+    }
+
+    return context.json({ data: result.value });
+  });
+  router.get("/collector-plugins", (context) => {
+    const result = listSourceCollectorPlugins();
 
     if (!result.ok) {
       return context.json({ error: result.error }, { status: 500 });
@@ -155,6 +167,7 @@ function toCreateSourceEndpointInput(
 ): CreateSourceEndpointInput {
   return {
     description: toOptionalString(value.description),
+    pluginSlug: toOptionalString(value.pluginSlug),
     sourceSlug: toOptionalString(value.sourceSlug),
     title: toOptionalString(value.title),
     url: toOptionalString(value.url),
@@ -165,6 +178,7 @@ function toInspectSourceEndpointInput(
   value: Record<string, unknown>,
 ): InspectSourceEndpointInput {
   return {
+    pluginSlug: toOptionalString(value.pluginSlug),
     url: toOptionalString(value.url),
   };
 }

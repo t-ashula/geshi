@@ -1,5 +1,6 @@
 import { v7 as uuidv7 } from "uuid";
 
+import type { CollectorPluginStateRepository } from "../../db/collector-plugin-state-repository.js";
 import type { JobRepository } from "../../db/job-repository.js";
 import type {
   JobQueue,
@@ -15,6 +16,7 @@ import type { ContentService } from "../../service/content-service.js";
 
 type HandleObserveSourceJobDependencies = {
   assetService: AssetService;
+  collectorPluginStateRepository: CollectorPluginStateRepository;
   contentService: ContentService;
   jobQueue: JobQueue;
   jobRepository: JobRepository;
@@ -44,12 +46,27 @@ export async function handleObserveSourceJob(
   const plugin = dependencies.sourceCollectorRegistry.get(
     payload.collector.pluginSlug,
   );
-  const abortController = new AbortController();
-  let observedContents;
+  const collectorPluginStateResult =
+    await dependencies.collectorPluginStateRepository.findLatestStateByCollectorSettingId(
+      payload.collector.settingId,
+    );
+
+  if (!collectorPluginStateResult.ok) {
+    await failObserveSourceJob(
+      payload.jobId,
+      dependencies,
+      logger,
+      collectorPluginStateResult.error,
+    );
+    return collectorPluginStateResult;
+  }
+
+  let observeResult;
 
   try {
-    observedContents = await plugin.observe({
-      abortSignal: abortController.signal,
+    observeResult = await plugin.observe({
+      abortSignal: AbortSignal.timeout(30_000),
+      collectorPluginState: collectorPluginStateResult.value,
       config: payload.collector.config,
       logger: logger.child({
         operation: "observe",
@@ -64,7 +81,7 @@ export async function handleObserveSourceJob(
   }
 
   try {
-    for (const observedContent of observedContents) {
+    for (const observedContent of observeResult.contents) {
       const storedContent =
         await dependencies.contentService.createObservedContent({
           contentFingerprints: observedContent.contentFingerprints,
@@ -212,6 +229,25 @@ export async function handleObserveSourceJob(
         }
       }
     }
+
+    if (observeResult.collectorPluginState !== undefined) {
+      const saveCollectorPluginStateResult =
+        await dependencies.collectorPluginStateRepository.saveState({
+          collectorSettingId: payload.collector.settingId,
+          pluginSlug: payload.collector.pluginSlug,
+          state: observeResult.collectorPluginState,
+        });
+
+      if (!saveCollectorPluginStateResult.ok) {
+        await failObserveSourceJob(
+          payload.jobId,
+          dependencies,
+          logger,
+          saveCollectorPluginStateResult.error,
+        );
+        return saveCollectorPluginStateResult;
+      }
+    }
   } catch (error) {
     await failObserveSourceJob(payload.jobId, dependencies, logger, error);
     return err(
@@ -227,7 +263,7 @@ export async function handleObserveSourceJob(
     return markSucceededResult;
   }
   logger.info("observe job completed.", {
-    observedContentCount: observedContents.length,
+    observedContentCount: observeResult.contents.length,
   });
 
   return ok(undefined);

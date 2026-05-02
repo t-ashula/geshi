@@ -3,10 +3,14 @@ import type { CreateSourceRequest } from "./source-api.js";
 export function validateCreateSourceRequest(
   request: CreateSourceRequest,
 ): string | null {
+  if ((request.pluginSlug ?? "").trim().length === 0) {
+    return "Source collector plugin is required.";
+  }
+
   const trimmedUrl = request.url.trim();
 
   if (trimmedUrl.length === 0) {
-    return "RSS URL is required.";
+    return "Source URL is required.";
   }
 
   let parsedUrl: URL;
@@ -14,11 +18,11 @@ export function validateCreateSourceRequest(
   try {
     parsedUrl = new URL(trimmedUrl);
   } catch {
-    return "RSS URL must be an absolute http or https URL.";
+    return "Source URL must be an absolute http or https URL.";
   }
 
   if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    return "RSS URL must be an absolute http or https URL.";
+    return "Source URL must be an absolute http or https URL.";
   }
 
   return null;

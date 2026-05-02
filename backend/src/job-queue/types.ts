@@ -1,3 +1,5 @@
+import type { SourceCollectorSourceKind } from "../plugins/types.js";
+
 export const OBSERVE_SOURCE_JOB_NAME = "observe-source";
 export const ACQUIRE_CONTENT_JOB_NAME = "acquire-content";
 export const PERIODIC_CRAWL_JOB_NAME = "periodic-crawl";
@@ -12,7 +14,7 @@ export type ObserveSourceJobPayload = {
   };
   source: {
     id: string;
-    kind: "podcast";
+    kind: SourceCollectorSourceKind;
     slug: string;
     url: string;
   };

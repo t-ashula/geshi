@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 
 import { AssetRepository } from "../../db/asset-repository.js";
+import { CollectorPluginStateRepository } from "../../db/collector-plugin-state-repository.js";
 import { ContentRepository } from "../../db/content-repository.js";
 import { createDatabaseFromPool } from "../../db/database.js";
 import { JobRepository } from "../../db/job-repository.js";
@@ -38,6 +39,9 @@ const boss = createPgBoss(runtimeConfig);
 const jobQueue = new PgBossJobQueue(boss);
 const assetRepository = new AssetRepository(database);
 const assetService = createAssetService(assetRepository);
+const collectorPluginStateRepository = new CollectorPluginStateRepository(
+  database,
+);
 const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
@@ -63,6 +67,7 @@ await boss.work<ObserveSourceJobPayload>(
   async ([job]) => {
     const result = await handleObserveSourceJob(job.data, {
       assetService,
+      collectorPluginStateRepository,
       contentService,
       jobQueue,
       jobRepository,

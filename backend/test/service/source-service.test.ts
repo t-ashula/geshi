@@ -8,18 +8,36 @@ import type {
   SourceRepository,
 } from "../../src/db/source-repository.js";
 import { err, ok } from "../../src/lib/result.js";
+import type { SourceCollectorRegistry } from "../../src/plugins/index.js";
 import {
   createSourceService,
   normalizeSourceUrl,
 } from "../../src/service/source-service.js";
 import { assertErr, assertOk } from "../support/result.js";
 
+const sourceCollectorPlugin = {
+  acquire: vi.fn(),
+  inspect: vi.fn(),
+  observe: vi.fn(),
+  supports: vi.fn(),
+};
+
+const sourceCollectorRegistry: SourceCollectorRegistry = {
+  get: vi.fn(() => ({
+    ...sourceCollectorPlugin,
+  })),
+  list: vi.fn(() => []),
+  getSourceKind: vi.fn((pluginSlug: string) =>
+    pluginSlug === "go-jp-rss" ? ("feed" as const) : ("podcast" as const),
+  ),
+};
+
 describe("source service", () => {
   it("rejects blank source urls", () => {
     expect(normalizeSourceUrl("   ")).toEqual({
       error: {
         code: "source_url_required",
-        message: "RSS URL is required.",
+        message: "Source URL is required.",
       },
       ok: false,
     });
@@ -45,13 +63,16 @@ describe("source service", () => {
         } satisfies SourceListItem),
       ),
     );
-    const service = createSourceService({
-      createSource,
-      findObserveSourceTarget: vi.fn(),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource,
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.createSource({
       description: "  Weekly notes  ",
@@ -76,22 +97,25 @@ describe("source service", () => {
     expect(normalizeSourceUrl("ftp://example.com/feed.xml")).toEqual({
       error: {
         code: "source_url_invalid",
-        message: "RSS URL must be an absolute http or https URL.",
+        message: "Source URL must be an absolute http or https URL.",
       },
       ok: false,
     });
   });
 
   it("passes through repository errors while creating sources", async () => {
-    const service = createSourceService({
-      createSource: vi.fn(() =>
-        Promise.resolve(err(new Error("create failed"))),
-      ),
-      findObserveSourceTarget: vi.fn(),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(() =>
+          Promise.resolve(err(new Error("create failed"))),
+        ),
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.createSource({
       url: "https://example.com/feed.xml",
@@ -103,13 +127,16 @@ describe("source service", () => {
   });
 
   it("maps missing observe targets to source_not_found", async () => {
-    const service = createSourceService({
-      createSource: vi.fn(),
-      findObserveSourceTarget: vi.fn(() => Promise.resolve(ok(null))),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(() => Promise.resolve(ok(null))),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.findObserveSourceTarget("missing");
 
@@ -133,13 +160,16 @@ describe("source service", () => {
       sourceKind: "podcast",
       url: "https://example.com/feed.xml",
     } satisfies ObserveSourceTarget;
-    const service = createSourceService({
-      createSource: vi.fn(),
-      findObserveSourceTarget: vi.fn(() => Promise.resolve(ok(target))),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(() => Promise.resolve(ok(target))),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.findObserveSourceTarget("source-1");
 
@@ -148,15 +178,18 @@ describe("source service", () => {
   });
 
   it("passes through repository errors while finding observe targets", async () => {
-    const service = createSourceService({
-      createSource: vi.fn(),
-      findObserveSourceTarget: vi.fn(() =>
-        Promise.resolve(err(new Error("lookup failed"))),
-      ),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(() =>
+          Promise.resolve(err(new Error("lookup failed"))),
+        ),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.findObserveSourceTarget("source-1");
 
@@ -174,18 +207,86 @@ describe("source service", () => {
         sourceId: "source-1",
       },
     ] as unknown as PeriodicCrawlSourceTarget[];
-    const service = createSourceService({
-      createSource: vi.fn(),
-      findObserveSourceTarget: vi.fn(),
-      listPeriodicCrawlTargets: vi.fn(() => Promise.resolve(ok(targets))),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(() => Promise.resolve(ok(targets))),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.listPeriodicCrawlTargets();
 
     assertOk(result);
     expect(result.value).toEqual(targets);
+  });
+
+  it("lists source collector plugins from the registry", () => {
+    sourceCollectorRegistry.list = vi.fn(() => [
+      {
+        capability: {
+          kind: "source-collector" as const,
+          sourceKind: "podcast" as const,
+        },
+        definition: {
+          manifest: {
+            apiVersion: "1" as const,
+            capabilities: [],
+            description: "Collect podcast RSS and Atom feeds.",
+            displayName: "Podcast RSS",
+            pluginSlug: "podcast-rss",
+          },
+          plugin: sourceCollectorPlugin,
+        },
+      },
+      {
+        capability: {
+          kind: "source-collector" as const,
+          sourceKind: "feed" as const,
+        },
+        definition: {
+          manifest: {
+            apiVersion: "1" as const,
+            capabilities: [],
+            description: "Collect gov-online updates.",
+            displayName: "Go JP RSS",
+            pluginSlug: "go-jp-rss",
+          },
+          plugin: sourceCollectorPlugin,
+        },
+      },
+    ]);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
+
+    const result = service.listSourceCollectorPlugins();
+
+    assertOk(result);
+    expect(result.value).toEqual([
+      {
+        description: "Collect podcast RSS and Atom feeds.",
+        displayName: "Podcast RSS",
+        pluginSlug: "podcast-rss",
+        sourceKind: "podcast",
+      },
+      {
+        description: "Collect gov-online updates.",
+        displayName: "Go JP RSS",
+        pluginSlug: "go-jp-rss",
+        sourceKind: "feed",
+      },
+    ]);
   });
 
   it("lists sources from repository", async () => {
@@ -206,13 +307,16 @@ describe("source service", () => {
         version: 1,
       },
     ] satisfies SourceListItem[];
-    const service = createSourceService({
-      createSource: vi.fn(),
-      findObserveSourceTarget: vi.fn(),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(() => Promise.resolve(ok(sources))),
-      updateSourceCollectorSettings: vi.fn(),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(() => Promise.resolve(ok(sources))),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.listSources();
 
@@ -221,13 +325,16 @@ describe("source service", () => {
   });
 
   it("maps missing collector settings updates to source_not_found", async () => {
-    const service = createSourceService({
-      createSource: vi.fn(),
-      findObserveSourceTarget: vi.fn(),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(() => Promise.resolve(ok(null))),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(() => Promise.resolve(ok(null))),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.updateSourceCollectorSettings(
       "missing",
@@ -261,13 +368,16 @@ describe("source service", () => {
       urlHash: "hash-1",
       version: 2,
     } satisfies SourceListItem;
-    const service = createSourceService({
-      createSource: vi.fn(),
-      findObserveSourceTarget: vi.fn(),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(() => Promise.resolve(ok(source))),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(() => Promise.resolve(ok(source))),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.updateSourceCollectorSettings(
       "source-1",
@@ -283,15 +393,18 @@ describe("source service", () => {
   });
 
   it("passes through repository errors while updating collector settings", async () => {
-    const service = createSourceService({
-      createSource: vi.fn(),
-      findObserveSourceTarget: vi.fn(),
-      listPeriodicCrawlTargets: vi.fn(),
-      listSources: vi.fn(),
-      updateSourceCollectorSettings: vi.fn(() =>
-        Promise.resolve(err(new Error("update failed"))),
-      ),
-    } as unknown as SourceRepository);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(() =>
+          Promise.resolve(err(new Error("update failed"))),
+        ),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
 
     const result = await service.updateSourceCollectorSettings(
       "source-1",
@@ -305,5 +418,50 @@ describe("source service", () => {
     assertErr(result);
     expect(result.error).toBeInstanceOf(Error);
     expect(result.error.message).toBe("update failed");
+  });
+
+  it("uses plugin source kind when creating non-podcast sources", async () => {
+    const createSource = vi.fn((input: CreateSourceInput) =>
+      Promise.resolve(
+        ok({
+          collectorSettingsVersion: 1,
+          createdAt: new Date("2026-05-01T00:00:00.000Z"),
+          description: input.description ?? null,
+          id: "source-2",
+          kind: input.kind,
+          periodicCrawlEnabled: true,
+          periodicCrawlIntervalMinutes: 60,
+          recordedAt: null,
+          slug: input.slug,
+          title: input.title ?? null,
+          url: input.url,
+          urlHash: input.urlHash,
+          version: 1,
+        } satisfies SourceListItem),
+      ),
+    );
+    const service = createSourceService(
+      {
+        createSource,
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
+
+    await service.createSource({
+      pluginSlug: "go-jp-rss",
+      title: "Go JP",
+      url: "https://example.com/blog",
+    });
+
+    expect(createSource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "feed",
+        pluginSlug: "go-jp-rss",
+      }),
+    );
   });
 });

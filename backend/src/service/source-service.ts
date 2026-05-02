@@ -11,10 +11,13 @@ import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
 import { createSourceSlug, normalizeOptionalSlug } from "../lib/source-slug.js";
 import { createUrlHash } from "../lib/url-hash.js";
+import type { SourceCollectorRegistry } from "../plugins/index.js";
+import { defaultSourceCollectorRegistry } from "../plugins/index.js";
 import type { SourcePeriodicCrawlSettings } from "./periodic-crawl-settings.js";
 
 export type CreateSourceRequest = {
   description?: string;
+  pluginSlug?: string;
   sourceSlug?: string;
   title?: string;
   url: string;
@@ -39,6 +42,13 @@ export type FindObserveSourceTargetError = {
   message: string;
 };
 
+export type SourceCollectorPluginListItem = {
+  description: string | null;
+  displayName: string;
+  pluginSlug: string;
+  sourceKind: "feed" | "podcast";
+};
+
 export interface SourceService {
   createSource(
     request: CreateSourceRequest,
@@ -51,6 +61,7 @@ export interface SourceService {
       FindObserveSourceTargetError | SourceRepositoryError
     >
   >;
+  listSourceCollectorPlugins(): Result<SourceCollectorPluginListItem[], Error>;
   listPeriodicCrawlTargets(): Promise<
     Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
   >;
@@ -71,6 +82,7 @@ export interface SourceService {
 
 export function createSourceService(
   sourceRepository: SourceRepository,
+  sourceCollectorRegistry: SourceCollectorRegistry = defaultSourceCollectorRegistry,
 ): SourceService {
   return {
     async createSource(
@@ -86,14 +98,16 @@ export function createSourceService(
       const slug =
         normalizeOptionalSlug(request.sourceSlug) ??
         createSourceSlug(normalizedUrl, request.title);
+      const pluginSlug = request.pluginSlug ?? "podcast-rss";
+      const sourceKind = sourceCollectorRegistry.getSourceKind(pluginSlug);
 
       return sourceRepository.createSource({
         collectorSettingId: crypto.randomUUID(),
         collectorSettingSnapshotId: crypto.randomUUID(),
         description: normalizeOptionalString(request.description),
         id: crypto.randomUUID(),
-        kind: "podcast",
-        pluginSlug: "podcast-rss",
+        kind: sourceKind,
+        pluginSlug,
         slug,
         snapshotId: crypto.randomUUID(),
         title: normalizeOptionalString(request.title),
@@ -124,6 +138,28 @@ export function createSourceService(
       }
 
       return ok(source.value);
+    },
+
+    listSourceCollectorPlugins(): Result<
+      SourceCollectorPluginListItem[],
+      Error
+    > {
+      try {
+        return ok(
+          sourceCollectorRegistry.list().map(({ capability, definition }) => ({
+            description: definition.manifest.description ?? null,
+            displayName: definition.manifest.displayName,
+            pluginSlug: definition.manifest.pluginSlug,
+            sourceKind: capability.sourceKind,
+          })),
+        );
+      } catch (error) {
+        return err(
+          error instanceof Error
+            ? error
+            : new Error("Failed to list source collector plugins."),
+        );
+      }
     },
 
     async listPeriodicCrawlTargets(): Promise<
@@ -188,7 +224,7 @@ export function normalizeSourceUrl(
   if (trimmedValue.length === 0) {
     return err({
       code: "source_url_required",
-      message: "RSS URL is required.",
+      message: "Source URL is required.",
     });
   }
 
@@ -199,14 +235,14 @@ export function normalizeSourceUrl(
   } catch {
     return err({
       code: "source_url_invalid",
-      message: "RSS URL must be an absolute http or https URL.",
+      message: "Source URL must be an absolute http or https URL.",
     });
   }
 
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     return err({
       code: "source_url_invalid",
-      message: "RSS URL must be an absolute http or https URL.",
+      message: "Source URL must be an absolute http or https URL.",
     });
   }
 

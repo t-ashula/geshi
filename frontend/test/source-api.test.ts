@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getContentDetail, inspectSource } from "../src/source-api.js";
+import {
+  getContentDetail,
+  inspectSource,
+  listSourceCollectorPlugins,
+} from "../src/source-api.js";
 
 describe("inspectSource", () => {
   afterEach(() => {
@@ -8,32 +12,31 @@ describe("inspectSource", () => {
   });
 
   it("returns inspect data on success", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({
-              data: {
-                description: "Weekly notes",
-                sourceSlug: "example-podcast-123456789abc",
-                title: "Example Podcast",
-                url: "https://example.com/feed.xml",
-              },
-            }),
-            {
-              headers: {
-                "content-type": "application/json",
-              },
-              status: 200,
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: {
+              description: "Weekly notes",
+              sourceSlug: "example-podcast-123456789abc",
+              title: "Example Podcast",
+              url: "https://example.com/feed.xml",
             },
-          ),
+          }),
+          {
+            headers: {
+              "content-type": "application/json",
+            },
+            status: 200,
+          },
         ),
       ),
     );
+    vi.stubGlobal("fetch", fetchMock);
 
     await expect(
       inspectSource({
+        pluginSlug: "podcast-rss",
         url: "https://example.com/feed.xml",
       }),
     ).resolves.toEqual({
@@ -42,6 +45,15 @@ describe("inspectSource", () => {
       title: "Example Podcast",
       url: "https://example.com/feed.xml",
     });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/sources/inspect",
+      expect.objectContaining({
+        body: JSON.stringify({
+          pluginSlug: "podcast-rss",
+          url: "https://example.com/feed.xml",
+        }),
+      }),
+    );
   });
 
   it("throws an inspect error on failure", async () => {
@@ -72,6 +84,61 @@ describe("inspectSource", () => {
         url: "https://example.com/feed.xml",
       }),
     ).rejects.toThrow("The given URL is not a supported RSS feed.");
+  });
+});
+
+describe("listSourceCollectorPlugins", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns plugin list data on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  description: "Collect podcast RSS and Atom feeds.",
+                  displayName: "Podcast RSS",
+                  pluginSlug: "podcast-rss",
+                  sourceKind: "podcast",
+                },
+                {
+                  description: "Collect gov-online updates.",
+                  displayName: "Go JP RSS",
+                  pluginSlug: "go-jp-rss",
+                  sourceKind: "feed",
+                },
+              ],
+            }),
+            {
+              headers: {
+                "content-type": "application/json",
+              },
+              status: 200,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await expect(listSourceCollectorPlugins()).resolves.toEqual([
+      {
+        description: "Collect podcast RSS and Atom feeds.",
+        displayName: "Podcast RSS",
+        pluginSlug: "podcast-rss",
+        sourceKind: "podcast",
+      },
+      {
+        description: "Collect gov-online updates.",
+        displayName: "Go JP RSS",
+        pluginSlug: "go-jp-rss",
+        sourceKind: "feed",
+      },
+    ]);
   });
 });
 

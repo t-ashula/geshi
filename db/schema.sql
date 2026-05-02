@@ -2,7 +2,7 @@ create table sources (
     id uuid primary key,
     slug varchar(128) not null unique,
     kind text not null constraint sources_kind_check check (
-        kind = any(array ['podcast'::text])
+        kind = any(array ['podcast'::text, 'feed'::text])
     ),
     url text not null,
     url_hash text not null unique,
@@ -36,6 +36,23 @@ create table collector_setting_snapshots (
     config jsonb not null default '{}'::jsonb,
     recorded_at timestamptz not null default current_timestamp,
     constraint collector_setting_snapshots_setting_id_version_key unique (collector_setting_id, version)
+);
+
+create table collector_plugin_states (
+    id uuid primary key,
+    collector_setting_id uuid not null references collector_settings(id),
+    plugin_slug varchar(128) not null,
+    created_at timestamptz not null default current_timestamp,
+    constraint collector_plugin_states_collector_setting_id_key unique (collector_setting_id)
+);
+
+create table collector_plugin_state_snapshots (
+    id uuid primary key,
+    collector_plugin_state_id uuid not null references collector_plugin_states(id),
+    version integer not null,
+    state jsonb not null default '{}'::jsonb,
+    recorded_at timestamptz not null default current_timestamp,
+    constraint collector_plugin_state_snapshots_state_id_version_key unique (collector_plugin_state_id, version)
 );
 
 create table app_settings (
@@ -130,6 +147,15 @@ create index if not exists collector_settings_source_id_idx on collector_setting
 
 create index if not exists collector_setting_snapshots_setting_id_version_idx on collector_setting_snapshots (
     collector_setting_id,
+    version desc
+);
+
+create index if not exists collector_plugin_states_collector_setting_id_idx on collector_plugin_states (
+    collector_setting_id
+);
+
+create index if not exists collector_plugin_state_snapshots_state_id_version_idx on collector_plugin_state_snapshots (
+    collector_plugin_state_id,
     version desc
 );
 
