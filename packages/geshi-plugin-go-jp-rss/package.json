@@ -3,7 +3,18 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
+  "files": [
+    "src",
+    "test"
+  ],
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run test/**/*.test.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@geshi/plugin-api": "file:../geshi-plugin-api"
   }
 }

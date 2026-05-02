@@ -1,4 +1,5 @@
-import { definition as goJpRssPluginDefinition } from "../../../packages/geshi-plugin-go-jp-rss/src/index.js";
+import { definition as goJpRssPluginDefinition } from "@geshi/plugin-go-jp-rss";
+
 import { definition as podcastRssPluginDefinition } from "./collector/podcast-rss/index.js";
 import type {
   SourceCollectorPlugin,

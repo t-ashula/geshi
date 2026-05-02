@@ -1,4 +1,4 @@
-import type { PluginManifest } from "../../geshi-plugin-api/src/index.js";
+import type { PluginManifest } from "@geshi/plugin-api";
 
 export const manifest: PluginManifest = {
   apiVersion: "1",

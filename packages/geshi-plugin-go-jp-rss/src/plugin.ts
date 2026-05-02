@@ -11,7 +11,8 @@ import type {
   SourceCollectorPluginDefinition,
   SourceCollectorSupportsInput,
   SourceMetadata,
-} from "../../geshi-plugin-api/src/index.js";
+} from "@geshi/plugin-api";
+
 import { manifest } from "./manifest.js";
 
 const DEFAULT_CONTENT_TYPE = "text/html";

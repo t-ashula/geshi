@@ -1,2 +1,2 @@
-export { manifest, goJpRssManifest } from "./manifest.js";
+export { goJpRssManifest,manifest } from "./manifest.js";
 export { definition, plugin } from "./plugin.js";
