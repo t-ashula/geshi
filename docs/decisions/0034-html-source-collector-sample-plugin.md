@@ -1,4 +1,4 @@
-# ADR-0034: 非 RSS HTML page を source 化する sample 外部 package plugin を追加する
+# ADR-0034: 外部 package plugin のサンプルとして非 RSS ページを source にする実装を追加する
 
 ## ステータス
 
@@ -13,13 +13,14 @@
 - [ADR-0033] により，source collector plugin 契約を外部 package から参照できる公開境界として扱う方針を取る
 - ただし，公開拡張点の設計が妥当かどうかは，既存内蔵 plugin とは別に外部 package plugin の実例を 1 つ定めないと判断しづらい
 - `geshi` は RSS 以外の source も扱う前提であり，HTML page を直接読んで更新単位を抽出する plugin は代表的な検証対象である
-- sample として `go-jp-rss` 相当の package を用意すると，RSS feed が提供されていない page を source として扱う最小経路を確認できる
+- sample として [`github.com/t-ashula/go-jp-rss`][go-jp-rss] 相当の package を用意すると，RSS feed が提供されていない page を source として扱う最小経路を確認できる
 - 一方で，HTML page 由来の source は RSS と違って item list や asset URL の構造が標準化されていないため，content identity と source metadata の決め方を先に定義しておく必要がある
+- 加えて，差分観測を安定させるには，前回観測位置や補助 metadata を plugin 固有 state として持てる方が都合がよい場合がある
 
 ## 決定
 
 - 外部 package から追加する sample plugin として，非 RSS HTML page を source 化する source collector plugin package を追加する方針にする
-- この sample plugin は，`go-jp-rss` 相当の用途を持つものとして，HTML page を取得し，そこから source metadata と content 候補を解釈する
+- この sample plugin は，[`github.com/t-ashula/go-jp-rss`][go-jp-rss] 相当の用途を持つものとして，HTML page を取得し，そこから source metadata と content 候補を解釈する
 - sample plugin の役割は，一般 HTML 取得基盤を作ることではなく，「内蔵 plugin と共存する外部 package plugin 境界が成立すること」を示すことに置く
 
 ### sample plugin の責務
@@ -39,7 +40,7 @@
 ### sample plugin のスコープ制限
 
 - 初期段階では，対象サイトを広く一般化しない
-- `go-jp-rss` 相当の plugin は，特定の HTML 構造を前提とした collector として実装してよい
+- [`github.com/t-ashula/go-jp-rss`][go-jp-rss] 相当の plugin は，特定の HTML 構造を前提とした collector として実装してよい
 - JavaScript 実行や headless browser を前提にしない
 - login や認証付き source は対象外とする
 - page 構造変更への追従戦略は，将来の plugin 個別課題として扱う
@@ -51,6 +52,13 @@
 - entry URL が無い場合は，plugin が HTML 断片から導出する fingerprint を使ってよい
 - asset は，少なくとも再取得可能な source URL を持つものだけを acquire 対象にする
 - HTML page 全体を primary asset とするか，entry ごとの linked resource を primary にするかは，plugin ごとの解釈規則として明示する
+
+### plugin state の方針
+
+- sample plugin が cursor や補助 metadata を必要とする場合，それは `collector setting` ではなく `collector_plugin_state` として扱う
+- sample plugin は，必要な state を input として受け取り，次回実行用の state を output として返せる前提で設計してよい
+- 人が編集する収集条件と，plugin 実行が更新する継続状態は混在させない
+- この state は collector setting ごとに独立し，他の source や設定と共有しない前提で扱う
 
 ## 影響
 
@@ -74,10 +82,14 @@
 - [ADR-0016] ADR-0016: source collector plugin は content と asset の fingerprint を返す
 - [ADR-0023] ADR-0023: source collector plugin に source 登録前 inspect API を追加する
 - [ADR-0033] ADR-0033: source collector plugin 契約を外部 package から参照できる公開境界として定義する
+- [ADR-0035] ADR-0035: plugin 固有の継続状態は collector setting とは分けて backend が保持する
+- [go-jp-rss] `github.com/t-ashula/go-jp-rss`
 - [plugin-doc] Plugin
 
 [ADR-0011]: ./0011-source-crawl-plugin-responsibilities.md
 [ADR-0016]: ./0016-source-collector-content-and-asset-identity.md
 [ADR-0023]: ./0023-source-registration-inspect-plugin-api.md
 [ADR-0033]: ./0033-source-collector-plugin-api-package-boundary.md
+[ADR-0035]: ./0035-plugin-owned-state-storage.md
+[go-jp-rss]: https://github.com/t-ashula/go-jp-rss
 [plugin-doc]: ../plugin.md

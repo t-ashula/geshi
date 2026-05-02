@@ -77,6 +77,23 @@ source をどう収集するかを表す．
 - `pluginSlug`
 - `createdAt`
 
+### collectorPluginState
+
+source collector plugin の継続実行に必要な内部状態を表す．
+
+例:
+
+- 前回観測位置を表す cursor
+- 解釈補助 metadata
+- 次回 observe 実行に渡す plugin 固有 state
+
+主な属性:
+
+- `id`
+- `collectorSettingId`
+- `pluginSlug`
+- `createdAt`
+
 ### asset
 
 content にひもづく実ファイルや派生ファイルを表す．
@@ -166,6 +183,25 @@ collectorSetting の可変属性のある時点の状態を表す．
 - `version` は `collectorSettingId` ごとの版番号とする
 - plugin 固有 option や運用状態のようなクロール実行設定を履歴として追えるようにする
 
+### collectorPluginStateSnapshot
+
+collectorPluginState の可変属性のある時点の状態を表す．
+
+主な属性:
+
+- `id`
+- `collectorPluginStateId`
+- `version`
+- `state`
+- `recordedAt`
+
+補足:
+
+- `version` は `collectorPluginStateId` ごとの版番号とする
+- `state` は plugin が所有する JSON serialize 可能な任意の object とする
+- property 名，値の意味，versioning，互換性，秘匿方法は plugin の責務とする
+- `backend` は `state` の意味を解釈せず，opaque state として保持する
+
 ### contentSnapshot
 
 content の可変属性のある時点の状態を表す．
@@ -201,10 +237,12 @@ asset の可変属性のある時点の状態を表す．
 
 - 1 `source` : N `content`
 - 1 `source` : N `collectorSetting`
+- 1 `collectorSetting` : 1 `collectorPluginState`
 - 1 `content` : N `asset`
 - 1 `asset` : N `transcript`
 - 1 `source` : N `sourceSnapshot`
 - 1 `collectorSetting` : N `collectorSettingSnapshot`
+- 1 `collectorPluginState` : N `collectorPluginStateSnapshot`
 - 1 `content` : N `contentSnapshot`
 - 1 `asset` : N `assetSnapshot`
 
@@ -224,6 +262,14 @@ asset の可変属性のある時点の状態を表す．
 - crawl するしないのような運用状態を含む収集設定の変更履歴は collectorSettingSnapshot 側に持つ
 - plugin 固有の追加設定は collectorSettingSnapshot.config に入れる
 
+### collectorPluginState は plugin の継続状態
+
+- collectorPluginState は source collector plugin 実行が更新する内部状態を表す
+- collectorSetting が人や API による入力設定を表すのに対し，collectorPluginState は plugin 実行に伴って変化する継続状態を表す
+- collectorPluginState は collectorSetting ごとに独立して持つ
+- source をまたいで state を共有しない
+- state の shape や意味は plugin が所有し，backend はそれを解釈しない
+
 ### content は閲覧と検索の中心
 
 - 一覧，詳細，検索結果の主単位は content とする
@@ -241,7 +287,7 @@ asset の可変属性のある時点の状態を表す．
 
 ### 可変属性は履歴テーブルに保持する
 
-- `source`，`collectorSetting`，`content`，`asset` の履歴が必要な属性は snapshot 側に持つ
+- `source`，`collectorSetting`，`collectorPluginState`，`content`，`asset` の履歴が必要な属性は snapshot 側に持つ
 - 現在値だけを主体テーブルへ上書きしない
 - `updatedAt` で履歴要件を代替しない
 - source の canonical な取得先 URL は source に持つ

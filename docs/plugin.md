@@ -24,6 +24,7 @@
 
 - backend の domain model を直接更新しない
 - 呼び出し側の責任で backend のモデルへ変換したり保存したりする
+- plugin 固有の継続状態が必要な場合でも，plugin 自身が永続化を直接行わない
 
 ### 配置
 
@@ -41,6 +42,15 @@
 - source から `content` 候補を抽出 (`observe`)
 - 必要に応じて実ファイルを取得 (`acquire`)
 
+### plugin state
+
+- source collector plugin は，必要に応じて plugin 固有の継続状態を扱ってよい
+- plugin state は，plugin が所有する JSON serialize 可能な任意の object とする
+- property 名，値の意味，versioning，互換性，秘匿方法は plugin の責務とする
+- backend は plugin state の意味を解釈せず，呼び出し時の受け渡しと保存を担う
+- plugin は plugin state を input として受け取り，必要に応じて次回実行用の state を output として返してよい
+- plugin は plugin state を直接永続化しない
+
 ### `inspect`
 
 - source 登録前に，入力された URL から登録用の初期データを返す
@@ -50,6 +60,7 @@
 - 入力
   - source の取得先 URL
   - plugin 固有 option
+  - plugin 固有 state
   - logger
   - abort signal
 - 出力
@@ -69,6 +80,7 @@
 - 入力
   - source の取得先 URL
   - plugin 固有 option
+  - plugin 固有 state
   - logger
   - abort signal
   - 一時ディレクトリパス
@@ -81,6 +93,7 @@
   - `contentSnapshot` 保存に必要なデータ
     - title
     - summary
+  - 必要に応じて次回実行用の plugin 固有 state
 
 ### `acquire`
 
@@ -92,12 +105,14 @@
   - 対象 `content`
   - 取得元 URL または外部識別子
   - plugin 固有 option
+  - plugin 固有 state
   - logger
   - abort signal
   - 一時ディレクトリパス
 - 出力
   - `storage` に移す，一時ディレクトリへ書き出した成果物一覧
   - `asset` 保存に必要な metadata
+  - 必要に応じて次回実行用の plugin 固有 state
 
 ## `podcast-rss` collector plugin
 

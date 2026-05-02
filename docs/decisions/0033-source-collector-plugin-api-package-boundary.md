@@ -38,6 +38,7 @@
 - plugin が受け取る logger は，実装依存の concrete class ではなく最小 interface とする
 - plugin manifest には，少なくとも `pluginSlug`，plugin kind，plugin API version を含める
 - `pluginSlug` は package 名と分離した論理識別子として扱う
+- plugin 固有の継続状態が必要な場合，その保存主体は plugin ではなく `backend` とする
 
 ### registry への影響
 
@@ -59,6 +60,7 @@
 - plugin の追加を，`backend` 本体改変なしでも行える公開拡張点として扱いやすくなる
 - `backend` と plugin の責務境界が，型定義の所有権まで含めて揃う
 - `podcast-rss` 以外の plugin を sample や別 repository で育てやすくなる
+- cursor や補助 metadata を必要とする plugin も，同じ公開境界の上で扱いやすくなる
 - 一方で，plugin API version と互換性判定を運用する責務が増える
 - monorepo 内 package と repository 外 package の両方を視野に入れた build / test 設計が別途必要になる
 
@@ -76,9 +78,11 @@
 - [ADR-0011] ADR-0011: source クロールを plugin 境界で拡張可能にする
 - [ADR-0023] ADR-0023: source collector plugin に source 登録前 inspect API を追加する
 - [ADR-0032] ADR-0032: source collector plugin 解決を registry interface 境界へ寄せる
+- [ADR-0035] ADR-0035: plugin 固有の継続状態は collector setting とは分けて backend が保持する
 - [plugin-doc] Plugin
 
 [ADR-0011]: ./0011-source-crawl-plugin-responsibilities.md
 [ADR-0023]: ./0023-source-registration-inspect-plugin-api.md
 [ADR-0032]: ./0032-source-collector-plugin-registry-boundary.md
+[ADR-0035]: ./0035-plugin-owned-state-storage.md
 [plugin-doc]: ../plugin.md
