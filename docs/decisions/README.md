@@ -36,3 +36,4 @@
 - [ADR-0033: source collector plugin 契約を backend から分離した外部 package として定義する](./0033-source-collector-plugin-api-package-boundary.md)
 - [ADR-0034: 非 RSS HTML page を source 化する sample 外部 plugin を追加する](./0034-html-source-collector-sample-plugin.md)
 - [ADR-0035: plugin 固有の継続状態は collector setting とは分けて backend が保持する](./0035-plugin-owned-state-storage.md)
+- [ADR-0036: source collector plugin の適用条件を manifest と inspect で表現する](./0036-source-collector-plugin-applicability-manifest.md)

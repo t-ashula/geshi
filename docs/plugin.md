@@ -50,6 +50,15 @@
 - backend は plugin state の意味を解釈せず，呼び出し時の受け渡しと保存を担う
 - plugin は plugin state を input として受け取り，必要に応じて次回実行用の state を output として返してよい
 - plugin は plugin state を直接永続化しない
+- plugin state は source collector plugin ごとではなく，`collector setting` 単位で独立して保持される
+- backend は observe 実行の開始前に current plugin state を plugin へ渡してよい
+- backend は observe 実行で domain model への反映が成立した後に，plugin が返した次回実行用 state を保存する
+
+### `supports`
+
+- source collector plugin は，与えられた `sourceUrl` を扱えるかどうかを `supports` で判定してよい
+- `supports` は plugin 自身の知識で applicability を返す API である
+- `supports` は source 登録前の候補絞り込みや事前 validation に使ってよい
 
 ### `inspect`
 
@@ -94,6 +103,7 @@
     - title
     - summary
   - 必要に応じて次回実行用の plugin 固有 state
+    - backend は content / asset 候補の反映が成立した後にこれを保存する
 
 ### `acquire`
 

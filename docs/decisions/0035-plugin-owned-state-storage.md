@@ -26,6 +26,7 @@
 - state の永続化と version 管理は `backend` 側の責務とする
 - `collector_plugin_state` は，少なくとも `collector setting` ごとに分離する
 - `pluginSlug` だけを key にした source 横断共有 state は，初期方針として採らない
+- `collector_plugin_state` の current state は，plugin ごとではなく `collector setting` 単位で保持する
 
 ### 用語
 
@@ -46,6 +47,7 @@
 - `collector_plugin_state` の基本スコープは，`collector_setting` と `pluginSlug` の組とする
 - 同じ source collector plugin を複数 source が使っていても，state は collector setting ごとに独立して持つ
 - `collector setting snapshot` の version 更新とは独立して，current state を更新できるようにしてよい
+- 実装上は，同一 `collector_setting` に対して source collector plugin の current state を 1 つ持ち，必要に応じて snapshot を積む形から始めてよい
 - source 横断で共有したい read-only な知識が将来必要になっても，それは別の cache や reference data として扱い，collector plugin state と混同しない
 - source 横断共有 state を collector plugin API の標準機能として先に入れない
 - この ADR の state は source collector plugin 専用であり，将来別種の plugin が追加されても同じ table や ownership を強制しない
@@ -56,11 +58,14 @@
 - plugin は `collector_plugin_state` を解釈して使ってよい
 - plugin が state 更新を望む場合は，呼び出し側へ新しい state を返す
 - `backend` は，job 実行単位でどの state snapshot を plugin に渡し，実行後にどの state を current state として採用するかを決める
+- `backend` は，少なくとも observe 実行の開始前に current state を plugin へ渡せるようにする
+- `backend` は，plugin 実行の副作用を domain model へ反映できた後で，新しい state を current state として保存する
+- 少なくとも observe 実行では，content / asset 候補の保存が成立した後に state を更新する方針とする
 - `collector setting` の変更 API と `plugin state` の更新経路は分ける
 
 ### API への影響
 
-- plugin 公開契約には，必要に応じて `collectorPluginState` input と `nextCollectorPluginState` output を追加できるようにする
+- plugin 公開契約には，`collectorPluginState` input と，次回実行用 state を返す output を追加する
 - state の shape は plugin ごとに異なるため，公開契約では JSON serialize 可能な object を基本にしてよい
 - `backend` は少なくとも pluginSlug と collector setting にひもづく形で state を管理する
 - state は，少なくとも last-write-wins で current state を更新できれば始められる

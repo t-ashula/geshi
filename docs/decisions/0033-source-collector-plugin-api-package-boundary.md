@@ -23,7 +23,7 @@
 - `backend` は plugin 契約の consumer になり，契約定義の owner にはならない
 - source collector plugin 用の公開 package を設け，少なくとも次をそこへ置く
   - `SourceCollectorPlugin`
-  - `inspect` / `observe` / `acquire` の input / output 型
+  - `supports` / `inspect` / `observe` / `acquire` の input / output 型
   - plugin manifest 型
   - plugin API version
   - plugin が受け取れる最小 logger interface
@@ -36,20 +36,30 @@
 - 公開契約 package は，`backend` の repository / service / endpoint / DB 型を export しない
 - plugin は `backend` の domain model を直接更新しないという既存原則を維持する
 - plugin が受け取る logger は，実装依存の concrete class ではなく最小 interface とする
-- plugin manifest には，少なくとも `pluginSlug`，plugin kind，plugin API version を含める
+- built-in / external を問わず，すべての plugin は manifest を持つ
+- plugin manifest には，少なくとも `pluginSlug`，`displayName`，plugin API version，capability 情報を含める
 - `pluginSlug` は package 名と分離した論理識別子として扱う
 - plugin 固有の継続状態が必要な場合，その保存主体は plugin ではなく `backend` とする
+- plugin 公開契約は，`collectorPluginState` を input として受け取り，必要に応じて次回実行用 state を output として返せる形にしてよい
+
+### manifest の役割
+
+- manifest は，plugin が何者で何ができるかを backend が先に知るための公開 metadata とする
+- source collector plugin であることの識別は，実装配置や import 元ではなく manifest の capability 宣言で行う
+- この原則は，built-in plugin と外部 package plugin の両方に同じように適用する
 
 ### registry への影響
 
 - registry は「どの plugin があるか」を知るが，「plugin 契約の型定義」は所有しない
 - registry 実装は，静的 import による内蔵 plugin 登録から始めてよい
-- それに加えて，外部 package が export する plugin を同じ registry へ追加登録できるようにする
+- ただし，built-in plugin でも外部 package plugin でも，manifest を読んだうえで capability ごとに registry へ登録する
+- それに加えて，外部 package が export する plugin を同じ流儀で registry へ追加登録できるようにする
 - 将来的な動的 import や設定ファイル経由登録は，この境界の上に追加してよい
 
 ### 既存 plugin との関係
 
 - 既存 `podcast-rss` plugin は，まず公開契約に従う内蔵 plugin として維持してよい
+- 既存 `podcast-rss` plugin にも，built-in plugin として manifest を追加する
 - `podcast-rss` を外部 package 化するかどうかは，この ADR の必須スコープに含めない
 - 外部 package plugin 追加後も，既存内蔵 plugin の `inspect` / `observe` / `acquire` の振る舞いと既存 DB / job 実行経路は維持する
 - `backend` 側の service / worker test は，引き続き fake registry を注入する
@@ -58,6 +68,7 @@
 ## 影響
 
 - plugin の追加を，`backend` 本体改変なしでも行える公開拡張点として扱いやすくなる
+- built-in / external で plugin 識別と登録の流儀を揃えられる
 - `backend` と plugin の責務境界が，型定義の所有権まで含めて揃う
 - `podcast-rss` 以外の plugin を sample や別 repository で育てやすくなる
 - cursor や補助 metadata を必要とする plugin も，同じ公開境界の上で扱いやすくなる
