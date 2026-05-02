@@ -15,14 +15,15 @@ import {
 import { assertErr, assertOk } from "../support/result.js";
 
 const sourceCollectorRegistry = {
-  get: vi.fn((pluginSlug: string) => ({
+  get: vi.fn(() => ({
     acquire: vi.fn(),
     inspect: vi.fn(),
     observe: vi.fn(),
-    pluginSlug,
-    sourceKind:
-      pluginSlug === "go-jp-rss" ? ("feed" as const) : ("podcast" as const),
+    supports: vi.fn(),
   })),
+  getSourceKind: vi.fn((pluginSlug: string) =>
+    pluginSlug === "go-jp-rss" ? ("feed" as const) : ("podcast" as const),
+  ),
 };
 
 describe("source service", () => {

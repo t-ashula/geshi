@@ -16,12 +16,14 @@ async function observeFixture(name: string) {
     vi.fn(() => Promise.resolve(new Response(fixture, { status: 200 }))),
   );
 
-  return podcastRssPlugin.observe({
+  const result = await podcastRssPlugin.observe({
     abortSignal: new AbortController().signal,
     config: {},
     logger: createNoopLogger(),
     sourceUrl: "https://example.com/feed.xml",
   });
+
+  return result.contents;
 }
 
 describe("podcastRssPlugin.observe fixtures", () => {
@@ -115,12 +117,13 @@ describe("podcastRssPlugin.observe", () => {
       ),
     );
 
-    const contents = await podcastRssPlugin.observe({
+    const result = await podcastRssPlugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
       logger: createNoopLogger(),
       sourceUrl: "https://example.com/feed.xml",
     });
+    const contents = result.contents;
 
     expect(contents).toHaveLength(1);
     expect(contents[0]).toMatchObject({
@@ -178,12 +181,13 @@ describe("podcastRssPlugin.observe", () => {
       ),
     );
 
-    const contents = await podcastRssPlugin.observe({
+    const result = await podcastRssPlugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
       logger: createNoopLogger(),
       sourceUrl: "https://example.com/feed.xml",
     });
+    const contents = result.contents;
 
     expect(contents).toHaveLength(2);
     expect(contents[0]).toMatchObject({
@@ -231,12 +235,13 @@ describe("podcastRssPlugin.observe", () => {
       ),
     );
 
-    const contents = await podcastRssPlugin.observe({
+    const result = await podcastRssPlugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
       logger: createNoopLogger(),
       sourceUrl: "https://example.com/feed.xml",
     });
+    const contents = result.contents;
 
     expect(contents).toHaveLength(1);
     expect(contents[0]?.publishedAt).toBeNull();

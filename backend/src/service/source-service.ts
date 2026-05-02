@@ -91,7 +91,7 @@ export function createSourceService(
         normalizeOptionalSlug(request.sourceSlug) ??
         createSourceSlug(normalizedUrl, request.title);
       const pluginSlug = request.pluginSlug ?? "podcast-rss";
-      const sourceKind = sourceCollectorRegistry.get(pluginSlug).sourceKind;
+      const sourceKind = sourceCollectorRegistry.getSourceKind(pluginSlug);
 
       return sourceRepository.createSource({
         collectorSettingId: crypto.randomUUID(),

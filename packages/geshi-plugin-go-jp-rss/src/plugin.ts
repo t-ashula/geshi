@@ -1,13 +1,26 @@
 import type {
   AcquiredAsset,
+  JsonObject,
   ObservedContent,
   SourceCollectorAcquireInput,
   SourceCollectorInspectErrorCode,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
+  SourceCollectorObserveResult,
   SourceCollectorPlugin,
+  SourceCollectorPluginDefinition,
+  SourceCollectorSupportsInput,
   SourceMetadata,
 } from "../../geshi-plugin-api/src/index.js";
+import { manifest } from "./manifest.js";
+
+const DEFAULT_CONTENT_TYPE = "text/html";
+const DEFAULT_USER_AGENT =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.000.0 Safari/537.36";
+const GOV_ONLINE_HOST = "www.gov-online.go.jp";
+const GOV_ONLINE_INFO_PATHS = new Set(["/info/", "/info/index.html"]);
+const MAX_ITEMS = 40;
+const ONE_WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 
 class SourceCollectorInspectPluginError extends Error {
   public readonly code: SourceCollectorInspectErrorCode;
@@ -19,80 +32,128 @@ class SourceCollectorInspectPluginError extends Error {
   }
 }
 
-export const goJpRssPlugin: SourceCollectorPlugin = {
-  pluginSlug: "go-jp-rss",
-  sourceKind: "feed",
+type GovOnlineEntry = {
+  category: string | null;
+  publishedAt: Date | null;
+  publishedAtText: string | null;
+  title: string | null;
+  url: string;
+};
+
+type GovOnlinePage = {
+  entries: GovOnlineEntry[];
+  metadata: Pick<SourceMetadata, "description" | "title">;
+  nextPageUrl: string | null;
+};
+
+export const plugin: SourceCollectorPlugin = {
+  supports(
+    input: SourceCollectorSupportsInput,
+  ): Promise<{ supported: boolean }> {
+    return Promise.resolve({
+      supported: isSupportedSourceUrl(input.sourceUrl),
+    });
+  },
 
   async inspect(input: SourceCollectorInspectInput) {
-    const response = await fetch(input.sourceUrl, {
-      signal: input.abortSignal,
-    }).catch(() => null);
+    assertSupportedSourceUrl(input.sourceUrl);
 
-    if (response === null || !response.ok) {
-      throw new SourceCollectorInspectPluginError(
-        "source_inspect_fetch_failed",
-        "Failed to fetch source metadata.",
-      );
-    }
+    const page = await fetchGovOnlinePage(input.sourceUrl, input.abortSignal);
 
-    const body = await response.text();
-    const metadata = parseHtmlMetadata(body);
-
-    if (metadata === null) {
+    if (page.metadata.title === null && page.metadata.description === null) {
       throw new SourceCollectorInspectPluginError(
         "source_inspect_unrecognized",
-        "The given URL is not a supported HTML source.",
+        "Failed to recognize the gov-online source metadata.",
       );
     }
 
     return {
-      description: metadata.description,
-      title: metadata.title,
+      description: page.metadata.description,
+      title: page.metadata.title,
       url: input.sourceUrl,
     };
   },
 
   async observe(
     input: SourceCollectorObserveInput,
-  ): Promise<ObservedContent[]> {
-    const response = await fetch(input.sourceUrl, {
-      signal: input.abortSignal,
-    });
+  ): Promise<SourceCollectorObserveResult> {
+    assertSupportedSourceUrl(input.sourceUrl);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch HTML source: ${response.status}`);
+    const now = Date.now();
+    const oneWeekAgo = now - ONE_WEEK_IN_MS;
+    const lastProcessedUrl = readLastProcessedUrl(input.collectorPluginState);
+    const observedContents: ObservedContent[] = [];
+    const seenUrls = new Set<string>();
+    let currentUrl = input.sourceUrl;
+
+    while (observedContents.length < MAX_ITEMS) {
+      const page = await fetchGovOnlinePage(currentUrl, input.abortSignal);
+
+      if (page.entries.length === 0) {
+        break;
+      }
+
+      let reachedLastProcessedUrl = false;
+      let reachedOldEntry = false;
+
+      for (const entry of page.entries) {
+        if (entry.url === lastProcessedUrl) {
+          reachedLastProcessedUrl = true;
+          break;
+        }
+
+        if (seenUrls.has(entry.url)) {
+          continue;
+        }
+
+        if (
+          entry.publishedAt !== null &&
+          entry.publishedAt.getTime() < oneWeekAgo
+        ) {
+          reachedOldEntry = true;
+          break;
+        }
+
+        seenUrls.add(entry.url);
+        observedContents.push(toObservedContent(entry));
+
+        if (observedContents.length >= MAX_ITEMS) {
+          break;
+        }
+      }
+
+      if (
+        reachedLastProcessedUrl ||
+        reachedOldEntry ||
+        observedContents.length >= MAX_ITEMS ||
+        page.nextPageUrl === null
+      ) {
+        break;
+      }
+
+      currentUrl = page.nextPageUrl;
     }
 
-    const body = await response.text();
-    const entries = parseHtmlEntries(body, input.sourceUrl);
-
-    return entries.map((entry) => ({
-      assets: [
-        {
-          kind: "html",
-          observedFingerprints: [
-            createFingerprint("observed-html-url", entry.url),
-          ],
-          primary: true,
-          sourceUrl: entry.url,
-        },
-      ],
-      contentFingerprints: [createFingerprint("content-url", entry.url)],
-      externalId: entry.url,
-      kind: "article",
-      publishedAt: null,
-      status: "discovered",
-      summary: null,
-      title: entry.title,
-    }));
+    return {
+      collectorPluginState:
+        observedContents[0] === undefined
+          ? undefined
+          : {
+              lastProcessedUrl: observedContents[0].externalId,
+            },
+      contents: observedContents,
+    };
   },
 
   async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
     if (input.asset.sourceUrl === null) {
-      throw new Error("HTML source asset sourceUrl is required.");
+      throw new Error("go-jp-rss asset sourceUrl is required.");
     }
 
     const response = await fetch(input.asset.sourceUrl, {
+      headers: {
+        "User-Agent": DEFAULT_USER_AGENT,
+      },
       signal: input.abortSignal,
     });
 
@@ -103,7 +164,7 @@ export const goJpRssPlugin: SourceCollectorPlugin = {
     const body = new Uint8Array(await response.arrayBuffer());
     const contentType = normalizeContentType(
       response.headers.get("content-type"),
-      "text/html",
+      DEFAULT_CONTENT_TYPE,
     );
 
     return {
@@ -123,65 +184,157 @@ export const goJpRssPlugin: SourceCollectorPlugin = {
   },
 };
 
-type HtmlMetadata = Pick<SourceMetadata, "description" | "title">;
-
-type HtmlEntry = {
-  title: string | null;
-  url: string;
+export const definition: SourceCollectorPluginDefinition = {
+  manifest,
+  plugin,
 };
 
-function parseHtmlMetadata(body: string): HtmlMetadata | null {
-  const title = normalizeWhitespace(
-    firstMatch(body, /<title[^>]*>(.*?)<\/title>/isu),
-  );
-  const description = normalizeWhitespace(
-    firstMatch(
-      body,
-      /<meta[^>]+name=["']description["'][^>]+content=["'](.*?)["'][^>]*>/isu,
-    ) ??
-      firstMatch(
-        body,
-        /<meta[^>]+content=["'](.*?)["'][^>]+name=["']description["'][^>]*>/isu,
-      ),
-  );
+export const goJpRssPlugin = plugin;
+export const goJpRssPluginDefinition = definition;
 
-  if (title === null && description === null) {
-    return null;
+function assertSupportedSourceUrl(sourceUrl: string): void {
+  if (!isSupportedSourceUrl(sourceUrl)) {
+    throw new SourceCollectorInspectPluginError(
+      "source_inspect_unsupported",
+      "The go-jp-rss plugin only supports gov-online ministry news pages.",
+    );
+  }
+}
+
+function isSupportedSourceUrl(sourceUrl: string): boolean {
+  const url = new URL(sourceUrl);
+
+  return (
+    url.hostname === GOV_ONLINE_HOST &&
+    GOV_ONLINE_INFO_PATHS.has(normalizeInfoPath(url.pathname))
+  );
+}
+
+async function fetchGovOnlinePage(
+  sourceUrl: string,
+  abortSignal: AbortSignal,
+): Promise<GovOnlinePage> {
+  const response = await fetch(sourceUrl, {
+    headers: {
+      "User-Agent": DEFAULT_USER_AGENT,
+    },
+    signal: abortSignal,
+  }).catch(() => null);
+
+  if (response === null || !response.ok) {
+    throw new SourceCollectorInspectPluginError(
+      "source_inspect_fetch_failed",
+      "Failed to fetch gov-online source.",
+    );
   }
 
+  const body = await response.text();
+
+  return parseGovOnlinePage(body, sourceUrl);
+}
+
+function parseGovOnlinePage(body: string, sourceUrl: string): GovOnlinePage {
   return {
-    description,
-    title,
+    entries: parseGovOnlineEntries(body, sourceUrl),
+    metadata: parseGovOnlineMetadata(body),
+    nextPageUrl: parseNextPageUrl(body, sourceUrl),
   };
 }
 
-function parseHtmlEntries(body: string, sourceUrl: string): HtmlEntry[] {
-  const matches = body.matchAll(/<a[^>]+href=["'](.*?)["'][^>]*>(.*?)<\/a>/gis);
-  const entries: HtmlEntry[] = [];
-  const seenUrls = new Set<string>();
+function parseGovOnlineMetadata(
+  body: string,
+): Pick<SourceMetadata, "description" | "title"> {
+  const pageTitle = normalizeWhitespace(
+    decodeHtmlEntities(firstMatch(body, /<title[^>]*>(.*?)<\/title>/isu)),
+  );
+  const description = normalizeWhitespace(
+    decodeHtmlEntities(
+      firstMatch(
+        body,
+        /<meta[^>]+name=["']description["'][^>]+content=["'](.*?)["'][^>]*>/isu,
+      ) ??
+        firstMatch(
+          body,
+          /<meta[^>]+content=["'](.*?)["'][^>]+name=["']description["'][^>]*>/isu,
+        ),
+    ),
+  );
 
-  for (const match of matches) {
-    const href = normalizeWhitespace(match[1]);
-    const title = normalizeWhitespace(stripTags(match[2] ?? ""));
+  return {
+    description,
+    title: stripGovOnlineTitleSuffix(pageTitle),
+  };
+}
 
-    if (href === null || href.startsWith("#")) {
+function parseGovOnlineEntries(
+  body: string,
+  sourceUrl: string,
+): GovOnlineEntry[] {
+  const itemPattern = /<li class=["']p-newsList__item["'][^>]*>(.*?)<\/li>/gis;
+  const entries: GovOnlineEntry[] = [];
+
+  for (const match of body.matchAll(itemPattern)) {
+    const itemHtml = match[1] ?? "";
+    const href = normalizeWhitespace(
+      decodeHtmlEntities(
+        firstMatch(
+          itemHtml,
+          /<a class=["']p-newsList__link["'][^>]+href=["'](.*?)["']/isu,
+        ),
+      ),
+    );
+
+    if (href === null) {
       continue;
     }
 
-    let resolvedUrl: string;
+    const resolvedUrl = safeResolveUrl(href, sourceUrl);
 
-    try {
-      resolvedUrl = new URL(href, sourceUrl).toString();
-    } catch {
+    if (resolvedUrl === null) {
       continue;
     }
 
-    if (resolvedUrl === sourceUrl || seenUrls.has(resolvedUrl)) {
-      continue;
-    }
+    const title = normalizeWhitespace(
+      decodeHtmlEntities(
+        stripTags(
+          firstMatch(
+            itemHtml,
+            /<span class=["']p-newsList__title["'][^>]*>(.*?)<\/span>/isu,
+          ) ?? "",
+        ),
+      ),
+    );
+    const category = normalizeWhitespace(
+      decodeHtmlEntities(
+        stripTags(
+          firstMatch(
+            itemHtml,
+            /<span class=["']p-newsList__categoryLabel["'][^>]*>(.*?)<\/span>/isu,
+          ) ?? "",
+        ),
+      ),
+    );
+    const publishedAtValue = normalizeWhitespace(
+      firstMatch(
+        itemHtml,
+        /<time class=["']p-newsList__date["'][^>]+datetime=["'](.*?)["']/isu,
+      ),
+    );
+    const publishedAtText = normalizeWhitespace(
+      decodeHtmlEntities(
+        stripTags(
+          firstMatch(
+            itemHtml,
+            /<time class=["']p-newsList__date["'][^>]*>(.*?)<\/time>/isu,
+          ) ?? "",
+        ),
+      ),
+    );
 
-    seenUrls.add(resolvedUrl);
     entries.push({
+      category,
+      publishedAt: parsePublishedAt(publishedAtValue),
+      publishedAtText,
       title,
       url: resolvedUrl,
     });
@@ -190,12 +343,113 @@ function parseHtmlEntries(body: string, sourceUrl: string): HtmlEntry[] {
   return entries;
 }
 
+function parseNextPageUrl(body: string, sourceUrl: string): string | null {
+  const nextPageHref = normalizeWhitespace(
+    decodeHtmlEntities(
+      firstMatch(
+        body,
+        /<div class=["']p-pagination__next["'][^>]*>\s*<a href=["'](.*?)["']/isu,
+      ),
+    ),
+  );
+
+  if (nextPageHref === null) {
+    return null;
+  }
+
+  return safeResolveUrl(nextPageHref, sourceUrl);
+}
+
+function toObservedContent(entry: GovOnlineEntry): ObservedContent {
+  return {
+    assets: [
+      {
+        kind: "html",
+        observedFingerprints: [
+          createFingerprint("observed-html-url", entry.url),
+        ],
+        primary: true,
+        sourceUrl: entry.url,
+      },
+    ],
+    contentFingerprints: [createFingerprint("content-url", entry.url)],
+    externalId: entry.url,
+    kind: "article",
+    publishedAt: entry.publishedAt,
+    status: "discovered",
+    summary: joinNonEmptyParts([
+      entry.publishedAtText,
+      entry.category,
+      entry.title,
+    ]),
+    title: entry.title,
+  };
+}
+
+function readLastProcessedUrl(
+  collectorPluginState: JsonObject | undefined,
+): string | null {
+  const candidate = collectorPluginState?.lastProcessedUrl;
+
+  return typeof candidate === "string" && candidate.length > 0
+    ? candidate
+    : null;
+}
+
+function parsePublishedAt(value: string | null): Date | null {
+  if (value === null) {
+    return null;
+  }
+
+  const normalized = `${value}T00:00:00Z`;
+  const date = new Date(normalized);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function stripGovOnlineTitleSuffix(title: string | null): string | null {
+  if (title === null) {
+    return null;
+  }
+
+  const [headline] = title.split("|");
+
+  return normalizeWhitespace(headline);
+}
+
+function normalizeInfoPath(pathname: string): string {
+  if (pathname === "/info") {
+    return "/info/";
+  }
+
+  return pathname;
+}
+
+function safeResolveUrl(url: string, sourceUrl: string): string | null {
+  try {
+    return new URL(url, sourceUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
 function createFingerprint(prefix: string, value: string): string {
   return `${prefix}:${value}`;
 }
 
+function joinNonEmptyParts(parts: Array<string | null>): string | null {
+  const normalizedParts = parts.filter(
+    (part): part is string => part !== null && part.length > 0,
+  );
+
+  return normalizedParts.length > 0 ? normalizedParts.join(" ") : null;
+}
+
 function normalizeWhitespace(value: string | null | undefined): string | null {
-  const normalized = value?.replaceAll(/\s+/g, " ").trim();
+  const normalized = value
+    ?.replaceAll(/<br\s*\/?>/gi, " ")
+    .replaceAll(/\s+/g, " ")
+    .trim();
 
   return normalized ? normalized : null;
 }
@@ -208,6 +462,20 @@ function firstMatch(body: string, pattern: RegExp): string | null {
 
 function stripTags(value: string): string {
   return value.replaceAll(/<[^>]+>/g, "");
+}
+
+function decodeHtmlEntities(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  return value
+    .replaceAll("&amp;", "&")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&nbsp;", " ");
 }
 
 function normalizeContentType(

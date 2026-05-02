@@ -8,8 +8,7 @@ const createRegistryPlugin = () => ({
   acquire: vi.fn(),
   inspect: inspectMock,
   observe: vi.fn(),
-  pluginSlug: "podcast-rss" as const,
-  sourceKind: "podcast" as const,
+  supports: vi.fn(),
 });
 
 describe("source inspect service", () => {
@@ -19,6 +18,7 @@ describe("source inspect service", () => {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
         })),
+        getSourceKind: vi.fn(() => "podcast" as const),
       },
     });
 
@@ -45,6 +45,7 @@ describe("source inspect service", () => {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
         })),
+        getSourceKind: vi.fn(() => "podcast" as const),
       },
     });
 
@@ -77,6 +78,7 @@ describe("source inspect service", () => {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
         })),
+        getSourceKind: vi.fn(() => "podcast" as const),
       },
     });
 
@@ -98,6 +100,7 @@ describe("source inspect service", () => {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
         })),
+        getSourceKind: vi.fn(() => "podcast" as const),
       },
     });
 

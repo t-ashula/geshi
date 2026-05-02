@@ -17,6 +17,21 @@ export interface PluginLogger {
 
 export type SourceCollectorSourceKind = "feed" | "podcast";
 
+export type SourceCollectorPluginCapability = {
+  kind: "source-collector";
+  sourceKind: SourceCollectorSourceKind;
+};
+
+export type PluginCapability = SourceCollectorPluginCapability;
+
+export type PluginManifest = {
+  apiVersion: "1";
+  capabilities: PluginCapability[];
+  description?: string;
+  displayName: string;
+  pluginSlug: string;
+};
+
 export type ObservedAsset = {
   kind: string;
   observedFingerprints: string[];
@@ -35,12 +50,27 @@ export type ObservedContent = {
   title: string | null;
 };
 
+export type SourceCollectorObserveResult = {
+  collectorPluginState?: JsonObject;
+  contents: ObservedContent[];
+};
+
 export type SourceCollectorObserveInput = {
   abortSignal: AbortSignal;
   collectorPluginState?: JsonObject;
   config: Record<string, unknown>;
   logger: PluginLogger;
   sourceUrl: string;
+};
+
+export type SourceCollectorSupportsInput = {
+  config: Record<string, unknown>;
+  logger: PluginLogger;
+  sourceUrl: string;
+};
+
+export type SourceCollectorSupportsResult = {
+  supported: boolean;
 };
 
 export type SourceMetadata = {
@@ -86,9 +116,17 @@ export type AcquiredAsset = {
 };
 
 export interface SourceCollectorPlugin {
-  readonly pluginSlug: string;
-  readonly sourceKind: SourceCollectorSourceKind;
+  supports(
+    input: SourceCollectorSupportsInput,
+  ): Promise<SourceCollectorSupportsResult>;
   inspect(input: SourceCollectorInspectInput): Promise<SourceMetadata>;
-  observe(input: SourceCollectorObserveInput): Promise<ObservedContent[]>;
+  observe(
+    input: SourceCollectorObserveInput,
+  ): Promise<SourceCollectorObserveResult>;
   acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset>;
 }
+
+export type SourceCollectorPluginDefinition = {
+  manifest: PluginManifest;
+  plugin: SourceCollectorPlugin;
+};

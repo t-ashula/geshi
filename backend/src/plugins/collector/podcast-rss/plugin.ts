@@ -9,6 +9,7 @@ import type {
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
   SourceCollectorPlugin,
+  SourceCollectorPluginDefinition,
   SourceMetadata,
 } from "../../types.js";
 import type {
@@ -24,6 +25,7 @@ import {
   CONTENT_FINGERPRINT_SPECS,
   OBSERVED_ASSET_FINGERPRINT_SPECS,
 } from "./fingerprint.js";
+import { manifest } from "./manifest.js";
 
 type RssChannel = {
   description?: string;
@@ -65,9 +67,12 @@ class SourceCollectorInspectPluginError extends Error {
   }
 }
 
-export const podcastRssPlugin: SourceCollectorPlugin = {
-  pluginSlug: "podcast-rss",
-  sourceKind: "podcast",
+export const plugin: SourceCollectorPlugin = {
+  supports() {
+    return Promise.resolve({
+      supported: true,
+    });
+  },
 
   async inspect(input: SourceCollectorInspectInput) {
     const response = await fetch(input.sourceUrl, {
@@ -100,7 +105,7 @@ export const podcastRssPlugin: SourceCollectorPlugin = {
 
   async observe(
     input: SourceCollectorObserveInput,
-  ): Promise<ObservedContent[]> {
+  ): Promise<{ contents: ObservedContent[] }> {
     const response = await fetch(input.sourceUrl, {
       signal: input.abortSignal,
     });
@@ -116,9 +121,11 @@ export const podcastRssPlugin: SourceCollectorPlugin = {
       throw new Error("Invalid RSS feed.");
     }
 
-    return parsedFeed.items
-      .map(toObservedContent)
-      .filter((item): item is ObservedContent => item !== null);
+    return {
+      contents: parsedFeed.items
+        .map(toObservedContent)
+        .filter((item): item is ObservedContent => item !== null),
+    };
   },
 
   async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
@@ -154,6 +161,14 @@ export const podcastRssPlugin: SourceCollectorPlugin = {
     };
   },
 };
+
+export const definition: SourceCollectorPluginDefinition = {
+  manifest,
+  plugin,
+};
+
+export const podcastRssPlugin = plugin;
+export const podcastRssPluginDefinition = definition;
 
 type ParsedPodcastRssFeed = {
   items: RssItem[];
