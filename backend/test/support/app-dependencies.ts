@@ -134,6 +134,16 @@ export function createTestAppDependencies(
           }),
         ),
       ),
+      listSourceCollectorPlugins: vi.fn(() =>
+        ok([
+          {
+            description: "Podcast RSS and Atom feeds",
+            displayName: "Podcast RSS",
+            pluginSlug: "podcast-rss",
+            sourceKind: "podcast" as const,
+          },
+        ]),
+      ),
       listSources: vi.fn(() => Promise.resolve(ok([]))),
       updateSourceCollectorSettings: vi.fn(() =>
         Promise.resolve(

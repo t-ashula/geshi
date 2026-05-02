@@ -9,6 +9,7 @@ import {
   createCreateSourceEndpoint,
   createEnqueueObserveSourceEndpoint,
   createInspectSourceEndpoint,
+  createListSourceCollectorPluginsEndpoint,
   createListSourcesEndpoint,
   createPatchSourceCollectorSettingsEndpoint,
 } from "../../src/endpoints/api/v1/sources.js";
@@ -80,6 +81,51 @@ describe("source endpoints", () => {
     });
   });
 
+  it("returns source collector plugins", () => {
+    const endpoint = createListSourceCollectorPluginsEndpoint(
+      createTestAppDependencies({
+        sourceService: {
+          createSource: vi.fn(),
+          listSourceCollectorPlugins: () =>
+            ok([
+              {
+                description: "Collect podcast RSS and Atom feeds.",
+                displayName: "Podcast RSS",
+                pluginSlug: "podcast-rss",
+                sourceKind: "podcast" as const,
+              },
+              {
+                description: "Collect gov-online updates.",
+                displayName: "Go JP RSS",
+                pluginSlug: "go-jp-rss",
+                sourceKind: "feed" as const,
+              },
+            ]),
+          listSources: vi.fn(),
+          updateSourceCollectorSettings: vi.fn(),
+        } as unknown as SourceService,
+      }),
+    );
+
+    const result = endpoint();
+
+    assertOk(result);
+    expect(result.value).toEqual([
+      {
+        description: "Collect podcast RSS and Atom feeds.",
+        displayName: "Podcast RSS",
+        pluginSlug: "podcast-rss",
+        sourceKind: "podcast",
+      },
+      {
+        description: "Collect gov-online updates.",
+        displayName: "Go JP RSS",
+        pluginSlug: "go-jp-rss",
+        sourceKind: "feed",
+      },
+    ]);
+  });
+
   it("returns the current create-source response on success", async () => {
     const endpoint = createCreateSourceEndpoint(
       createTestAppDependencies({
@@ -110,6 +156,7 @@ describe("source endpoints", () => {
             ),
           ),
           findObserveSourceTarget: vi.fn(),
+          listSourceCollectorPlugins: () => ok([]),
           listPeriodicCrawlTargets: vi.fn(),
           listSources: vi.fn(),
           updateSourceCollectorSettings: vi.fn(),

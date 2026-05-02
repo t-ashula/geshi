@@ -7,6 +7,7 @@ describe("validateCreateSourceRequest", () => {
     expect(
       validateCreateSourceRequest({
         description: "",
+        pluginSlug: "podcast-rss",
         sourceSlug: "",
         title: "",
         url: "   ",
@@ -18,6 +19,7 @@ describe("validateCreateSourceRequest", () => {
     expect(
       validateCreateSourceRequest({
         description: "",
+        pluginSlug: "podcast-rss",
         sourceSlug: "",
         title: "",
         url: "ftp://example.com/feed.xml",
@@ -29,10 +31,23 @@ describe("validateCreateSourceRequest", () => {
     expect(
       validateCreateSourceRequest({
         description: "",
+        pluginSlug: "podcast-rss",
         sourceSlug: "",
         title: "",
         url: "https://example.com/feed.xml",
       }),
     ).toBeNull();
+  });
+
+  it("requires a plugin slug", () => {
+    expect(
+      validateCreateSourceRequest({
+        description: "",
+        pluginSlug: "",
+        sourceSlug: "",
+        title: "",
+        url: "https://example.com/feed.xml",
+      }),
+    ).toBe("Source collector plugin is required.");
   });
 });

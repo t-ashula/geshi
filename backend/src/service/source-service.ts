@@ -42,6 +42,13 @@ export type FindObserveSourceTargetError = {
   message: string;
 };
 
+export type SourceCollectorPluginListItem = {
+  description: string | null;
+  displayName: string;
+  pluginSlug: string;
+  sourceKind: "feed" | "podcast";
+};
+
 export interface SourceService {
   createSource(
     request: CreateSourceRequest,
@@ -54,6 +61,7 @@ export interface SourceService {
       FindObserveSourceTargetError | SourceRepositoryError
     >
   >;
+  listSourceCollectorPlugins(): Result<SourceCollectorPluginListItem[], Error>;
   listPeriodicCrawlTargets(): Promise<
     Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
   >;
@@ -130,6 +138,28 @@ export function createSourceService(
       }
 
       return ok(source.value);
+    },
+
+    listSourceCollectorPlugins(): Result<
+      SourceCollectorPluginListItem[],
+      Error
+    > {
+      try {
+        return ok(
+          sourceCollectorRegistry.list().map(({ capability, definition }) => ({
+            description: definition.manifest.description ?? null,
+            displayName: definition.manifest.displayName,
+            pluginSlug: definition.manifest.pluginSlug,
+            sourceKind: capability.sourceKind,
+          })),
+        );
+      } catch (error) {
+        return err(
+          error instanceof Error
+            ? error
+            : new Error("Failed to list source collector plugins."),
+        );
+      }
     },
 
     async listPeriodicCrawlTargets(): Promise<

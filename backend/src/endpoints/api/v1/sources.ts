@@ -9,9 +9,15 @@ import type { Result } from "../../../lib/result.js";
 import { err, ok } from "../../../lib/result.js";
 import type { InspectSourceError } from "../../../service/source-inspect-service.js";
 import type { InspectSourceResult } from "../../../service/source-inspect-service.js";
+import type { SourceCollectorPluginListItem } from "../../../service/source-service.js";
 
 export type ListSourcesEndpointError = {
   code: "source_list_failed";
+  message: string;
+};
+
+export type ListSourceCollectorPluginsEndpointError = {
+  code: "source_collector_plugin_list_failed";
   message: string;
 };
 
@@ -86,6 +92,26 @@ export function createListSourcesEndpoint(dependencies: AppDependencies) {
     }
 
     return sources;
+  };
+}
+
+export function createListSourceCollectorPluginsEndpoint(
+  dependencies: AppDependencies,
+) {
+  return (): Result<
+    SourceCollectorPluginListItem[],
+    ListSourceCollectorPluginsEndpointError
+  > => {
+    const result = dependencies.sourceService.listSourceCollectorPlugins();
+
+    if (!result.ok) {
+      return err({
+        code: "source_collector_plugin_list_failed",
+        message: result.error.message,
+      });
+    }
+
+    return result;
   };
 }
 

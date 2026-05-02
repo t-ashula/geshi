@@ -7,6 +7,7 @@ import type {
   ContentListItem,
   CreateSourceRequest,
   PeriodicCrawlSettings,
+  SourceCollectorPluginListItem,
   SourceListItem,
 } from "./source-api.js";
 import {
@@ -14,6 +15,7 @@ import {
   getContentDetail,
   getPeriodicCrawlSettings,
   inspectSource,
+  listSourceCollectorPlugins,
   listContents,
   listSources,
   observeSource,
@@ -35,6 +37,7 @@ type RouteState =
 
 const contents = ref<ContentListItem[]>([]);
 const contentDetail = ref<ContentDetailItem | null>(null);
+const sourceCollectorPlugins = ref<SourceCollectorPluginListItem[]>([]);
 const sources = ref<SourceListItem[]>([]);
 const isCreateFormVisible = ref(false);
 const isInspecting = ref(false);
@@ -57,6 +60,7 @@ const lastInspectedUrl = ref<string | null>(null);
 const routeState = ref<RouteState>(normalizeRoute(window.location.pathname));
 const form = ref<CreateSourceRequest>({
   description: "",
+  pluginSlug: "",
   sourceSlug: "",
   title: "",
   url: "",
@@ -137,7 +141,12 @@ onMounted(async () => {
 
   window.addEventListener("popstate", syncRouteFromLocation);
 
-  await Promise.all([refreshSources(), refreshContents(), refreshSettings()]);
+  await Promise.all([
+    refreshSourceCollectorPlugins(),
+    refreshSources(),
+    refreshContents(),
+    refreshSettings(),
+  ]);
   await syncDetailWithRoute();
 });
 
@@ -156,6 +165,20 @@ function openCreateForm(): void {
   inspectErrorMessage.value = null;
   lastInspectedUrl.value = null;
   validationMessage.value = null;
+}
+
+function handlePluginSlugChange(pluginSlug: string): void {
+  form.value.pluginSlug = pluginSlug;
+  form.value.description = "";
+  form.value.sourceSlug = "";
+  form.value.title = "";
+  lastInspectedUrl.value = null;
+  inspectErrorMessage.value = null;
+  validationMessage.value = null;
+}
+
+function handlePluginSelection(event: Event): void {
+  handlePluginSlugChange((event.target as HTMLSelectElement).value);
 }
 
 function closeCreateForm(): void {
@@ -184,10 +207,12 @@ async function inspectCurrentSource(): Promise<void> {
 
   try {
     const draft = await inspectSource({
+      pluginSlug: form.value.pluginSlug,
       url: trimmedUrl,
     });
     form.value = {
       description: draft.description ?? "",
+      pluginSlug: form.value.pluginSlug,
       sourceSlug: draft.sourceSlug,
       title: draft.title ?? "",
       url: draft.url,
@@ -217,6 +242,7 @@ async function submitSource(): Promise<void> {
     await refreshSources();
     form.value = {
       description: "",
+      pluginSlug: form.value.pluginSlug,
       sourceSlug: "",
       title: "",
       url: "",
@@ -311,6 +337,24 @@ async function refreshSources(): Promise<void> {
       error instanceof Error ? error.message : "Failed to load sources.";
   } finally {
     isSourcesLoading.value = false;
+  }
+}
+
+async function refreshSourceCollectorPlugins(): Promise<void> {
+  try {
+    sourceCollectorPlugins.value = await listSourceCollectorPlugins();
+
+    if (
+      (form.value.pluginSlug ?? "") === "" &&
+      sourceCollectorPlugins.value.length > 0
+    ) {
+      form.value.pluginSlug = sourceCollectorPlugins.value[0]!.pluginSlug;
+    }
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to load source collector plugins.";
   }
 }
 
@@ -554,7 +598,7 @@ function renderContentSummaryPreview(summary: string | null): string {
         <div class="create-shell-header">
           <div>
             <p class="eyebrow">Register source</p>
-            <h2>Add podcast feed</h2>
+            <h2>Add source</h2>
           </div>
           <button class="ghost-button" type="button" @click="closeCreateForm">
             Close
@@ -562,6 +606,24 @@ function renderContentSummaryPreview(summary: string | null): string {
         </div>
 
         <div class="create-grid">
+          <label>
+            <span>Collector Plugin</span>
+            <select
+              :value="form.pluginSlug"
+              :disabled="isInspecting || isSubmitting"
+              @change="handlePluginSelection"
+            >
+              <option value="" disabled>Select a plugin</option>
+              <option
+                v-for="plugin in sourceCollectorPlugins"
+                :key="plugin.pluginSlug"
+                :value="plugin.pluginSlug"
+              >
+                {{ plugin.displayName }} ({{ plugin.sourceKind }})
+              </option>
+            </select>
+          </label>
+
           <label>
             <span>Source URL</span>
             <input

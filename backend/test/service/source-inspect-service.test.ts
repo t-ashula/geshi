@@ -18,6 +18,7 @@ describe("source inspect service", () => {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
         })),
+        list: vi.fn(() => []),
         getSourceKind: vi.fn(() => "podcast" as const),
       },
     });
@@ -45,6 +46,7 @@ describe("source inspect service", () => {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
         })),
+        list: vi.fn(() => []),
         getSourceKind: vi.fn(() => "podcast" as const),
       },
     });
@@ -78,6 +80,7 @@ describe("source inspect service", () => {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
         })),
+        list: vi.fn(() => []),
         getSourceKind: vi.fn(() => "podcast" as const),
       },
     });
@@ -100,6 +103,7 @@ describe("source inspect service", () => {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
         })),
+        list: vi.fn(() => []),
         getSourceKind: vi.fn(() => "podcast" as const),
       },
     });

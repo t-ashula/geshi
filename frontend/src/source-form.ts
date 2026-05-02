@@ -3,6 +3,10 @@ import type { CreateSourceRequest } from "./source-api.js";
 export function validateCreateSourceRequest(
   request: CreateSourceRequest,
 ): string | null {
+  if ((request.pluginSlug ?? "").trim().length === 0) {
+    return "Source collector plugin is required.";
+  }
+
   const trimmedUrl = request.url.trim();
 
   if (trimmedUrl.length === 0) {

@@ -11,6 +11,13 @@ export type InspectSourceRequest = {
   url: string;
 };
 
+export type SourceCollectorPluginListItem = {
+  description: string | null;
+  displayName: string;
+  pluginSlug: string;
+  sourceKind: "feed" | "podcast";
+};
+
 export type InspectSourceDraft = {
   description: string | null;
   sourceSlug: string;
@@ -112,6 +119,10 @@ type ListSourcesResponse = {
   data: SourceListItem[];
 };
 
+type ListSourceCollectorPluginsResponse = {
+  data: SourceCollectorPluginListItem[];
+};
+
 type ListContentsResponse = {
   data: ContentListItem[];
 };
@@ -140,6 +151,20 @@ export async function listSources(): Promise<SourceListItem[]> {
   }
 
   const payload = (await response.json()) as ListSourcesResponse;
+
+  return payload.data;
+}
+
+export async function listSourceCollectorPlugins(): Promise<
+  SourceCollectorPluginListItem[]
+> {
+  const response = await fetch("/api/v1/sources/collector-plugins");
+
+  if (!response.ok) {
+    throw new Error("Failed to load source collector plugins.");
+  }
+
+  const payload = (await response.json()) as ListSourceCollectorPluginsResponse;
 
   return payload.data;
 }

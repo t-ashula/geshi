@@ -19,6 +19,7 @@ const sourceCollectorPlugins = registerSourceCollectorPlugins([
 
 export interface SourceCollectorRegistry {
   get(pluginSlug: string): SourceCollectorPlugin;
+  list(): RegisteredSourceCollectorPlugin[];
   getSourceKind(pluginSlug: string): SourceCollectorSourceKind;
 }
 
@@ -37,6 +38,10 @@ export function createSourceCollectorRegistry(
       }
 
       return plugin.definition.plugin;
+    },
+
+    list(): RegisteredSourceCollectorPlugin[] {
+      return [...plugins.values()];
     },
 
     getSourceKind(pluginSlug: string): SourceCollectorSourceKind {

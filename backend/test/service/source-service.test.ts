@@ -8,19 +8,25 @@ import type {
   SourceRepository,
 } from "../../src/db/source-repository.js";
 import { err, ok } from "../../src/lib/result.js";
+import type { SourceCollectorRegistry } from "../../src/plugins/index.js";
 import {
   createSourceService,
   normalizeSourceUrl,
 } from "../../src/service/source-service.js";
 import { assertErr, assertOk } from "../support/result.js";
 
-const sourceCollectorRegistry = {
+const sourceCollectorPlugin = {
+  acquire: vi.fn(),
+  inspect: vi.fn(),
+  observe: vi.fn(),
+  supports: vi.fn(),
+};
+
+const sourceCollectorRegistry: SourceCollectorRegistry = {
   get: vi.fn(() => ({
-    acquire: vi.fn(),
-    inspect: vi.fn(),
-    observe: vi.fn(),
-    supports: vi.fn(),
+    ...sourceCollectorPlugin,
   })),
+  list: vi.fn(() => []),
   getSourceKind: vi.fn((pluginSlug: string) =>
     pluginSlug === "go-jp-rss" ? ("feed" as const) : ("podcast" as const),
   ),
@@ -216,6 +222,71 @@ describe("source service", () => {
 
     assertOk(result);
     expect(result.value).toEqual(targets);
+  });
+
+  it("lists source collector plugins from the registry", () => {
+    sourceCollectorRegistry.list = vi.fn(() => [
+      {
+        capability: {
+          kind: "source-collector" as const,
+          sourceKind: "podcast" as const,
+        },
+        definition: {
+          manifest: {
+            apiVersion: "1" as const,
+            capabilities: [],
+            description: "Collect podcast RSS and Atom feeds.",
+            displayName: "Podcast RSS",
+            pluginSlug: "podcast-rss",
+          },
+          plugin: sourceCollectorPlugin,
+        },
+      },
+      {
+        capability: {
+          kind: "source-collector" as const,
+          sourceKind: "feed" as const,
+        },
+        definition: {
+          manifest: {
+            apiVersion: "1" as const,
+            capabilities: [],
+            description: "Collect gov-online updates.",
+            displayName: "Go JP RSS",
+            pluginSlug: "go-jp-rss",
+          },
+          plugin: sourceCollectorPlugin,
+        },
+      },
+    ]);
+    const service = createSourceService(
+      {
+        createSource: vi.fn(),
+        findObserveSourceTarget: vi.fn(),
+        listPeriodicCrawlTargets: vi.fn(),
+        listSources: vi.fn(),
+        updateSourceCollectorSettings: vi.fn(),
+      } as unknown as SourceRepository,
+      sourceCollectorRegistry,
+    );
+
+    const result = service.listSourceCollectorPlugins();
+
+    assertOk(result);
+    expect(result.value).toEqual([
+      {
+        description: "Collect podcast RSS and Atom feeds.",
+        displayName: "Podcast RSS",
+        pluginSlug: "podcast-rss",
+        sourceKind: "podcast",
+      },
+      {
+        description: "Collect gov-online updates.",
+        displayName: "Go JP RSS",
+        pluginSlug: "go-jp-rss",
+        sourceKind: "feed",
+      },
+    ]);
   });
 
   it("lists sources from repository", async () => {
