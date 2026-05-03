@@ -139,8 +139,10 @@ export function createTestAppDependencies(
           {
             description: "Podcast RSS and Atom feeds",
             displayName: "Podcast RSS",
+            message: null,
             pluginSlug: "podcast-rss",
             sourceKind: "podcast" as const,
+            status: "available" as const,
           },
         ]),
       ),

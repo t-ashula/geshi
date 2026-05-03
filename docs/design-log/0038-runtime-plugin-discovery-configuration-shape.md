@@ -504,6 +504,7 @@ Design log としては案 C が最有力だったが，ADR-0038 では次だけ
 ```ts
 export default {
   plugin: {
+    output: ".geshi/generated/plugins/",
     packages: {
       "@geshi/plugin-go-jp-rss": "^0.1.0",
       "@private/geshi-plugin-foo": "git+ssh://git@example.com/private/foo.git",
@@ -517,6 +518,7 @@ export default {
 
 - `dependencies` よりも「plugin 機構のための package 群」という意味が素直
 - `plugin` 配下に，将来別の plugin 機構設定を追加しやすい
+- `output` を plugin 用 root directory として持てば，その配下へ `package.json`, `node_modules`, `index.js`, `metadata.json` を固定配置できる
 - package 名と spec string の組であることが明確
 
 一方で，`PluginPackageSpecString` を runtime 上どう validation するか，型としてどこまで明示するかは未決である．

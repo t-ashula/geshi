@@ -343,12 +343,15 @@ async function refreshSources(): Promise<void> {
 async function refreshSourceCollectorPlugins(): Promise<void> {
   try {
     sourceCollectorPlugins.value = await listSourceCollectorPlugins();
+    const firstAvailablePlugin = sourceCollectorPlugins.value.find(
+      (plugin) => plugin.status === "available",
+    );
 
     if (
       (form.value.pluginSlug ?? "") === "" &&
-      sourceCollectorPlugins.value.length > 0
+      firstAvailablePlugin !== undefined
     ) {
-      form.value.pluginSlug = sourceCollectorPlugins.value[0]!.pluginSlug;
+      form.value.pluginSlug = firstAvailablePlugin.pluginSlug;
     }
   } catch (error) {
     errorMessage.value =
@@ -618,11 +621,29 @@ function renderContentSummaryPreview(summary: string | null): string {
                 v-for="plugin in sourceCollectorPlugins"
                 :key="plugin.pluginSlug"
                 :value="plugin.pluginSlug"
+                :disabled="plugin.status !== 'available'"
               >
-                {{ plugin.displayName }} ({{ plugin.sourceKind }})
+                {{ plugin.displayName }} ({{ plugin.sourceKind }}){{
+                  plugin.status === "available" ? "" : " unavailable"
+                }}
               </option>
             </select>
           </label>
+
+          <p
+            v-if="
+              sourceCollectorPlugins.find(
+                (plugin) => plugin.pluginSlug === form.pluginSlug,
+              )?.message
+            "
+            class="feedback error"
+          >
+            {{
+              sourceCollectorPlugins.find(
+                (plugin) => plugin.pluginSlug === form.pluginSlug,
+              )?.message
+            }}
+          </p>
 
           <label>
             <span>Source URL</span>

@@ -21,6 +21,7 @@
 - この設定は plugin CLI の install 入力として扱う
 - この設定が扱うのは external plugin package の導入元とする
 - 設定の中心は plugin package 群の宣言とし，package manager が扱える依存指定の表現力を流用する
+- plugin 用 `package.json`, `node_modules`, generated module, metadata の配置先は，運用時設定で単一の出力先 directory として指定できるようにする
 - app policy はこの設定へ入れず，`pluginSlug` ベースの有効化設定は全体設定で扱う
 
 ## 影響
@@ -28,6 +29,7 @@
 - external plugin install source の表現力を既存 package manager の流儀に寄せられる
 - private / local plugin を扱いやすくなる
 - plugin CLI の install 入力を本体 repository 依存から分離できる
+- plugin 用 artifact の配置先を 1 つの directory 配下へまとめやすくなる
 - built-in plugin の導入管理と external plugin の導入管理を分けやすくなる
 - 一方で，config parse / validation の責務が新たに必要になる
 

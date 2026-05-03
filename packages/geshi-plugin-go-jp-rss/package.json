@@ -15,6 +15,6 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@geshi/plugin-api": "file:../geshi-plugin-api"
+    "@geshi/sdk": "file:../geshi-sdk"
   }
 }

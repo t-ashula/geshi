@@ -231,6 +231,7 @@ describe("source service", () => {
           kind: "source-collector" as const,
           sourceKind: "podcast" as const,
         },
+        description: "Collect podcast RSS and Atom feeds.",
         definition: {
           manifest: {
             apiVersion: "1" as const,
@@ -241,12 +242,19 @@ describe("source service", () => {
           },
           plugin: sourceCollectorPlugin,
         },
+        displayName: "Podcast RSS",
+        message: null,
+        packageName: null,
+        pluginSlug: "podcast-rss",
+        sourceKind: "podcast" as const,
+        status: "available" as const,
       },
       {
         capability: {
           kind: "source-collector" as const,
           sourceKind: "feed" as const,
         },
+        description: "Collect gov-online updates.",
         definition: {
           manifest: {
             apiVersion: "1" as const,
@@ -257,6 +265,12 @@ describe("source service", () => {
           },
           plugin: sourceCollectorPlugin,
         },
+        displayName: "Go JP RSS",
+        message: null,
+        packageName: null,
+        pluginSlug: "go-jp-rss",
+        sourceKind: "feed" as const,
+        status: "available" as const,
       },
     ]);
     const service = createSourceService(
@@ -277,14 +291,18 @@ describe("source service", () => {
       {
         description: "Collect podcast RSS and Atom feeds.",
         displayName: "Podcast RSS",
+        message: null,
         pluginSlug: "podcast-rss",
         sourceKind: "podcast",
+        status: "available",
       },
       {
         description: "Collect gov-online updates.",
         displayName: "Go JP RSS",
+        message: null,
         pluginSlug: "go-jp-rss",
         sourceKind: "feed",
+        status: "available",
       },
     ]);
   });

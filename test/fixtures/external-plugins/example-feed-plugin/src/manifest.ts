@@ -8,10 +8,7 @@ export const manifest: PluginManifest = {
       sourceKind: "feed",
     },
   ],
-  description:
-    "Collect gov-online ministry news updates from the non-RSS HTML source used by go-jp-rss.",
-  displayName: "Go JP RSS",
-  pluginSlug: "go-jp-rss",
+  description: "Fixture external plugin for install and generate verification.",
+  displayName: "Example External Feed",
+  pluginSlug: "example-external-feed",
 };
-
-export const goJpRssManifest = manifest;

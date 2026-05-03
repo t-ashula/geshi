@@ -13,7 +13,9 @@
   "include": [
     "backend/src/**/*.ts",
     "backend/test/**/*.ts",
+    "cmd/**/*.ts",
     "frontend/src/**/*.d.ts",
+    "internal/**/*.ts",
     "frontend/src/**/*.ts",
     "frontend/test/**/*.ts",
     "frontend/vite.config.ts",

@@ -103,14 +103,18 @@ describe("listSourceCollectorPlugins", () => {
                 {
                   description: "Collect podcast RSS and Atom feeds.",
                   displayName: "Podcast RSS",
+                  message: null,
                   pluginSlug: "podcast-rss",
                   sourceKind: "podcast",
+                  status: "available",
                 },
                 {
                   description: "Collect gov-online updates.",
                   displayName: "Go JP RSS",
+                  message: null,
                   pluginSlug: "go-jp-rss",
                   sourceKind: "feed",
+                  status: "available",
                 },
               ],
             }),
@@ -129,14 +133,18 @@ describe("listSourceCollectorPlugins", () => {
       {
         description: "Collect podcast RSS and Atom feeds.",
         displayName: "Podcast RSS",
+        message: null,
         pluginSlug: "podcast-rss",
         sourceKind: "podcast",
+        status: "available",
       },
       {
         description: "Collect gov-online updates.",
         displayName: "Go JP RSS",
+        message: null,
         pluginSlug: "go-jp-rss",
         sourceKind: "feed",
+        status: "available",
       },
     ]);
   });

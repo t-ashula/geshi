@@ -21,6 +21,7 @@
 - 生成済み module は，external plugin definitions または registry 初期化済みの entry point として扱う
 - built-in plugin と external plugin は，この生成済み import 入口の直後に合流させてよい
 - built-in plugin は generate 対象に含めず，本体同梱の definition として別経路で扱ってよい
+- 生成済み module と metadata の配置先は，運用時設定で与えられた plugin 出力先 directory を起点に解決する
 - generate 未実行や生成失敗時の起動時挙動は，CLI 側方針と整合して扱う
 
 ## 影響

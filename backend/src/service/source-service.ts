@@ -43,10 +43,12 @@ export type FindObserveSourceTargetError = {
 };
 
 export type SourceCollectorPluginListItem = {
+  message: string | null;
   description: string | null;
   displayName: string;
   pluginSlug: string;
   sourceKind: "feed" | "podcast";
+  status: "available" | "unavailable";
 };
 
 export interface SourceService {
@@ -146,11 +148,13 @@ export function createSourceService(
     > {
       try {
         return ok(
-          sourceCollectorRegistry.list().map(({ capability, definition }) => ({
-            description: definition.manifest.description ?? null,
-            displayName: definition.manifest.displayName,
-            pluginSlug: definition.manifest.pluginSlug,
-            sourceKind: capability.sourceKind,
+          sourceCollectorRegistry.list().map((plugin) => ({
+            description: plugin.description,
+            displayName: plugin.displayName,
+            message: plugin.message,
+            pluginSlug: plugin.pluginSlug,
+            sourceKind: plugin.sourceKind,
+            status: plugin.status,
           })),
         );
       } catch (error) {

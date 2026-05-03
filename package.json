@@ -3,6 +3,9 @@
   "version": "0.5.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "geshi": "./bin/geshi"
+  },
   "workspaces": [
     "packages/*"
   ],
@@ -22,7 +25,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/geshi-plugin-api/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-go-jp-rss/tsconfig.json && vue-tsc --noEmit -p frontend/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/geshi-sdk/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-go-jp-rss/tsconfig.json && vue-tsc --noEmit -p frontend/tsconfig.json",
     "precommit": "npm run format && npm run lint -- --fix && npm run typecheck && npm run test"
   },
   "engines": {
@@ -50,7 +53,7 @@
     "vue-tsc": "^3.2.7"
   },
   "dependencies": {
-    "@geshi/plugin-api": "file:packages/geshi-plugin-api",
+    "@geshi/sdk": "file:packages/geshi-sdk",
     "@geshi/plugin-go-jp-rss": "file:packages/geshi-plugin-go-jp-rss",
     "@hono/node-server": "^2.0.0",
     "fast-xml-parser": "^5.7.2",

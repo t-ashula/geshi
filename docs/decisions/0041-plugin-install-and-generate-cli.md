@@ -24,7 +24,7 @@
 - install は本体依存と切り離された plugin 依存集合を対象に行う
 - generate は install 済み plugin を検査し，実行時に読む生成物を作る責務を持つ
 - install における依存解決と package 配置は，独自実装ではなく npm の仕組みを前提に扱う
-- 運用時設定ファイル，plugin 用 install 先，generate 出力先は固定パスとして扱う
+- 運用時設定ファイル名は固定とし，plugin 用 install 先と generate 出力先は運用時設定で与えられた単一 directory 配下へ配置する
 
 ## 影響
 
@@ -33,6 +33,7 @@
 - plugin 依存集合を本体依存集合から分離しやすくなる
 - CLI 利用者が入口を `geshi` に一本化して扱える
 - 依存解決の責務を npm に委ねることで，独自 package manager 的実装を避けられる
+- plugin 用 install root と generated artifact の配置を 1 つの directory 配下へ揃えやすくなる
 - 一方で，CLI 境界と運用手順の定義が必要になる
 
 ## 代替案
