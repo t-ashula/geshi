@@ -44,3 +44,4 @@
 - [ADR-0041: external plugin 用 install / generate CLI の責務を分ける](./0041-plugin-install-and-generate-cli.md)
 - [ADR-0042: backend と worker は生成済み plugin registry module を import する](./0042-generated-plugin-registry-import-boundary.md)
 - [ADR-0043: 外部 plugin 開発のために plugin author 向け SDK 境界を分離する](./0043-plugin-sdk-boundary-for-external-plugin-development.md)
+- [ADR-0044: scribe 連携は adapter 境界に閉じ込める](./0044-scribe-integration-boundary.md)
