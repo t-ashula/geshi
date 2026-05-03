@@ -13,6 +13,20 @@
 - plugin は特定の拡張点に対する実装単位である
 - plugin は識別子として `pluginSlug` を持つ
 
+## 用語
+
+- 組み込みプラグイン
+  - `geshi` 本体 repository に実装を同梱し，本体 code から直接扱う plugin を指す
+  - 典型例は `backend/src/plugins/collector/podcast-rss/` 配下の `podcast-rss` である
+- 組み込みパッケージプラグイン
+  - `geshi` 本体 repository に同梱されているが，source code 上は独立 package として管理される plugin を指す
+  - 典型例は `packages/geshi-plugin-go-jp-rss/` のような plugin package である
+  - repository には同梱されているが，`backend` が個別 source import で固定参照することは前提にしない
+- 外部パッケージプラグイン
+  - `geshi` 本体 repository の外で配布・保守され，運用時設定と install / generate を通じて利用される plugin を指す
+  - private package, git URL, `file:` package を含んでよい
+  - `geshi` 本体から見れば，生成済み plugin registry module を通じて利用される package plugin である
+
 ## 責務境界
 
 ### backend
