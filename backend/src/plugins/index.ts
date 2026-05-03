@@ -1,6 +1,6 @@
-import { definition as goJpRssPluginDefinition } from "@geshi/plugin-go-jp-rss";
-
+import { loadPluginArtifactPaths } from "../../../internal/geshi-config.js";
 import { definition as podcastRssPluginDefinition } from "./collector/podcast-rss/index.js";
+import { loadExternalSourceCollectorPlugins } from "./generated.js";
 import type {
   SourceCollectorPlugin,
   SourceCollectorPluginCapability,
@@ -8,15 +8,39 @@ import type {
   SourceCollectorSourceKind,
 } from "./types.js";
 
-type RegisteredSourceCollectorPlugin = {
-  capability: SourceCollectorPluginCapability;
-  definition: SourceCollectorPluginDefinition;
-};
+export type RegisteredSourceCollectorPlugin =
+  | {
+      capability: SourceCollectorPluginCapability;
+      definition: SourceCollectorPluginDefinition;
+      description: string | null;
+      displayName: string;
+      message: null;
+      packageName: string | null;
+      pluginSlug: string;
+      sourceKind: SourceCollectorSourceKind;
+      status: "available";
+    }
+  | {
+      description: string | null;
+      displayName: string;
+      message: string;
+      packageName: string | null;
+      pluginSlug: string;
+      sourceKind: SourceCollectorSourceKind;
+      status: "unavailable";
+    };
 
-const sourceCollectorPlugins = registerSourceCollectorPlugins([
-  goJpRssPluginDefinition,
-  podcastRssPluginDefinition,
-]);
+export class SourceCollectorPluginUnavailableError extends Error {
+  readonly pluginSlug: string;
+
+  constructor(pluginSlug: string, message: string) {
+    super(message);
+    this.name = "SourceCollectorPluginUnavailableError";
+    this.pluginSlug = pluginSlug;
+  }
+}
+
+const sourceCollectorPlugins = await loadDefaultSourceCollectorPlugins();
 
 export interface SourceCollectorRegistry {
   get(pluginSlug: string): SourceCollectorPlugin;
@@ -38,6 +62,13 @@ export function createSourceCollectorRegistry(
         throw new Error(`Unknown source collector plugin: ${pluginSlug}`);
       }
 
+      if (plugin.status === "unavailable") {
+        throw new SourceCollectorPluginUnavailableError(
+          pluginSlug,
+          plugin.message,
+        );
+      }
+
       return plugin.definition.plugin;
     },
 
@@ -52,7 +83,14 @@ export function createSourceCollectorRegistry(
         throw new Error(`Unknown source collector plugin: ${pluginSlug}`);
       }
 
-      return plugin.capability.sourceKind;
+      if (plugin.status === "unavailable") {
+        throw new SourceCollectorPluginUnavailableError(
+          pluginSlug,
+          plugin.message,
+        );
+      }
+
+      return plugin.sourceKind;
     },
   };
 }
@@ -80,11 +118,47 @@ function registerSourceCollectorPlugins(
       continue;
     }
 
-    registeredPlugins.set(definition.manifest.pluginSlug, {
+    setRegisteredPlugin(registeredPlugins, definition.manifest.pluginSlug, {
       capability,
       definition,
+      description: definition.manifest.description ?? null,
+      displayName: definition.manifest.displayName,
+      message: null,
+      packageName: null,
+      pluginSlug: definition.manifest.pluginSlug,
+      sourceKind: capability.sourceKind,
+      status: "available",
     });
   }
 
   return registeredPlugins;
+}
+
+async function loadDefaultSourceCollectorPlugins(): Promise<
+  Map<string, RegisteredSourceCollectorPlugin>
+> {
+  const registeredPlugins = registerSourceCollectorPlugins([
+    podcastRssPluginDefinition,
+  ]);
+  const pluginArtifactPaths = await loadPluginArtifactPaths();
+  const externalPlugins =
+    await loadExternalSourceCollectorPlugins(pluginArtifactPaths);
+
+  for (const plugin of externalPlugins) {
+    setRegisteredPlugin(registeredPlugins, plugin.pluginSlug, plugin);
+  }
+
+  return registeredPlugins;
+}
+
+function setRegisteredPlugin(
+  plugins: Map<string, RegisteredSourceCollectorPlugin>,
+  pluginSlug: string,
+  plugin: RegisteredSourceCollectorPlugin,
+): void {
+  if (plugins.has(pluginSlug)) {
+    throw new Error(`Duplicate source collector plugin: ${pluginSlug}`);
+  }
+
+  plugins.set(pluginSlug, plugin);
 }

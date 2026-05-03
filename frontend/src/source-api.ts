@@ -14,8 +14,10 @@ export type InspectSourceRequest = {
 export type SourceCollectorPluginListItem = {
   description: string | null;
   displayName: string;
+  message: string | null;
   pluginSlug: string;
   sourceKind: "feed" | "podcast";
+  status: "available" | "unavailable";
 };
 
 export type InspectSourceDraft = {

@@ -11,7 +11,7 @@ import type {
   SourceCollectorPluginDefinition,
   SourceCollectorSupportsInput,
   SourceMetadata,
-} from "@geshi/plugin-api";
+} from "@geshi/sdk";
 
 import { manifest } from "./manifest.js";
 

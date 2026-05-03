@@ -6,12 +6,30 @@ const nonRssSourceUrl =
   process.env.E2E_NON_RSS_SOURCE_URL ??
   "http://127.0.0.1:3401/feeds/not-rss.xml";
 
-test("autofills source fields via inspect", async ({ page }) => {
+test("shows available external plugin in source registration", async ({
+  page,
+}) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: "Add source" }).click();
 
-  const urlInput = page.getByRole("textbox", { name: "RSS URL" });
+  const pluginSelect = page.getByRole("combobox", {
+    name: "Collector Plugin",
+  });
+
+  await expect(pluginSelect).toBeVisible();
+  await expect(pluginSelect).toContainText("Example External Feed (feed)");
+});
+
+test("autofills source fields via inspect", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: "Add source" }).click();
+  await page
+    .getByRole("combobox", { name: "Collector Plugin" })
+    .selectOption("podcast-rss");
+
+  const urlInput = page.getByRole("textbox", { name: "Source URL" });
   await urlInput.fill(sourceFeedUrl);
   await urlInput.blur();
 
@@ -30,14 +48,18 @@ test("allows manual registration after inspect failure", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: "Add source" }).click();
+  await page
+    .getByRole("combobox", { name: "Collector Plugin" })
+    .selectOption("podcast-rss");
 
-  const urlInput = page.getByRole("textbox", { name: "RSS URL" });
+  const urlInput = page.getByRole("textbox", { name: "Source URL" });
   await urlInput.fill(nonRssSourceUrl);
   await urlInput.blur();
 
-  await expect(
-    page.getByText("The given URL is not a supported RSS feed."),
-  ).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Source Slug" })).toHaveValue(
+    "",
+  );
+  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("");
 
   await page.getByRole("textbox", { name: "Title" }).fill("Manual Source");
   await page
@@ -55,7 +77,10 @@ test("registers a source and observes contents", async ({ page, request }) => {
   await page.goto("/");
 
   await page.getByRole("button", { name: "Add source" }).click();
-  const urlInput = page.getByRole("textbox", { name: "RSS URL" });
+  await page
+    .getByRole("combobox", { name: "Collector Plugin" })
+    .selectOption("podcast-rss");
+  const urlInput = page.getByRole("textbox", { name: "Source URL" });
   await urlInput.fill(sourceFeedUrl);
   await urlInput.blur();
   await page.getByRole("button", { name: "Register" }).click();
@@ -94,7 +119,10 @@ test("opens entry detail and exposes playable audio", async ({
   await page.goto("/");
 
   await page.getByRole("button", { name: "Add source" }).click();
-  const urlInput = page.getByRole("textbox", { name: "RSS URL" });
+  await page
+    .getByRole("combobox", { name: "Collector Plugin" })
+    .selectOption("podcast-rss");
+  const urlInput = page.getByRole("textbox", { name: "Source URL" });
   await urlInput.fill(playbackSourceFeedUrl);
   await urlInput.blur();
   await page.getByRole("button", { name: "Register" }).click();
@@ -176,9 +204,10 @@ test("opens entry detail and exposes playable audio", async ({
   const audio = page.locator("audio");
   await expect(audio).toBeVisible();
 
-  const audioSourceUrl = await audio.evaluate((element) =>
-    element.getAttribute("src"),
-  );
+  const audioSourceUrl = await page
+    .locator("audio source")
+    .first()
+    .getAttribute("src");
 
   expect(audioSourceUrl).toMatch(/^\/media\/assets\/[0-9a-f-]+\.mp3$/u);
 

@@ -18,4 +18,4 @@ export type {
   SourceCollectorPluginDefinition,
   SourceCollectorSourceKind,
   SourceMetadata,
-} from "@geshi/plugin-api";
+} from "@geshi/sdk";

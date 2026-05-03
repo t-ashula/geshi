@@ -91,14 +91,18 @@ describe("source endpoints", () => {
               {
                 description: "Collect podcast RSS and Atom feeds.",
                 displayName: "Podcast RSS",
+                message: null,
                 pluginSlug: "podcast-rss",
                 sourceKind: "podcast" as const,
+                status: "available" as const,
               },
               {
                 description: "Collect gov-online updates.",
                 displayName: "Go JP RSS",
+                message: null,
                 pluginSlug: "go-jp-rss",
                 sourceKind: "feed" as const,
+                status: "available" as const,
               },
             ]),
           listSources: vi.fn(),
@@ -114,14 +118,18 @@ describe("source endpoints", () => {
       {
         description: "Collect podcast RSS and Atom feeds.",
         displayName: "Podcast RSS",
+        message: null,
         pluginSlug: "podcast-rss",
         sourceKind: "podcast",
+        status: "available",
       },
       {
         description: "Collect gov-online updates.",
         displayName: "Go JP RSS",
+        message: null,
         pluginSlug: "go-jp-rss",
         sourceKind: "feed",
+        status: "available",
       },
     ]);
   });

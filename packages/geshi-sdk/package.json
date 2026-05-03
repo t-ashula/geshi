@@ -1,5 +1,5 @@
 {
-  "name": "@geshi/plugin-api",
+  "name": "@geshi/sdk",
   "private": true,
   "type": "module",
   "version": "0.0.0",
