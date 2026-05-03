@@ -20,7 +20,7 @@ type InstalledPluginResolution =
   | {
       message: string;
       packageName: string;
-    status: "unavailable";
+      status: "unavailable";
     };
 
 const projectRootDir = process.cwd();
@@ -29,7 +29,10 @@ const pluginConfig = resolvePluginConfig(geshiConfig, projectRootDir);
 const pluginOutputRootDir = pluginConfig.outputRootDir;
 const pluginPackageJsonPath = path.join(pluginOutputRootDir, "package.json");
 const generatedPluginIndexPath = path.join(pluginOutputRootDir, "index.js");
-const generatedPluginMetadataPath = path.join(pluginOutputRootDir, "metadata.json");
+const generatedPluginMetadataPath = path.join(
+  pluginOutputRootDir,
+  "metadata.json",
+);
 
 const [, , command, subcommand] = process.argv;
 
@@ -78,9 +81,8 @@ async function installPlugins(): Promise<void> {
 async function generatePlugins(): Promise<void> {
   const packageNames = Object.keys(pluginConfig.packages);
   const previousMetadata = await loadExistingMetadata();
-  const installedPluginResolutions = resolveInstalledPluginResolutions(
-    packageNames,
-  );
+  const installedPluginResolutions =
+    resolveInstalledPluginResolutions(packageNames);
 
   await mkdir(pluginOutputRootDir, { recursive: true });
   await writeFile(
@@ -106,11 +108,12 @@ async function buildGeneratedPluginMetadata(
   previousMetadata: GeneratedSourceCollectorPluginMetadata[],
 ): Promise<GeneratedSourceCollectorPluginMetadata[]> {
   const nextMetadata: GeneratedSourceCollectorPluginMetadata[] = [];
-  
+
   for (const resolution of installedPluginResolutions) {
     const packageName = resolution.packageName;
     const previousEntry =
-      previousMetadata.find((entry) => entry.packageName === packageName) ?? null;
+      previousMetadata.find((entry) => entry.packageName === packageName) ??
+      null;
 
     if (resolution.status === "unavailable") {
       nextMetadata.push({
@@ -134,7 +137,10 @@ async function buildGeneratedPluginMetadata(
 
       const definition = pluginModule.definition as {
         manifest: {
-          capabilities: Array<{ kind: string; sourceKind?: "feed" | "podcast" }>;
+          capabilities: Array<{
+            kind: string;
+            sourceKind?: "feed" | "podcast";
+          }>;
           description?: string;
           displayName: string;
           pluginSlug: string;
@@ -143,9 +149,13 @@ async function buildGeneratedPluginMetadata(
       const capability = definition.manifest.capabilities.find(
         (
           candidate,
-        ): candidate is { kind: "source-collector"; sourceKind: "feed" | "podcast" } =>
+        ): candidate is {
+          kind: "source-collector";
+          sourceKind: "feed" | "podcast";
+        } =>
           candidate.kind === "source-collector" &&
-          (candidate.sourceKind === "feed" || candidate.sourceKind === "podcast"),
+          (candidate.sourceKind === "feed" ||
+            candidate.sourceKind === "podcast"),
       );
 
       if (capability === undefined) {
@@ -253,7 +263,9 @@ function renderGeneratedPluginIndex(
 ): string {
   const loaderItems = installedPluginResolutions
     .filter(
-      (resolution): resolution is Extract<
+      (
+        resolution,
+      ): resolution is Extract<
         InstalledPluginResolution,
         { status: "available" }
       > => resolution.status === "available",

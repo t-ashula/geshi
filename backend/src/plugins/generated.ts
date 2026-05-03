@@ -1,14 +1,14 @@
 import { readFile } from "node:fs/promises";
 
 import type {
+  GeneratedSourceCollectorPluginMetadata,
+  PluginArtifactPaths,
+} from "../../../internal/geshi-config.js";
+import type {
   SourceCollectorPluginCapability,
   SourceCollectorPluginDefinition,
   SourceCollectorSourceKind,
 } from "./types.js";
-import type {
-  GeneratedSourceCollectorPluginMetadata,
-  PluginArtifactPaths,
-} from "../../../internal/geshi-config.js";
 
 export type ExternalSourceCollectorPluginRecord =
   | {
@@ -43,9 +43,7 @@ type GeneratedSourceCollectorPluginModule = {
 
 export async function loadExternalSourceCollectorPlugins(
   pluginArtifactPaths: PluginArtifactPaths,
-): Promise<
-  ExternalSourceCollectorPluginRecord[]
-> {
+): Promise<ExternalSourceCollectorPluginRecord[]> {
   const [loaders, metadataEntries] = await Promise.all([
     loadGeneratedSourceCollectorPluginLoaders(
       pluginArtifactPaths.generatedPluginIndexUrl,
@@ -112,8 +110,7 @@ export async function loadExternalSourceCollectorPlugins(
       records.push({
         description: metadata.description,
         displayName: metadata.displayName,
-        message:
-          error instanceof Error ? error.message : "Plugin load failed.",
+        message: error instanceof Error ? error.message : "Plugin load failed.",
         packageName: loader.packageName,
         pluginSlug: metadata.pluginSlug,
         sourceKind: metadata.sourceKind,
@@ -141,9 +138,7 @@ async function loadGeneratedSourceCollectorPluginLoaders(
 
 async function loadGeneratedSourceCollectorPluginMetadata(
   generatedPluginMetadataPath: string,
-): Promise<
-  GeneratedSourceCollectorPluginMetadata[]
-> {
+): Promise<GeneratedSourceCollectorPluginMetadata[]> {
   try {
     const content = await readFile(generatedPluginMetadataPath, "utf8");
     const entries = JSON.parse(

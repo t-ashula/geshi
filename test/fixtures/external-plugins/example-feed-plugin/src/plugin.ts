@@ -11,29 +11,32 @@ import type {
 import { manifest } from "./manifest.js";
 
 export const plugin: SourceCollectorPlugin = {
-  async supports(_input: SourceCollectorSupportsInput) {
-    return {
+  supports(_input: SourceCollectorSupportsInput) {
+    return Promise.resolve({
       supported: true,
-    };
+    });
   },
 
-  async inspect(input: SourceCollectorInspectInput) {
-    return {
-      description: "Fixture external plugin for install and generate verification.",
+  inspect(input: SourceCollectorInspectInput) {
+    return Promise.resolve({
+      description:
+        "Fixture external plugin for install and generate verification.",
       title: "Example External Feed",
       url: input.sourceUrl,
-    };
+    });
   },
 
-  async observe(_input: SourceCollectorObserveInput) {
-    return {
+  observe(_input: SourceCollectorObserveInput) {
+    return Promise.resolve({
       contents: [],
-    };
+    });
   },
 
-  async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
-    throw new Error(
-      `Example external feed plugin does not acquire assets: ${input.asset.kind}`,
+  acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
+    return Promise.reject(
+      new Error(
+        `Example external feed plugin does not acquire assets: ${input.asset.kind}`,
+      ),
     );
   },
 };
