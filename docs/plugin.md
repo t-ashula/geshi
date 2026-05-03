@@ -124,6 +124,80 @@
   - `asset` 保存に必要な metadata
   - 必要に応じて次回実行用の plugin 固有 state
 
+## 外部 plugin 開発
+
+### 依存境界
+
+- 外部 source collector plugin は，`geshi` 本体 repository 全体ではなく `@geshi/sdk` に依存して開発する
+- plugin author は，少なくとも次を `@geshi/sdk` から import できればよい
+  - `PluginManifest`
+  - `SourceCollectorPlugin`
+  - `SourceCollectorPluginDefinition`
+  - `supports` / `inspect` / `observe` / `acquire` の input / output 型
+- plugin は `backend` の内部 module や repository / service / endpoint / DB 型へ依存しない
+
+### module 形
+
+- 外部 plugin package は，source collector plugin として扱われる module entry を 1 つ持つ
+- その module は，少なくとも `manifest` と `definition` を export する
+- `definition` は `SourceCollectorPluginDefinition` を満たし，`manifest` と `plugin` を含む
+
+```ts
+import type {
+  PluginManifest,
+  SourceCollectorPlugin,
+  SourceCollectorPluginDefinition,
+} from "@geshi/sdk";
+
+export const manifest: PluginManifest = {
+  apiVersion: "1",
+  capabilities: [
+    {
+      kind: "source-collector",
+      sourceKind: "feed",
+    },
+  ],
+  displayName: "Example External Feed",
+  pluginSlug: "example-external-feed",
+};
+
+export const plugin: SourceCollectorPlugin = {
+  async supports(_input) {
+    return { supported: true };
+  },
+  async inspect(input) {
+    return {
+      description: null,
+      title: "Example External Feed",
+      url: input.sourceUrl,
+    };
+  },
+  async observe(_input) {
+    return { contents: [] };
+  },
+  async acquire(_input) {
+    throw new Error("Not implemented");
+  },
+};
+
+export const definition: SourceCollectorPluginDefinition = {
+  manifest,
+  plugin,
+};
+```
+
+### 運用時設定との関係
+
+- 外部 plugin package 自体の導入は，運用時設定 `geshi.config.js` の `plugin.packages` によって行う
+- `geshi` はその設定をもとに install / generate し，生成済み plugin registry module から外部 plugin を読む
+- plugin author は，本体の static import 一覧へ自分の plugin を追加することを前提にしない
+
+### 参考実装
+
+- 外部 package 例: [test/fixtures/external-plugins/example-feed-plugin](/home/office/src/github.com/t-ashula/geshi/test/fixtures/external-plugins/example-feed-plugin/package.json:1)
+- package plugin 例: [packages/geshi-plugin-go-jp-rss](/home/office/src/github.com/t-ashula/geshi/packages/geshi-plugin-go-jp-rss/package.json:1)
+- SDK: [packages/geshi-sdk/src/index.ts](/home/office/src/github.com/t-ashula/geshi/packages/geshi-sdk/src/index.ts:1)
+
 ## `podcast-rss` collector plugin
 
 ### 取得元

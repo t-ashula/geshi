@@ -2,7 +2,7 @@
 
 ## ステータス
 
-提案
+決定
 
 ## 範囲
 
@@ -11,14 +11,14 @@
 ## コンテキスト
 
 - external plugin を完全に別 repository として開発する場合，plugin author は型情報と契約定義を本体側から import する必要がある
-- 現在の `@geshi/plugin-api` は plugin 契約の一部を切り出しているが，今後 `init(context)` のような初期化境界や host interface を追加する余地がある
+- 現在の plugin 契約は `@geshi/sdk` に置いているが，今後 `init(context)` のような初期化境界や host interface を追加する余地がある
 - 一方で，external plugin が `geshi` 本体 repository 全体へ依存する形は重く，依存境界としても大きすぎる
 - plugin discovery や install / generate の仕組みとは別に，plugin author がどの package 群へ依存して開発するかを整理する必要がある
 
 ## 決定
 
 - external plugin 開発者が依存する境界は，`geshi` 本体 repository 全体ではなく plugin author 向け SDK として分離する
-- `@geshi/plugin-api` を含む plugin author 向け契約は，この SDK 境界の一部として扱う
+- plugin author 向け契約は，`@geshi/sdk` を中心とした SDK 境界として扱う
 - `backend` や worker も，plugin 契約に関する型や interface は可能な限り同じ SDK 境界へ依存する
 - plugin author が本体実装詳細へ依存しなくても開発できることを優先する
 - host から plugin へ注入する interface を今後追加する場合も，本体固有 module ではなく SDK 境界へ置く
@@ -32,7 +32,7 @@
 
 ## 代替案
 
-- `@geshi/plugin-api` だけを現状のまま維持し，足りない型は本体 repository から直接 import させる
+- `@geshi/sdk` を置かず，足りない型は本体 repository から直接 import させる
   - 本体への依存境界が大きすぎるため採らない
 - plugin author 向け package を細かく分割せず，本体 repository 配下の内部 module を外部 plugin から参照させる
   - 内部構造がそのまま外部契約になってしまうため採らない
