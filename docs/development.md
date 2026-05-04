@@ -36,14 +36,33 @@
    - 使用する言語ランタイムや主要 CLI ツールは `.tool-versions` に従う
    - asdf または互換ツールで必要バージョンをインストールする
 
-4. ローカル設定ファイルを用意する
+4. npm 依存を入れる
+
+   ```sh
+   npm install
+   ```
+
+5. plugin を install / generate する
+
+   ```sh
+   ./bin/geshi plugins install
+   ./bin/geshi plugins generate
+   ```
+
+   補足:
+
+   - `geshi.config.js` に書かれた external plugin を `.geshi/generated/plugins/`
+     配下へ解決する
+   - plugin の設定や依存を変えたときは，起動前に再実行する
+
+6. ローカル設定ファイルを用意する
    - `.env.example` を元に `.env.local` を作る
    - `.env.local` にはローカル専用設定と秘密情報を置く
    - `.env.local` はコミットしない
    - 現状は `.env.local` の自動読込はしていない
    - 必要なら shell から export するか，`set -a; . ./.env.local; set +a` のように読み込む
 
-5. ローカル依存サービスを起動する
+7. ローカル依存サービスを起動する
    - DB，検索エンジン，オブジェクトストレージなどの依存サービスは `docker compose` で起動する
    - 起動対象や手順はリポジトリルートの共通入口から辿れるようにする
 
