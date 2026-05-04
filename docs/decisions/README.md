@@ -45,3 +45,5 @@
 - [ADR-0042: backend と worker は生成済み plugin registry module を import する](./0042-generated-plugin-registry-import-boundary.md)
 - [ADR-0043: 外部 plugin 開発のために plugin author 向け SDK 境界を分離する](./0043-plugin-sdk-boundary-for-external-plugin-development.md)
 - [ADR-0044: scribe 連携は adapter 境界に閉じ込める](./0044-scribe-integration-boundary.md)
+- [ADR-0045: transcript は content に直接ひもづく主体として保持する](./0045-transcript-owned-by-content.md)
+- [ADR-0046: transcript 要求と scribe polling は backend job で扱う](./0046-transcript-job-orchestration.md)

@@ -16,6 +16,25 @@
 - 当面はローカル filesystem を実装として使う
 - 将来的な保存先差し替えに備えて，interface として規定する
 
+## 作業用 storage
+
+`asset` の正本保存とは別に，変換や分割の途中でだけ使う作業用 `storage` を持ってよい．
+
+例:
+
+- transcript 前処理で生成した WAV
+- chunk 分割後の一時音声
+
+作業用 `storage` の前提:
+
+- 永続 `storage` とは責務を分ける
+- 当面の実装は local filesystem でよい
+- ただし caller 間の受け渡しは local path ではなく key または同等の参照で行う
+- job 間契約に「同じ host の filesystem を共有していること」を持ち込まない
+- 保存物は最終成果物ではなく，一時生成物として扱う
+- 処理終了時に削除する前提で扱う
+- retry 時は再利用を前提にせず，再生成してよい
+
 ## API
 
 - `put`
@@ -41,6 +60,7 @@
 - 保存失敗時に，失敗を扱えること
 - `overwrite` フラグに従って上書き可否を制御すること
 - `pathJoin` によって，実装依存の区切り文字を吸収し，解決先が `rootDir` 自身またはその配下に収まることを保証することで path traversal を防ぐこと
+- 作業用 `storage` を採る場合は，その key ベース参照と削除規則を一貫して扱えること
 
 ### storage が直接は担わないこと
 
@@ -48,6 +68,7 @@
 - source collector plugin の収集ロジック
 - 収集対象ごとの観測ルール
 - 保存先 key の意味づけ
+- 一時生成物を最終成果物として公開すること
 
 ## key の考え方
 
@@ -66,6 +87,12 @@
 - 保存先 key を，必要に応じて `storage.pathJoin` を使って決めて `storage` に渡す
 - 保存対象の body を `storage` に渡す
 - 保存結果を metadata 側へ反映するための情報を受け取る
+
+### job worker
+
+- 必要に応じて，永続 `storage` とは別の作業用 `storage` を使って中間生成物を扱ってよい
+- 作業用 `storage` をまたぐ受け渡しは key ベースで行う
+- local filesystem path をそのまま job payload 契約に含めない
 
 ### api backend
 

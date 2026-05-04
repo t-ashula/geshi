@@ -136,14 +136,61 @@ content にひもづく実ファイルや派生ファイルを表す．
 主な属性:
 
 - `id`
-- `assetId`
+- `contentId`
+- `sourceAssetSnapshotId`
+- `generation`
+  - 同じ音源に対する何度目の文字起こしか
+  - failure chunk の retry では増えず，明示的な再文字起こしで増える
 - `kind`
   - `transcript`
   - `ocr`
   - `extracted-text`
 - `language`
+- `status`
+  - `queued`
+  - `running`
+  - `succeeded`
+  - `failed`
 - `body`
+- `startedAt`
+- `finishedAt`
 - `createdAt`
+
+補足:
+
+- `transcript` は `content` 文脈で読む最終成果物とする
+- 生成元 audio は `sourceAssetSnapshotId` で追う
+- `body` には chunk を連結した最終本文を保持する
+
+### transcriptChunk
+
+chunk 分割された文字起こしの部分結果を表す．
+
+主な属性:
+
+- `id`
+- `transcriptId`
+- `chunkIndex`
+- `status`
+  - `queued`
+  - `running`
+  - `succeeded`
+  - `failed`
+  - `timedOut`
+- `body`
+- `sourceStartMs`
+- `sourceEndMs`
+- `failureMessage`
+- `startedAt`
+- `finishedAt`
+- `createdAt`
+
+補足:
+
+- `transcriptChunk` は `transcript` の中間成果物とする
+- `chunkIndex` は `transcriptId` ごとに一意で，最終連結順序に使う
+- `body` は chunk 単位の本文を保持する
+- `sourceStartMs` / `sourceEndMs` は元音声内での時間範囲を表す
 
 ## 履歴テーブル
 
@@ -239,7 +286,8 @@ asset の可変属性のある時点の状態を表す．
 - 1 `source` : N `collectorSetting`
 - 1 `collectorSetting` : 1 `collectorPluginState`
 - 1 `content` : N `asset`
-- 1 `asset` : N `transcript`
+- 1 `content` : N `transcript`
+- 1 `transcript` : N `transcriptChunk`
 - 1 `source` : N `sourceSnapshot`
 - 1 `collectorSetting` : N `collectorSettingSnapshot`
 - 1 `collectorPluginState` : N `collectorPluginStateSnapshot`
