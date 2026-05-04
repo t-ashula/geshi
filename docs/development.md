@@ -37,9 +37,11 @@
    - asdf または互換ツールで必要バージョンをインストールする
 
 4. ローカル設定ファイルを用意する
-   - `.env.example` がある場合は，それを元に `.env.local` を作る
+   - `.env.example` を元に `.env.local` を作る
    - `.env.local` にはローカル専用設定と秘密情報を置く
    - `.env.local` はコミットしない
+   - 現状は `.env.local` の自動読込はしていない
+   - 必要なら shell から export するか，`set -a; . ./.env.local; set +a` のように読み込む
 
 5. ローカル依存サービスを起動する
    - DB，検索エンジン，オブジェクトストレージなどの依存サービスは `docker compose` で起動する
@@ -55,12 +57,39 @@ make dev-up
 - `make dev-down` で停止する
   - volume まで消したいときだけ `make dev-reset` を使う
 
+### 通常の起動
+
+依存サービスを起動した後は，別 terminal でそれぞれ次を起動する．
+
+backend:
+
+```sh
+npm run backend:dev
+```
+
+frontend:
+
+```sh
+npm run frontend:dev
+```
+
+worker:
+
+```sh
+npm run worker:start
+```
+
+補足:
+
+- `backend:dev` は API server を watch モードで起動する
+- `frontend:dev` は Vite dev server を起動する
+- `worker:start` は `observe-source` / `acquire-content` / `periodic-crawl` /
+  `transcript-split` / `transcript-chunk` worker をまとめて起動する
+
 ### transcript 動作確認用 audio
 
-- transcript の受け入れ条件確認では，repo に長尺音声 fixture を置かず，必要時に各自でローカル配置する
-- 現在の transcript 用 E2E は `tmp/botchan/botchan_01_natsume_64kb.mp3` を入力にする
-- 入手元は LibriVox の `Botchan by Soseki Natsume`
-  - https://librivox.org/botchan-by-soseki-natsume-2/
+- transcript の E2E 用に `tmp/botchan/botchan_01_natsume_64kb.mp3` というファイルを配置する前提になっている
+- 入手元は LibriVox の [Botchan by Soseki Natsume](https://librivox.org/botchan-by-soseki-natsume-2/)
 - E2E runner はこの mp3 から先頭 8 分を切り出して source server から配信する
 
 例:
@@ -68,7 +97,9 @@ make dev-up
 ```sh
 mkdir -p tmp/botchan
 # 取得した chapter 1 mp3 を以下へ置く
-# tmp/botchan/botchan_01_natsume_64kb.mp3
+# cd tmp;
+# unzip -d botchan botchan_1310_librivox.zip
+# ls botchan/botchan_01_natsume_64kb.mp3
 ```
 
 ```sh
