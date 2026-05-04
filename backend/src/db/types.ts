@@ -16,7 +16,7 @@ type NumberColumn = ColumnType<number, number | undefined, number>;
 type JsonColumn = ColumnType<
   Record<string, unknown>,
   Record<string, unknown> | string | undefined,
-  never
+  Record<string, unknown> | string | undefined
 >;
 
 export type SourceTable = {
@@ -144,11 +144,40 @@ export type JobTable = {
   finished_at: NullableTimestampColumn;
   id: string;
   kind: string;
+  metadata: JsonColumn;
   queue_job_id: string | null;
   retryable: GeneratedBooleanColumn;
   source_id: string | null;
   started_at: NullableTimestampColumn;
   status: "queued" | "running" | "succeeded" | "failed";
+};
+
+export type TranscriptTable = {
+  body: string | null;
+  content_id: string;
+  created_at: TimestampColumn;
+  finished_at: NullableTimestampColumn;
+  generation: number;
+  id: string;
+  kind: "transcript" | "ocr" | "extracted-text";
+  source_asset_snapshot_id: string;
+  started_at: NullableTimestampColumn;
+  status: "queued" | "running" | "succeeded" | "failed";
+};
+
+export type TranscriptChunkTable = {
+  body: string | null;
+  chunk_index: number;
+  created_at: TimestampColumn;
+  failure_message: string | null;
+  finished_at: NullableTimestampColumn;
+  id: string;
+  source_end_ms: number;
+  source_start_ms: number;
+  started_at: NullableTimestampColumn;
+  status: "queued" | "running" | "succeeded" | "failed" | "timed_out";
+  storage_key: string | null;
+  transcript_id: string;
 };
 
 export type GeshiDatabase = {
@@ -163,6 +192,8 @@ export type GeshiDatabase = {
   content_snapshots: ContentSnapshotTable;
   contents: ContentTable;
   jobs: JobTable;
+  transcript_chunks: TranscriptChunkTable;
+  transcripts: TranscriptTable;
   source_snapshots: SourceSnapshotTable;
   sources: SourceTable;
 };

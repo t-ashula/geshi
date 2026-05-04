@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 
 import { err, ok } from "../lib/result.js";
@@ -6,6 +6,22 @@ import type { Storage, StoragePutInput } from "./types.js";
 
 export class FilesystemStorage implements Storage {
   public constructor(private readonly rootDir: string) {}
+
+  public async delete(key: string) {
+    try {
+      await rm(this.resolveStoragePath(key), {
+        force: true,
+      });
+
+      return ok(undefined);
+    } catch (error) {
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to delete storage object."),
+      );
+    }
+  }
 
   public async get(key: string) {
     try {

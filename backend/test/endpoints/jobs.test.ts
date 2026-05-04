@@ -18,6 +18,7 @@ describe("job endpoints", () => {
               finishedAt: null,
               id: "job-1",
               kind: "observe-source",
+              metadata: {},
               queueJobId: "queue-1",
               retryable: true,
               sourceId: "source-1",

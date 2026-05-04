@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import type {
   ContentDetailAsset,
   ContentDetailItem,
+  ContentTranscriptItem,
   ContentListItem,
   CreateSourceRequest,
   PeriodicCrawlSettings,
@@ -19,6 +20,8 @@ import {
   listContents,
   listSources,
   observeSource,
+  requestTranscripts,
+  retryTranscript,
   updatePeriodicCrawlSettings,
   updateSourceCollectorSettings,
 } from "./source-api.js";
@@ -48,6 +51,7 @@ const isSettingsSubmitting = ref(false);
 const isSourcesLoading = ref(true);
 const isContentsLoading = ref(true);
 const isDetailLoading = ref(false);
+const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
 const errorMessage = ref<string | null>(null);
 const detailErrorMessage = ref<string | null>(null);
@@ -55,6 +59,7 @@ const inspectErrorMessage = ref<string | null>(null);
 const observeErrorMessage = ref<string | null>(null);
 const settingsErrorMessage = ref<string | null>(null);
 const sourceCrawlErrorMessage = ref<string | null>(null);
+const transcriptActionErrorMessage = ref<string | null>(null);
 const validationMessage = ref<string | null>(null);
 const lastInspectedUrl = ref<string | null>(null);
 const routeState = ref<RouteState>(normalizeRoute(window.location.pathname));
@@ -411,6 +416,39 @@ async function syncDetailWithRoute(): Promise<void> {
   }
 }
 
+async function requestContentTranscripts(contentId: string): Promise<void> {
+  isTranscriptSubmitting.value = contentId;
+  transcriptActionErrorMessage.value = null;
+
+  try {
+    await requestTranscripts(contentId);
+    await syncDetailWithRoute();
+  } catch (error) {
+    transcriptActionErrorMessage.value =
+      error instanceof Error ? error.message : "Failed to request transcripts.";
+  } finally {
+    isTranscriptSubmitting.value = null;
+  }
+}
+
+async function retryFailedTranscript(
+  contentId: string,
+  transcriptId: string,
+): Promise<void> {
+  isTranscriptSubmitting.value = transcriptId;
+  transcriptActionErrorMessage.value = null;
+
+  try {
+    await retryTranscript(contentId, transcriptId);
+    await syncDetailWithRoute();
+  } catch (error) {
+    transcriptActionErrorMessage.value =
+      error instanceof Error ? error.message : "Failed to retry transcript.";
+  } finally {
+    isTranscriptSubmitting.value = null;
+  }
+}
+
 function navigateTo(pathname: string): void {
   if (window.location.pathname === pathname) {
     return;
@@ -481,6 +519,20 @@ function formatDate(value: string | null): string {
 
 function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
   return detail.assets.filter((asset) => asset.url !== null);
+}
+
+function detailAudioAssets(detail: ContentDetailItem): ContentDetailAsset[] {
+  return detail.assets.filter((asset) => asset.kind === "audio");
+}
+
+function transcriptSourceLabel(transcript: ContentTranscriptItem): string {
+  const source = transcript.sourceAsset;
+
+  return [
+    source.kind,
+    source.primary ? "Primary" : "Supplemental",
+    source.mimeType ?? "Unknown mime",
+  ].join(" · ");
 }
 
 function renderContentSummary(summary: string | null): string {
@@ -916,6 +968,94 @@ function renderContentSummaryPreview(summary: string | null): string {
               class="detail-summary"
               v-html="renderContentSummary(contentDetail.summary)"
             ></div>
+
+            <section class="detail-section">
+              <div class="detail-section-header">
+                <div>
+                  <h3>Transcripts</h3>
+                  <span class="detail-count">
+                    {{ contentDetail.transcripts.length }}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="
+                    detailAudioAssets(contentDetail).length === 0 ||
+                    isTranscriptSubmitting === contentDetail.id
+                  "
+                  @click="requestContentTranscripts(contentDetail.id)"
+                >
+                  {{
+                    isTranscriptSubmitting === contentDetail.id
+                      ? "Requesting..."
+                      : "Request transcripts"
+                  }}
+                </button>
+              </div>
+
+              <p v-if="transcriptActionErrorMessage" class="feedback error">
+                {{ transcriptActionErrorMessage }}
+              </p>
+
+              <div
+                v-if="contentDetail.transcripts.length === 0"
+                class="empty-inline"
+              >
+                No transcripts yet.
+              </div>
+
+              <ul v-else class="asset-list">
+                <li
+                  v-for="transcript in contentDetail.transcripts"
+                  :key="transcript.id"
+                  class="asset-card"
+                >
+                  <div class="asset-card-header">
+                    <div class="transcript-card-heading">
+                      <strong> Transcript #{{ transcript.generation }} </strong>
+                      <span class="asset-meta">
+                        {{ transcriptSourceLabel(transcript) }}
+                      </span>
+                    </div>
+                    <div class="transcript-card-actions">
+                      <span class="asset-meta">
+                        {{ transcript.status }}
+                        <template v-if="transcript.totalChunkCount > 0">
+                          · {{ transcript.totalChunkCount }} chunks
+                        </template>
+                      </span>
+                      <button
+                        v-if="transcript.retryAvailable"
+                        type="button"
+                        class="ghost-button"
+                        :disabled="isTranscriptSubmitting === transcript.id"
+                        @click="
+                          retryFailedTranscript(contentDetail.id, transcript.id)
+                        "
+                      >
+                        {{
+                          isTranscriptSubmitting === transcript.id
+                            ? "Retrying..."
+                            : "Retry failed chunks"
+                        }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <p v-if="transcript.body" class="transcript-body">
+                    {{ transcript.body }}
+                  </p>
+                  <p v-else class="asset-meta">
+                    {{
+                      transcript.status === "failed"
+                        ? `Failed chunks: ${transcript.failedChunkCount}`
+                        : "Transcript is not completed yet."
+                    }}
+                  </p>
+                </li>
+              </ul>
+            </section>
 
             <section class="detail-section">
               <div class="detail-section-header">

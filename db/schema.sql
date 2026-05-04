@@ -126,6 +126,7 @@ create table jobs (
     kind varchar(128) not null,
     source_id uuid references sources (id),
     queue_job_id text unique,
+    metadata jsonb not null default '{}'::jsonb,
     status text not null constraint jobs_status_check check (
         status = any(
             array ['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text]
@@ -137,6 +138,52 @@ create table jobs (
     created_at timestamptz not null default current_timestamp,
     started_at timestamptz,
     finished_at timestamptz
+);
+
+create table transcripts (
+    id uuid primary key,
+    content_id uuid not null references contents (id),
+    source_asset_snapshot_id uuid not null references asset_snapshots (id),
+    generation integer not null,
+    kind text not null constraint transcripts_kind_check check (
+        kind = any(array ['transcript'::text, 'ocr'::text, 'extracted-text'::text])
+    ),
+    status text not null constraint transcripts_status_check check (
+        status = any(
+            array ['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text]
+        )
+    ),
+    body text,
+    created_at timestamptz not null default current_timestamp,
+    started_at timestamptz,
+    finished_at timestamptz,
+    constraint transcripts_source_asset_snapshot_id_generation_key unique (
+        source_asset_snapshot_id,
+        generation
+    )
+);
+
+create table transcript_chunks (
+    id uuid primary key,
+    transcript_id uuid not null references transcripts (id),
+    chunk_index integer not null,
+    status text not null constraint transcript_chunks_status_check check (
+        status = any(
+            array ['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text, 'timed_out'::text]
+        )
+    ),
+    body text,
+    source_start_ms integer not null,
+    source_end_ms integer not null,
+    failure_message text,
+    storage_key text,
+    created_at timestamptz not null default current_timestamp,
+    started_at timestamptz,
+    finished_at timestamptz,
+    constraint transcript_chunks_transcript_id_chunk_index_key unique (
+        transcript_id,
+        chunk_index
+    )
 );
 
 create index if not exists sources_created_at_idx on sources (created_at);
@@ -183,3 +230,18 @@ create index if not exists assets_content_id_observed_fingerprint_idx on assets 
 create index if not exists asset_snapshots_asset_id_version_idx on asset_snapshots (asset_id, version desc);
 
 create index if not exists jobs_source_id_created_at_idx on jobs (source_id, created_at desc);
+
+create index if not exists transcripts_content_id_created_at_idx on transcripts (
+    content_id,
+    created_at desc
+);
+
+create index if not exists transcripts_source_asset_snapshot_id_idx on transcripts (
+    source_asset_snapshot_id,
+    created_at desc
+);
+
+create index if not exists transcript_chunks_transcript_id_chunk_index_idx on transcript_chunks (
+    transcript_id,
+    chunk_index asc
+);

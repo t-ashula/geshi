@@ -8,6 +8,7 @@ import { ContentRepository } from "./db/content-repository.js";
 import { createDatabaseFromPool } from "./db/database.js";
 import { JobRepository } from "./db/job-repository.js";
 import { SourceRepository } from "./db/source-repository.js";
+import { TranscriptRepository } from "./db/transcript-repository.js";
 import {
   createPgBoss,
   ensureQueue,
@@ -17,6 +18,8 @@ import {
   ACQUIRE_CONTENT_JOB_NAME,
   OBSERVE_SOURCE_JOB_NAME,
   PERIODIC_CRAWL_JOB_NAME,
+  TRANSCRIPT_CHUNK_JOB_NAME,
+  TRANSCRIPT_SPLIT_JOB_NAME,
 } from "./job-queue/types.js";
 import { createLogger } from "./logger/index.js";
 import { getRuntimeConfig } from "./runtime-config.js";
@@ -26,6 +29,7 @@ import { createContentService } from "./service/content-service.js";
 import { createJobService } from "./service/job-service.js";
 import { createSourceInspectService } from "./service/source-inspect-service.js";
 import { createSourceService } from "./service/source-service.js";
+import { createTranscriptService } from "./service/transcript-service.js";
 import { FilesystemStorage } from "./storage/filesystem-storage.js";
 
 const runtimeConfig = getRuntimeConfig();
@@ -53,6 +57,14 @@ const sourceService = createSourceService(sourceRepository);
 const sourceInspectService = createSourceInspectService();
 const jobQueue = new PgBossJobQueue(boss);
 const jobService = createJobService(sourceService, jobRepository, jobQueue);
+const transcriptRepository = new TranscriptRepository(database);
+const transcriptService = createTranscriptService(
+  assetService,
+  database,
+  jobQueue,
+  jobRepository,
+  transcriptRepository,
+);
 const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
 
 boss.on("error", (error) => {
@@ -68,6 +80,8 @@ await boss.start();
 await ensureQueue(boss, OBSERVE_SOURCE_JOB_NAME, queueOptions);
 await ensureQueue(boss, ACQUIRE_CONTENT_JOB_NAME, queueOptions);
 await ensureQueue(boss, PERIODIC_CRAWL_JOB_NAME, queueOptions);
+await ensureQueue(boss, TRANSCRIPT_SPLIT_JOB_NAME, queueOptions);
+await ensureQueue(boss, TRANSCRIPT_CHUNK_JOB_NAME, queueOptions);
 const ensureDefaultProfileResult =
   await appSettingService.ensureDefaultProfile();
 
@@ -83,6 +97,7 @@ const app = createApp({
   sourceInspectService,
   sourceService,
   storage,
+  transcriptService,
 });
 
 serve({

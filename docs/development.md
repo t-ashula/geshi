@@ -44,6 +44,33 @@
 5. ローカル依存サービスを起動する
    - DB，検索エンジン，オブジェクトストレージなどの依存サービスは `docker compose` で起動する
    - 起動対象や手順はリポジトリルートの共通入口から辿れるようにする
+   - `scribe` は `git submodule` ではなく sibling checkout を前提にし，`Makefile` から起動できる
+
+### `scribe` の起動
+
+- `scribe` は既定で `../scribe` に checkout 済みである前提にする
+- 別の場所に置く場合は `SCRIBE_DIR=/path/to/scribe` を付けて上書きする
+
+例:
+
+```sh
+make scribe-up
+```
+
+```sh
+SCRIBE_DIR=~/src/github.com/t-ashula/scribe make scribe-up
+```
+
+```sh
+make dev-up
+```
+
+補足:
+
+- `make scribe-up` は `scribe` 用 Redis, API, worker, scheduler を起動する
+- `make dev-up` は `postgres` と `scribe` 一式をまとめて起動する
+- `make scribe-down` と `make dev-down` で停止する
+  - volume まで消したいときだけ `make dev-reset` を使う
 
 ### 運用方針
 
@@ -68,7 +95,7 @@
 
 - メッセージは .commit-template.txt と関連する ADR に基づいて一貫性を保つ
 - 粒度は大きくなりすぎないタイミングで行う
-- コミット前に，最低限テストやコーディングスタイルのチェックを行い，チェックが通らないときはコミットしない
+- コミット前に，npm run precommit での最低限のテストやコーディングスタイルのチェックを行い，チェックが通らないときはコミットしない
 
 ## フロー
 

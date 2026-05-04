@@ -47,6 +47,17 @@ export type ContentDetailAsset = {
   storageKey: string | null;
 };
 
+export type TranscriptionTargetAsset = {
+  assetId: string;
+  assetSnapshotId: string;
+  byteSize: number | null;
+  kind: string;
+  mimeType: string | null;
+  primary: boolean;
+  sourceUrl: string | null;
+  storageKey: string | null;
+};
+
 export type StoredAssetMedia = {
   byteSize: number | null;
   id: string;
@@ -381,31 +392,85 @@ export class AssetRepository {
   public async listAssetsByContentId(
     contentId: string,
   ): Promise<ContentDetailAsset[]> {
+    const latestAssetSnapshots = latestAssetSnapshotsQuery(this.database);
     const assets = await this.database
       .selectFrom("assets")
-      .selectAll()
+      .innerJoin(
+        latestAssetSnapshots.as("latest_asset_snapshots"),
+        "latest_asset_snapshots.asset_id",
+        "assets.id",
+      )
+      .select([
+        "assets.id",
+        "assets.is_primary",
+        "assets.kind",
+        "latest_asset_snapshots.asset_snapshot_id",
+        "latest_asset_snapshots.byte_size",
+        "latest_asset_snapshots.mime_type",
+        "latest_asset_snapshots.source_url",
+        "latest_asset_snapshots.storage_key",
+      ])
       .where("content_id", "=", contentId)
       .orderBy("created_at", "asc")
       .execute();
 
-    return Promise.all(
-      assets.map(async (asset) => {
-        const latestSnapshot = await findLatestAssetSnapshot(
-          this.database,
-          asset.id,
-        );
+    return assets.map((asset) => ({
+      byteSize: asset.byte_size,
+      id: asset.id,
+      kind: asset.kind,
+      mimeType: asset.mime_type,
+      primary: asset.is_primary,
+      sourceUrl: asset.source_url,
+      storageKey: asset.storage_key,
+    }));
+  }
 
-        return {
-          byteSize: latestSnapshot.byte_size,
-          id: asset.id,
+  public async listAudioTranscriptionTargetsByContentId(
+    contentId: string,
+  ): Promise<Result<TranscriptionTargetAsset[], AssetRepositoryError>> {
+    try {
+      const latestAssetSnapshots = latestAssetSnapshotsQuery(this.database);
+      const assets = await this.database
+        .selectFrom("assets")
+        .innerJoin(
+          latestAssetSnapshots.as("latest_asset_snapshots"),
+          "latest_asset_snapshots.asset_id",
+          "assets.id",
+        )
+        .select([
+          "assets.id",
+          "assets.is_primary",
+          "assets.kind",
+          "latest_asset_snapshots.asset_snapshot_id",
+          "latest_asset_snapshots.byte_size",
+          "latest_asset_snapshots.mime_type",
+          "latest_asset_snapshots.source_url",
+          "latest_asset_snapshots.storage_key",
+        ])
+        .where("content_id", "=", contentId)
+        .where("kind", "=", "audio")
+        .orderBy("created_at", "asc")
+        .execute();
+
+      return ok(
+        assets.map((asset) => ({
+          assetId: asset.id,
+          assetSnapshotId: asset.asset_snapshot_id,
+          byteSize: asset.byte_size,
           kind: asset.kind,
-          mimeType: latestSnapshot.mime_type,
+          mimeType: asset.mime_type,
           primary: asset.is_primary,
-          sourceUrl: latestSnapshot.source_url,
-          storageKey: latestSnapshot.storage_key,
-        };
-      }),
-    );
+          sourceUrl: asset.source_url,
+          storageKey: asset.storage_key,
+        })),
+      );
+    } catch (error) {
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to list transcription target assets."),
+      );
+    }
   }
 
   public async findStoredMediaById(
@@ -548,6 +613,7 @@ function latestAssetSnapshotsQuery(database: Kysely<GeshiDatabase>) {
     )
     .select([
       "asset_snapshots.asset_id",
+      "asset_snapshots.id as asset_snapshot_id",
       "asset_snapshots.byte_size",
       "asset_snapshots.checksum",
       "asset_snapshots.mime_type",

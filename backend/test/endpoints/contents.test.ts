@@ -3,10 +3,13 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createGetContentDetailEndpoint,
   createListContentsEndpoint,
+  createRequestTranscriptsEndpoint,
+  createRetryTranscriptEndpoint,
 } from "../../src/endpoints/api/v1/contents.js";
 import { err, ok } from "../../src/lib/result.js";
 import type { AssetService } from "../../src/service/asset-service.js";
 import type { ContentService } from "../../src/service/content-service.js";
+import type { TranscriptService } from "../../src/service/transcript-service.js";
 import { createTestAppDependencies } from "../support/app-dependencies.js";
 
 describe("content endpoints", () => {
@@ -77,6 +80,74 @@ describe("content endpoints", () => {
         ],
         id: "content-1",
         title: "Episode 1",
+        transcripts: [],
+      }),
+    );
+  });
+
+  it("returns transcript request results", async () => {
+    const endpoint = createRequestTranscriptsEndpoint(
+      createTestAppDependencies({
+        transcriptService: {
+          enqueueTranscriptsForContent: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                createdTranscriptCount: 1,
+                skippedTranscriptCount: 0,
+                transcripts: [
+                  {
+                    body: null,
+                    contentId: "content-1",
+                    finishedAt: null,
+                    generation: 1,
+                    id: "transcript-1",
+                    kind: "transcript",
+                    language: "ja",
+                    sourceAssetSnapshotId: "asset-snapshot-1",
+                    startedAt: null,
+                    status: "queued",
+                  },
+                ],
+              }),
+            ),
+          ),
+        } as unknown as TranscriptService,
+      }),
+    );
+
+    await expect(endpoint("content-1")).resolves.toEqual(
+      ok({
+        createdTranscriptCount: 1,
+        skippedTranscriptCount: 0,
+        transcripts: [
+          expect.objectContaining({
+            id: "transcript-1",
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("returns transcript retry results", async () => {
+    const endpoint = createRetryTranscriptEndpoint(
+      createTestAppDependencies({
+        transcriptService: {
+          retryTranscript: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                jobId: "job-1",
+                transcriptId: "transcript-1",
+              }),
+            ),
+          ),
+        } as unknown as TranscriptService,
+      }),
+    );
+
+    await expect(endpoint("content-1", "transcript-1")).resolves.toEqual(
+      ok({
+        jobId: "job-1",
+        transcriptId: "transcript-1",
       }),
     );
   });

@@ -168,10 +168,31 @@ export function createTestAppDependencies(
       ),
     } as unknown as SourceService,
     storage: {
+      delete: vi.fn(() => Promise.resolve(ok(undefined))),
       get: vi.fn(() => Promise.resolve(ok(new Uint8Array([1, 2, 3])))),
       pathJoin: vi.fn((...parts: string[]) => parts.join("/")),
       put: vi.fn(),
     } satisfies Storage,
+    transcriptService: {
+      enqueueTranscriptsForContent: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            createdTranscriptCount: 0,
+            skippedTranscriptCount: 0,
+            transcripts: [],
+          }),
+        ),
+      ),
+      listTranscriptsByContentId: vi.fn(() => Promise.resolve(ok([]))),
+      retryTranscript: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            jobId: "job-2",
+            transcriptId: "transcript-1",
+          }),
+        ),
+      ),
+    },
     ...overrides,
   };
 }

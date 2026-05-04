@@ -14,6 +14,7 @@ export type StoragePutOutput = {
 };
 
 export interface Storage {
+  delete(key: string): Promise<Result<void, Error>>;
   get(key: string): Promise<Result<Uint8Array, Error>>;
   pathJoin(...parts: string[]): string;
   put(input: StoragePutInput): Promise<Result<StoragePutOutput, Error>>;

@@ -16,6 +16,8 @@
     "worker:acquire-content": "node --import tsx backend/src/workers/acquire-content/main.ts",
     "worker:observe-source": "node --import tsx backend/src/workers/observe-source/main.ts",
     "worker:periodic-crawl": "node --import tsx backend/src/workers/periodic-crawl/main.ts",
+    "worker:transcript-chunk": "node --import tsx backend/src/workers/transcript-chunk/main.ts",
+    "worker:transcript-split": "node --import tsx backend/src/workers/transcript-split/main.ts",
     "frontend:dev": "vite --config frontend/vite.config.ts",
     "test:e2e": "sh test/scripts/run-e2e.sh",
     "test:e2e:cases": "playwright test --config test/playwright.config.ts",

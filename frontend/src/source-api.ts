@@ -79,6 +79,29 @@ export type ContentDetailAsset = {
   url: string | null;
 };
 
+export type ContentTranscriptItem = {
+  body: string | null;
+  createdAt: string;
+  failedChunkCount: number;
+  finishedAt: string | null;
+  generation: number;
+  id: string;
+  kind: "transcript" | "ocr" | "extracted-text";
+  retryAvailable: boolean;
+  sourceAsset: {
+    assetId: string;
+    assetSnapshotId: string;
+    byteSize: number | null;
+    kind: string;
+    mimeType: string | null;
+    primary: boolean;
+    sourceUrl: string | null;
+  };
+  startedAt: string | null;
+  status: "queued" | "running" | "succeeded" | "failed";
+  totalChunkCount: number;
+};
+
 export type ContentDetailItem = {
   assets: ContentDetailAsset[];
   collectedAt: string;
@@ -93,6 +116,7 @@ export type ContentDetailItem = {
   status: "discovered" | "stored" | "failed";
   summary: string | null;
   title: string | null;
+  transcripts: ContentTranscriptItem[];
 };
 
 export type JobListItem = {
@@ -131,6 +155,16 @@ type ListContentsResponse = {
 
 type ContentDetailResponse = {
   data: ContentDetailItem;
+};
+
+type TranscriptRequestResponse = {
+  data: {
+    createdTranscriptCount: number;
+    skippedTranscriptCount: number;
+    transcripts: Array<{
+      id: string;
+    }>;
+  };
 };
 
 type JobResponse = {
@@ -282,6 +316,52 @@ export async function getContentDetail(
   }
 
   throw new Error("Failed to load content detail.");
+}
+
+export async function requestTranscripts(
+  contentId: string,
+): Promise<TranscriptRequestResponse["data"]> {
+  const response = await fetch(`/api/v1/contents/${contentId}/transcripts`, {
+    method: "POST",
+  });
+  const payload = (await response.json()) as
+    | TranscriptRequestResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to request transcripts.");
+}
+
+export async function retryTranscript(
+  contentId: string,
+  transcriptId: string,
+): Promise<{ jobId: string; transcriptId: string }> {
+  const response = await fetch(
+    `/api/v1/contents/${contentId}/transcripts/${transcriptId}/retry`,
+    {
+      method: "POST",
+    },
+  );
+  const payload = (await response.json()) as
+    | { data: { jobId: string; transcriptId: string } }
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to retry transcript.");
 }
 
 export async function getPeriodicCrawlSettings(): Promise<PeriodicCrawlSettings> {

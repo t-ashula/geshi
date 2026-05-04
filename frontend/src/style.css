@@ -329,6 +329,21 @@ h1 {
   margin-bottom: 10px;
 }
 
+.transcript-card-heading,
+.transcript-card-actions {
+  display: grid;
+  gap: 4px;
+}
+
+.transcript-card-actions {
+  justify-items: end;
+}
+
+.transcript-body {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .asset-card audio {
   width: 100%;
 }

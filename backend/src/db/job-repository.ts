@@ -18,6 +18,7 @@ export type JobListItem = {
   finishedAt: Date | null;
   id: string;
   kind: string;
+  metadata: Record<string, unknown>;
   queueJobId: string | null;
   retryable: boolean;
   sourceId: string | null;
@@ -44,6 +45,7 @@ export class JobRepository {
         .values({
           id: input.id,
           kind: input.kind,
+          metadata: {},
           retryable: input.retryable,
           source_id: input.sourceId,
           status: "queued",
@@ -151,6 +153,41 @@ export class JobRepository {
     return job === undefined ? null : toJobListItem(job);
   }
 
+  public async replaceMetadata(
+    id: string,
+    metadata: Record<string, unknown>,
+  ): Promise<Result<void, JobRepositoryError>> {
+    try {
+      await this.database
+        .updateTable("jobs")
+        .set({
+          metadata,
+        })
+        .where("id", "=", id)
+        .executeTakeFirstOrThrow();
+
+      return ok(undefined);
+    } catch (error) {
+      return err(toRepositoryError(error, "Failed to replace job metadata."));
+    }
+  }
+
+  public async getMetadata(
+    id: string,
+  ): Promise<Result<Record<string, unknown>, JobRepositoryError>> {
+    try {
+      const job = await this.database
+        .selectFrom("jobs")
+        .select(["metadata"])
+        .where("id", "=", id)
+        .executeTakeFirst();
+
+      return ok(job?.metadata ?? {});
+    } catch (error) {
+      return err(toRepositoryError(error, "Failed to read job metadata."));
+    }
+  }
+
   public async listQueuedOrRunningObserveSourceIds(): Promise<
     Result<Set<string>, JobRepositoryError>
   > {
@@ -240,6 +277,7 @@ function toJobListItem(job: Selectable<JobTable>): JobListItem {
     finishedAt: job.finished_at,
     id: job.id,
     kind: job.kind,
+    metadata: job.metadata,
     queueJobId: job.queue_job_id,
     retryable: job.retryable,
     sourceId: job.source_id,

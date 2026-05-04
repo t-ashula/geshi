@@ -1,6 +1,6 @@
-.PHONY: db-up db-down db-schema-dry-run db-schema-apply \
-	db-schema-apply-with-drop e2e-db-up e2e-db-down e2e-db-reset \
-	e2e-db-schema-apply test-e2e
+.PHONY: db-up db-down scribe-up scribe-down dev-up dev-down dev-reset \
+	db-schema-dry-run db-schema-apply db-schema-apply-with-drop \
+	e2e-db-up e2e-db-down e2e-db-reset e2e-db-schema-apply test-e2e
 
 PSQLDEF_VERSION ?= 3.11.1
 PSQLDEF_IMAGE := sqldef/psqldef:$(PSQLDEF_VERSION)
@@ -10,7 +10,9 @@ DB_SCHEMA_APPLY_LOG := tmp/db-schema-apply.log
 DB_SCHEMA_APPLY_WITH_DROP_LOG := tmp/db-schema-apply-with-drop.log
 DB_NAME ?= geshi
 DB_PORT ?= 55432
+SCRIBE_DIR ?= ../scribe
 DEV_COMPOSE := docker compose -f compose.yaml
+SCRIBE_COMPOSE := SCRIBE_DIR=$(SCRIBE_DIR) docker compose -f compose.yaml -f compose.scribe.yaml
 TEST_COMPOSE := docker compose -f test/compose.test.yaml
 
 db-up:
@@ -18,6 +20,24 @@ db-up:
 
 db-down:
 	$(DEV_COMPOSE) down -v
+
+scribe-up:
+	@test -d "$(SCRIBE_DIR)" || (echo "SCRIBE_DIR not found: $(SCRIBE_DIR)" && exit 1)
+	$(SCRIBE_COMPOSE) up -d scribe-redis scribe-api scribe-worker scribe-scheduler
+
+scribe-down:
+	$(SCRIBE_COMPOSE) down
+
+dev-up:
+	@test -d "$(SCRIBE_DIR)" || (echo "SCRIBE_DIR not found: $(SCRIBE_DIR)" && exit 1)
+	$(SCRIBE_COMPOSE) up -d postgres scribe-redis scribe-api scribe-worker scribe-scheduler
+
+dev-down:
+	$(SCRIBE_COMPOSE) down
+
+dev-reset:
+	@test -d "$(SCRIBE_DIR)" || (echo "SCRIBE_DIR not found: $(SCRIBE_DIR)" && exit 1)
+	$(SCRIBE_COMPOSE) down -v
 
 db-schema-dry-run:
 	@rm -rf  $(DB_SCHEMA_DRY_RUN_LOG)

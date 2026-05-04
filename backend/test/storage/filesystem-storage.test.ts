@@ -61,6 +61,27 @@ describe("FilesystemStorage", () => {
     });
   });
 
+  it("deletes an existing object", async () => {
+    const storage = new FilesystemStorage(rootDir);
+    const stored = await storage.put({
+      body: new Uint8Array(Buffer.from("hello")),
+      contentType: "text/plain",
+      key: "work/transcripts/chunk-1.wav",
+      overwrite: false,
+    });
+
+    if (!stored.ok) {
+      throw stored.error;
+    }
+
+    await expect(storage.delete(stored.value.key)).resolves.toMatchObject({
+      ok: true,
+    });
+    await expect(storage.get(stored.value.key)).resolves.toMatchObject({
+      ok: false,
+    });
+  });
+
   it("joins path parts", () => {
     const storage = new FilesystemStorage(rootDir);
 

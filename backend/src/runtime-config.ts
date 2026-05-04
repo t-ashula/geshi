@@ -5,7 +5,9 @@ export interface RuntimeConfig {
   pgPassword: string;
   pgPort: number;
   pgUser: string;
+  scribeBaseUrl: string;
   storageRootDir: string;
+  workStorageRootDir: string;
 }
 
 export function getRuntimeConfig(): RuntimeConfig {
@@ -16,6 +18,10 @@ export function getRuntimeConfig(): RuntimeConfig {
     pgPassword: process.env.PGPASSWORD ?? "geshi",
     pgPort: Number(process.env.PGPORT ?? "55432"),
     pgUser: process.env.PGUSER ?? "geshi",
+    scribeBaseUrl:
+      process.env.GESHI_SCRIBE_BASE_URL ?? "http://127.0.0.1:58000",
     storageRootDir: process.env.GESHI_STORAGE_ROOT_DIR ?? ".data/storage",
+    workStorageRootDir:
+      process.env.GESHI_WORK_STORAGE_ROOT_DIR ?? ".data/work-storage",
   };
 }

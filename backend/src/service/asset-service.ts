@@ -7,6 +7,7 @@ import type {
   CreateObservedAssetInput,
   CreateObservedAssetsResult,
   StoredAssetMedia,
+  TranscriptionTargetAsset,
   UpsertStoredAssetInput,
 } from "../db/asset-repository.js";
 import type { Result } from "../lib/result.js";
@@ -36,6 +37,9 @@ export interface AssetService {
   ): Promise<Result<StoredAssetMedia, FindStoredMediaByIdError>>;
   listAssets(): Promise<Result<AssetListItem[], AssetServiceError>>;
   listAssetsByContentId(contentId: string): Promise<ContentDetailAsset[]>;
+  listAudioTranscriptionTargetsByContentId(
+    contentId: string,
+  ): Promise<Result<TranscriptionTargetAsset[], AssetServiceError>>;
   listPendingAssetsByContentId(
     contentId: string,
   ): Promise<Result<AcquireTargetAsset[], AssetServiceError>>;
@@ -92,6 +96,14 @@ export function createAssetService(
       contentId: string,
     ): Promise<ContentDetailAsset[]> {
       return assetRepository.listAssetsByContentId(contentId);
+    },
+
+    async listAudioTranscriptionTargetsByContentId(
+      contentId: string,
+    ): Promise<Result<TranscriptionTargetAsset[], AssetServiceError>> {
+      return assetRepository.listAudioTranscriptionTargetsByContentId(
+        contentId,
+      );
     },
 
     async listPendingAssetsByContentId(

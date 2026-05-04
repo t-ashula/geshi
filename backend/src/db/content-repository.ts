@@ -301,13 +301,13 @@ export class ContentRepository {
 
     const contentSnapshot = await this.database
       .selectFrom("content_snapshots")
-      .selectAll()
+      .select(["summary", "title"])
       .where("content_id", "=", contentId)
       .orderBy("version", "desc")
       .executeTakeFirst();
     const sourceSnapshot = await this.database
       .selectFrom("source_snapshots")
-      .selectAll()
+      .select(["title"])
       .where("source_id", "=", content.source_id)
       .orderBy("version", "desc")
       .executeTakeFirst();
