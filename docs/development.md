@@ -44,22 +44,6 @@
 5. ローカル依存サービスを起動する
    - DB，検索エンジン，オブジェクトストレージなどの依存サービスは `docker compose` で起動する
    - 起動対象や手順はリポジトリルートの共通入口から辿れるようにする
-   - `scribe` は `git submodule` ではなく sibling checkout を前提にし，`Makefile` から起動できる
-
-### `scribe` の起動
-
-- `scribe` は既定で `../scribe` に checkout 済みである前提にする
-- 別の場所に置く場合は `SCRIBE_DIR=/path/to/scribe` を付けて上書きする
-
-例:
-
-```sh
-make scribe-up
-```
-
-```sh
-SCRIBE_DIR=~/src/github.com/t-ashula/scribe make scribe-up
-```
 
 ```sh
 make dev-up
@@ -67,10 +51,43 @@ make dev-up
 
 補足:
 
-- `make scribe-up` は `scribe` 用 Redis, API, worker, scheduler を起動する
-- `make dev-up` は `postgres` と `scribe` 一式をまとめて起動する
-- `make scribe-down` と `make dev-down` で停止する
+- `make dev-up` は `postgres` を起動する
+- `make dev-down` で停止する
   - volume まで消したいときだけ `make dev-reset` を使う
+
+### transcript 動作確認用 audio
+
+- transcript の受け入れ条件確認では，repo に長尺音声 fixture を置かず，必要時に各自でローカル配置する
+- 現在の transcript 用 E2E は `tmp/botchan/botchan_01_natsume_64kb.mp3` を入力にする
+- 入手元は LibriVox の `Botchan by Soseki Natsume`
+  - https://librivox.org/botchan-by-soseki-natsume-2/
+- E2E runner はこの mp3 から先頭 8 分を切り出して source server から配信する
+
+例:
+
+```sh
+mkdir -p tmp/botchan
+# 取得した chapter 1 mp3 を以下へ置く
+# tmp/botchan/botchan_01_natsume_64kb.mp3
+```
+
+```sh
+npm run test:e2e:transcript
+```
+
+補足:
+
+- 別 path を使う場合は `E2E_BOTCHAN_SOURCE_MP3=/path/to/file.mp3` を指定する
+- `scribe` の接続先を変える場合は `E2E_SCRIBE_BASE_URL=http://127.0.0.1:NNNNN` を指定する
+- `npm run test:e2e:transcript` は本物の `scribe` ではなく fake server を使う
+  - 制御可能な `pending -> working -> done` を返し，job orchestration を安定して確認するため
+- 外部起動済みの本物 `scribe` に向けたい場合は `E2E_USE_REAL_SCRIBE=1` を付ける
+
+```sh
+E2E_USE_REAL_SCRIBE=1 \
+E2E_SCRIBE_BASE_URL=http://127.0.0.1:58000 \
+npm run test:e2e:transcript
+```
 
 ### 運用方針
 

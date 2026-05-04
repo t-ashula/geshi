@@ -42,7 +42,6 @@
 - UI は transcript 導線のために独立した第 4 画面を作らず，既存の `content detail` 文脈の中で完結することが文書化されている
 - transcript 導線を追加しても，長期的には利用者が `asset` を前面に意識しなくても `content` 画面から扱える方向を阻害しないことが文書化されている
 - `tmp/v0.3.0/packages/scribe-client` の残骸を，そのまま使うのか，移植するのか，捨てて作り直すのかが判断されている
-- `scribe` 本体は git submodule にせず，sibling checkout を `compose` / `Makefile` から起動する開発用入口を `geshi` 側へ持つ方針が判断されている
 - 実装時に必要な test 観点が，unit / integration / e2e のどこで確認するかまで含めて整理されている
 - この開発項目で扱う範囲と，後続タスクへ送る論点が分離されている
 
@@ -58,6 +57,5 @@
 - 複数 audio asset がある `content` でも transcript の生成元を誤認しない UI 方針が ADR または Design log で整理されていることを確認する
 - transcript の生成元判別に必要な `asset snapshot` 由来情報が API 応答へ含まれる方針が ADR または Design log で整理されていることを確認する
 - `tmp/v0.3.0/packages/scribe-client` の再利用方針と，現行 `scribe` API との差分が Design log で整理されていることを確認する
-- `scribe` を git submodule にせず sibling checkout 起動を採る理由が Design log で整理されていることを確認する
 - 失敗モードと retry 方針が，呼び出し層と利用者向け表現の両面から整理されていることを確認する
 - 実装着手前に，未確定事項が Design log へ切り分けられていることを確認する

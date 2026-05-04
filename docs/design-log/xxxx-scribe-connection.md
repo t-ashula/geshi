@@ -66,8 +66,6 @@
 - そのためには，DB 上で由来を持つだけでなく，API 応答にも snapshot 由来の音源識別情報を載せる必要がある
 - transcript 導線の UI は独立画面へ分けず，`content detail` の中に収める
 - 長期的には `content` 画面から自然に扱える形に寄せ，利用者が `asset` を強く意識しない方向を維持したい
-- 開発時の `scribe` 起動は，git submodule よりも sibling checkout を `compose` / `Makefile` から起動する方が軽い
-- そのため `scribe` 本体は別 repository のままにし，`geshi` 側には開発用の起動入口だけを持つ方針に寄せる
 
 ## 異常系メモ
 
@@ -162,4 +160,3 @@ sequenceDiagram
 - 親 transcript が `failed` の後に，再試行ボタン 1 つで失敗 chunk 群だけを再送できるようにするか
 - `content detail` 内で transcript 要求状態と結果をどう見せれば，`asset` を露出しすぎずに扱いつつ，複数 audio asset 間の由来取り違えを防げるか
 - `content detail` や transcript API が，どの snapshot 由来の音源情報をどの粒度で返せば UI 判別に十分か
-- sibling checkout 前提の `scribe` 起動入口で十分か，追加で clone 補助 script まで必要か

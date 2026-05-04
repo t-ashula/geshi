@@ -1,9 +1,13 @@
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
 const sourceServerPort = Number(process.env.E2E_SOURCE_SERVER_PORT ?? "3401");
+const botchanAudioPath = process.env.E2E_BOTCHAN_AUDIO_PATH
+  ? resolve(process.env.E2E_BOTCHAN_AUDIO_PATH)
+  : null;
 const app = new Hono();
 
 app.get("/feeds/podcast.xml", (context) => {
@@ -43,6 +47,41 @@ app.get("/feeds/not-rss.xml", () => {
   });
 });
 
+app.get("/feeds/botchan.xml", (context) => {
+  if (botchanAudioPath === null) {
+    return new Response("botchan fixture is not configured", {
+      status: 500,
+    });
+  }
+
+  const origin = new URL(context.req.url).origin;
+  const episodePageUrl = `${origin}/episodes/1.html`;
+  const audioUrl = `${origin}/assets/botchan.mp3`;
+
+  const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Geshi E2E Botchan Feed</title>
+    <description>Transcript fixture feed for E2E tests.</description>
+    <link>${origin}</link>
+    <item>
+      <guid>e2e-botchan-episode-1</guid>
+      <title>Botchan Episode 1</title>
+      <description>Transcript fixture episode.</description>
+      <link>${episodePageUrl}</link>
+      <enclosure url="${audioUrl}" type="audio/mpeg" />
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+
+  return new Response(feed, {
+    headers: {
+      "content-type": "application/rss+xml; charset=utf-8",
+    },
+  });
+});
+
 app.get("/episodes/1.html", async (_context) => {
   const body = await readFixtureText("episodes/1.html");
 
@@ -55,6 +94,22 @@ app.get("/episodes/1.html", async (_context) => {
 
 app.get("/assets/dummy.mp3", async (_context) => {
   const body = await readFixtureFile("assets/dummy.mp3");
+
+  return new Response(toArrayBuffer(body), {
+    headers: {
+      "content-type": "audio/mpeg",
+    },
+  });
+});
+
+app.get("/assets/botchan.mp3", async (_context) => {
+  if (botchanAudioPath === null) {
+    return new Response("botchan fixture is not configured", {
+      status: 500,
+    });
+  }
+
+  const body = await readFile(botchanAudioPath);
 
   return new Response(toArrayBuffer(body), {
     headers: {
