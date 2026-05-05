@@ -3,6 +3,7 @@ import { PgBoss } from "pg-boss";
 
 import type { RuntimeConfig } from "../runtime-config.js";
 import type { JobPayload, JobQueue } from "./types.js";
+import { RECORD_CONTENT_JOB_NAME } from "./types.js";
 
 export function createPgBoss(runtimeConfig: RuntimeConfig): PgBoss {
   return new PgBoss({
@@ -42,10 +43,19 @@ export class PgBossJobQueue implements JobQueue {
       startAfter?: Date;
     },
   ): Promise<string | null> {
+    const retryOptions =
+      name === RECORD_CONTENT_JOB_NAME
+        ? {
+            retryLimit: 0,
+          }
+        : {
+            retryBackoff: true,
+            retryDelay: 5,
+            retryLimit: 2,
+          };
+
     return this.boss.send(name, payload, {
-      retryBackoff: true,
-      retryDelay: 5,
-      retryLimit: 2,
+      ...retryOptions,
       ...extraOptions,
     });
   }

@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { resolve } from "node:path";
 
 import { serve } from "@hono/node-server";
@@ -7,6 +8,9 @@ import { Hono } from "hono";
 const sourceServerPort = Number(process.env.E2E_SOURCE_SERVER_PORT ?? "3401");
 const botchanAudioPath = process.env.E2E_BOTCHAN_AUDIO_PATH
   ? resolve(process.env.E2E_BOTCHAN_AUDIO_PATH)
+  : null;
+const botchanPlaylistDir = process.env.E2E_BOTCHAN_PLAYLIST_DIR
+  ? resolve(process.env.E2E_BOTCHAN_PLAYLIST_DIR)
   : null;
 const app = new Hono();
 
@@ -90,6 +94,55 @@ app.get("/episodes/1.html", async (_context) => {
       "content-type": "text/html; charset=utf-8",
     },
   });
+});
+
+app.get("/sources/streams/:id", (context) => {
+  if (botchanPlaylistDir === null) {
+    return new Response("botchan playlist fixture is not configured", {
+      status: 500,
+    });
+  }
+
+  const { id } = context.req.param();
+  const origin = new URL(context.req.url).origin;
+
+  return context.json({
+    description: `Sample streaming fixture for ${id}.`,
+    id,
+    playlistUrl: `${origin}/streams/${id}.m3u8`,
+    scheduledStartAt: "2026-05-05T00:00:00.000Z",
+    title: `Sample Stream ${id}`,
+  });
+});
+
+app.get("/streams/:fileName", async (context) => {
+  if (botchanPlaylistDir === null) {
+    return new Response("botchan playlist fixture is not configured", {
+      status: 500,
+    });
+  }
+
+  const { fileName } = context.req.param();
+
+  if (!/^[A-Za-z0-9._-]+\.(m3u8|ts)$/.test(fileName)) {
+    return new Response("not found", { status: 404 });
+  }
+
+  const filePath = resolve(botchanPlaylistDir, basename(fileName));
+
+  try {
+    const body = await readFile(filePath);
+
+    return new Response(toArrayBuffer(body), {
+      headers: {
+        "content-type": fileName.endsWith(".m3u8")
+          ? "application/vnd.apple.mpegurl"
+          : "video/mp2t",
+      },
+    });
+  } catch {
+    return new Response("not found", { status: 404 });
+  }
 });
 
 app.get("/assets/dummy.mp3", async (_context) => {

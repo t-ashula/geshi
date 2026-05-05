@@ -16,11 +16,14 @@
     "worker:acquire-content": "node --import tsx backend/src/workers/acquire-content/main.ts",
     "worker:observe-source": "node --import tsx backend/src/workers/observe-source/main.ts",
     "worker:periodic-crawl": "node --import tsx backend/src/workers/periodic-crawl/main.ts",
+    "worker:record-content": "node --import tsx backend/src/workers/record-content/main.ts",
+    "worker:recording-scheduler": "node --import tsx backend/src/workers/recording-scheduler/main.ts",
     "worker:transcript-chunk": "node --import tsx backend/src/workers/transcript-chunk/main.ts",
     "worker:transcript-split": "node --import tsx backend/src/workers/transcript-split/main.ts",
     "frontend:dev": "vite --config frontend/vite.config.ts",
-    "test:e2e": "sh test/scripts/run-e2e.sh",
-    "test:e2e:transcript": "sh test/scripts/run-e2e-transcript.sh",
+    "test:e2e": "sh test/scripts/run-e2e.sh basic",
+    "test:e2e:recording": "sh test/scripts/run-e2e.sh recording",
+    "test:e2e:transcript": "sh test/scripts/run-e2e.sh transcript",
     "test:e2e:cases": "playwright test --config test/playwright.config.ts",
     "test:coverage": "vitest run --coverage",
     "format:check": "prettier --check .",
@@ -28,7 +31,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/geshi-sdk/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-go-jp-rss/tsconfig.json && vue-tsc --noEmit -p frontend/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/geshi-sdk/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-go-jp-rss/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-sample-streaming/tsconfig.json && vue-tsc --noEmit -p frontend/tsconfig.json",
     "precommit": "npm run format && npm run lint -- --fix && npm run typecheck && npm run test"
   },
   "engines": {
@@ -58,6 +61,7 @@
   "dependencies": {
     "@geshi/sdk": "file:packages/geshi-sdk",
     "@geshi/plugin-go-jp-rss": "file:packages/geshi-plugin-go-jp-rss",
+    "@geshi/plugin-sample-streaming": "file:packages/geshi-plugin-sample-streaming",
     "@hono/node-server": "^2.0.0",
     "fast-xml-parser": "^5.7.2",
     "hono": "^4.12.15",

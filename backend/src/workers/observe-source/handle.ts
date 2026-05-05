@@ -5,8 +5,12 @@ import type { JobRepository } from "../../db/job-repository.js";
 import type {
   JobQueue,
   ObserveSourceJobPayload,
+  RecordContentJobPayload,
 } from "../../job-queue/types.js";
-import { ACQUIRE_CONTENT_JOB_NAME } from "../../job-queue/types.js";
+import {
+  ACQUIRE_CONTENT_JOB_NAME,
+  RECORD_CONTENT_JOB_NAME,
+} from "../../job-queue/types.js";
 import type { Result } from "../../lib/result.js";
 import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
@@ -162,6 +166,72 @@ export async function handleObserveSourceJob(
             error,
           );
           return err(error);
+        }
+
+        const nextActionKind =
+          observedAsset.nextAction?.actionKind ?? "acquire";
+
+        if (nextActionKind === "record") {
+          const recordJobId = uuidv7();
+          const recordPayload: RecordContentJobPayload = {
+            asset: {
+              id: assetId,
+              kind: observedAsset.kind,
+              observedFingerprint: persistedAsset.value.observedFingerprint,
+              primary: observedAsset.primary,
+              sourceUrl: observedAsset.sourceUrl,
+            },
+            collector: {
+              config: payload.collector.config,
+              pluginSlug: payload.collector.pluginSlug,
+              settingId: payload.collector.settingId,
+              settingSnapshotId: payload.collector.settingSnapshotId,
+            },
+            content: {
+              externalId: observedContent.externalId,
+              id: storedContent.value.id,
+              kind: observedContent.kind,
+              publishedAt: observedContent.publishedAt,
+              status: observedContent.status,
+              summary: observedContent.summary,
+              title: observedContent.title,
+            },
+            jobId: recordJobId,
+            source: {
+              id: payload.source.id,
+              slug: payload.source.slug,
+            },
+          };
+          const recordJob = await dependencies.jobRepository.createJob({
+            id: recordJobId,
+            kind: RECORD_CONTENT_JOB_NAME,
+            metadata: {
+              core: {
+                actionKind: "record",
+                payload: recordPayload,
+                scheduledStartAt:
+                  observedAsset.nextAction?.scheduledStartAt?.toISOString() ??
+                  null,
+              },
+              plugin: {
+                arguments: observedAsset.nextAction?.arguments ?? {},
+              },
+            },
+            retryable: true,
+            sourceId: payload.source.id,
+          });
+
+          if (!recordJob.ok) {
+            await failObserveSourceJob(
+              payload.jobId,
+              dependencies,
+              logger,
+              recordJob.error,
+            );
+            return recordJob;
+          }
+
+          continue;
         }
 
         const acquireJob = await dependencies.jobRepository.createJob({

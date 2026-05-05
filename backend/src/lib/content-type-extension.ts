@@ -18,6 +18,8 @@ export function contentTypeToExtension(
       return "wav";
     case "text/html":
       return "html";
+    case "video/mp2t":
+      return "ts";
     default:
       return null;
   }

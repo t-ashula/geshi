@@ -7,6 +7,7 @@ import type { GeshiDatabase, JobTable } from "./types.js";
 export type CreateJobInput = {
   id: string;
   kind: string;
+  metadata?: Record<string, unknown>;
   retryable: boolean;
   sourceId: string | null;
 };
@@ -45,7 +46,7 @@ export class JobRepository {
         .values({
           id: input.id,
           kind: input.kind,
-          metadata: {},
+          metadata: input.metadata ?? {},
           retryable: input.retryable,
           source_id: input.sourceId,
           status: "queued",
@@ -266,6 +267,30 @@ export class JobRepository {
       .executeTakeFirst();
 
     return job === undefined ? null : toJobListItem(job);
+  }
+
+  public async listQueuedJobsWithoutQueueIdByKind(
+    kind: string,
+  ): Promise<Result<JobListItem[], JobRepositoryError>> {
+    try {
+      const jobs = await this.database
+        .selectFrom("jobs")
+        .selectAll()
+        .where("kind", "=", kind)
+        .where("status", "=", "queued")
+        .where("queue_job_id", "is", null)
+        .orderBy("created_at", "asc")
+        .execute();
+
+      return ok(jobs.map(toJobListItem));
+    } catch (error) {
+      return err(
+        toRepositoryError(
+          error,
+          "Failed to list queued jobs without queue job id.",
+        ),
+      );
+    }
   }
 }
 

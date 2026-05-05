@@ -152,6 +152,7 @@ async function loadGeneratedSourceCollectorPluginMetadata(
         (typeof entry.pluginSlug === "string" || entry.pluginSlug === null) &&
         (entry.sourceKind === "feed" ||
           entry.sourceKind === "podcast" ||
+          entry.sourceKind === "streaming" ||
           entry.sourceKind === null),
     );
   } catch {

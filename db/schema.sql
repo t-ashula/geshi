@@ -2,7 +2,7 @@ create table sources (
     id uuid primary key,
     slug varchar(128) not null unique,
     kind text not null constraint sources_kind_check check (
-        kind = any(array ['podcast'::text, 'feed'::text])
+        kind = any(array ['podcast'::text, 'feed'::text, 'streaming'::text])
     ),
     url text not null,
     url_hash text not null unique,

@@ -22,7 +22,7 @@ type JsonColumn = ColumnType<
 export type SourceTable = {
   created_at: TimestampColumn;
   id: string;
-  kind: "feed" | "podcast";
+  kind: "feed" | "podcast" | "streaming";
   slug: string;
   url: string;
   url_hash: string;

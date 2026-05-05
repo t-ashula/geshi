@@ -15,7 +15,7 @@ export interface PluginLogger {
   error(message: string, metadata?: PluginLogMetadata): void;
 }
 
-export type SourceCollectorSourceKind = "feed" | "podcast";
+export type SourceCollectorSourceKind = "feed" | "podcast" | "streaming";
 
 export type SourceCollectorPluginCapability = {
   kind: "source-collector";
@@ -32,8 +32,17 @@ export type PluginManifest = {
   pluginSlug: string;
 };
 
+export type SourceCollectorNextActionKind = "acquire" | "record";
+
+export type SourceCollectorNextAction = {
+  actionKind: SourceCollectorNextActionKind;
+  arguments?: JsonObject;
+  scheduledStartAt?: Date | null;
+};
+
 export type ObservedAsset = {
   kind: string;
+  nextAction?: SourceCollectorNextAction;
   observedFingerprints: string[];
   primary: boolean;
   sourceUrl: string | null;
@@ -59,12 +68,14 @@ export type SourceCollectorObserveInput = {
   abortSignal: AbortSignal;
   collectorPluginState?: JsonObject;
   config: Record<string, unknown>;
+  context?: SourceCollectorExecutionContext;
   logger: PluginLogger;
   sourceUrl: string;
 };
 
 export type SourceCollectorSupportsInput = {
   config: Record<string, unknown>;
+  context?: SourceCollectorExecutionContext;
   logger: PluginLogger;
   sourceUrl: string;
 };
@@ -92,8 +103,13 @@ export type SourceCollectorInspectError = {
 export type SourceCollectorInspectInput = {
   abortSignal: AbortSignal;
   config: Record<string, unknown>;
+  context?: SourceCollectorExecutionContext;
   logger: PluginLogger;
   sourceUrl: string;
+};
+
+export type SourceCollectorExecutionContext = {
+  replacePluginMetadata?(metadata: JsonObject): Promise<void>;
 };
 
 export type SourceCollectorAcquireInput = {
@@ -102,6 +118,18 @@ export type SourceCollectorAcquireInput = {
   collectorPluginState?: JsonObject;
   config: Record<string, unknown>;
   content: Omit<ObservedContent, "assets" | "contentFingerprints">;
+  context?: SourceCollectorExecutionContext;
+  logger: PluginLogger;
+};
+
+export type SourceCollectorRecordInput = {
+  arguments: JsonObject;
+  asset: ObservedAsset;
+  abortSignal: AbortSignal;
+  collectorPluginState?: JsonObject;
+  config: Record<string, unknown>;
+  content: Omit<ObservedContent, "assets" | "contentFingerprints">;
+  context: SourceCollectorExecutionContext;
   logger: PluginLogger;
 };
 
@@ -115,6 +143,8 @@ export type AcquiredAsset = {
   sourceUrl: string | null;
 };
 
+export type RecordedAsset = AcquiredAsset;
+
 export interface SourceCollectorPlugin {
   supports(
     input: SourceCollectorSupportsInput,
@@ -124,6 +154,7 @@ export interface SourceCollectorPlugin {
     input: SourceCollectorObserveInput,
   ): Promise<SourceCollectorObserveResult>;
   acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset>;
+  record?(input: SourceCollectorRecordInput): Promise<RecordedAsset>;
 }
 
 export type SourceCollectorPluginDefinition = {

@@ -132,7 +132,7 @@
 - `observe-source` はこの値を見て，
   - すぐ取得する asset
   - 予約実行する録画 asset
-  を分けて扱う
+    を分けて扱う
 - `observe-source` は next-action policy の `arguments` を後続 job の `jobs.metadata.plugin.arguments` へ引き継ぐ
 - 録画条件の詳細や終了判定など，source 固有の知識は core 側 policy に持ち込まず plugin 側へ残す
 

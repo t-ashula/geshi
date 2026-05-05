@@ -16,7 +16,7 @@ export type SourceCollectorPluginListItem = {
   displayName: string;
   message: string | null;
   pluginSlug: string;
-  sourceKind: "feed" | "podcast";
+  sourceKind: "feed" | "podcast" | "streaming";
   status: "available" | "unavailable";
 };
 
@@ -39,7 +39,7 @@ export type SourceListItem = {
   createdAt: string;
   description: string | null;
   id: string;
-  kind: "feed" | "podcast";
+  kind: "feed" | "podcast" | "streaming";
   recordedAt: string | null;
   slug: string;
   title: string | null;

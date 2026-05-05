@@ -24,7 +24,7 @@ export type GeneratedSourceCollectorPluginMetadata = {
   message: string | null;
   packageName: string;
   pluginSlug: string | null;
-  sourceKind: "feed" | "podcast" | null;
+  sourceKind: "feed" | "podcast" | "streaming" | null;
   status: "available" | "unavailable";
 };
 

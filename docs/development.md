@@ -50,7 +50,6 @@
    ```
 
    補足:
-
    - `geshi.config.js` に書かれた external plugin を `.geshi/generated/plugins/`
      配下へ解決する
    - plugin の設定や依存を変えたときは，起動前に再実行する

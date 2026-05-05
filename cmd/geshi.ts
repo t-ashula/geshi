@@ -139,7 +139,7 @@ async function buildGeneratedPluginMetadata(
         manifest: {
           capabilities: Array<{
             kind: string;
-            sourceKind?: "feed" | "podcast";
+            sourceKind?: "feed" | "podcast" | "streaming";
           }>;
           description?: string;
           displayName: string;
@@ -151,11 +151,12 @@ async function buildGeneratedPluginMetadata(
           candidate,
         ): candidate is {
           kind: "source-collector";
-          sourceKind: "feed" | "podcast";
+          sourceKind: "feed" | "podcast" | "streaming";
         } =>
           candidate.kind === "source-collector" &&
           (candidate.sourceKind === "feed" ||
-            candidate.sourceKind === "podcast"),
+            candidate.sourceKind === "podcast" ||
+            candidate.sourceKind === "streaming"),
       );
 
       if (capability === undefined) {

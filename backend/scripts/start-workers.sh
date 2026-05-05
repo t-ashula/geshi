@@ -11,6 +11,9 @@ observe_pid=$!
 npm run -s worker:periodic-crawl &
 periodic_pid=$!
 
+npm run -s worker:recording-scheduler &
+recording_scheduler_pid=$!
+
 npm run -s worker:transcript-split &
 transcript_split_pid=$!
 
@@ -18,9 +21,9 @@ npm run -s worker:transcript-chunk &
 transcript_chunk_pid=$!
 
 cleanup() {
-  kill "$acquire_pid" "$observe_pid" "$periodic_pid" "$transcript_split_pid" "$transcript_chunk_pid" 2>/dev/null || true
+  kill "$acquire_pid" "$observe_pid" "$periodic_pid" "$recording_scheduler_pid" "$transcript_split_pid" "$transcript_chunk_pid" 2>/dev/null || true
 }
 
 trap cleanup INT TERM
 
-wait "$acquire_pid" "$observe_pid" "$periodic_pid" "$transcript_split_pid" "$transcript_chunk_pid"
+wait "$acquire_pid" "$observe_pid" "$periodic_pid" "$recording_scheduler_pid" "$transcript_split_pid" "$transcript_chunk_pid"
