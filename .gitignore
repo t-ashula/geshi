@@ -12,3 +12,4 @@ geshi.config.js
 .geshi/node_modules/
 .geshi/package-lock.json
 .geshi/package.json
+.codex/
