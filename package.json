@@ -64,7 +64,7 @@
     "@geshi/plugin-sample-streaming": "file:packages/geshi-plugin-sample-streaming",
     "@hono/node-server": "^2.0.0",
     "fast-xml-parser": "^5.7.2",
-    "hono": "^4.12.15",
+    "hono": "^4.12.16",
     "kysely": "^0.28.16",
     "pg": "^8.20.0",
     "pg-boss": "^12.18.1",
