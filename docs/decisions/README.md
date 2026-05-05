@@ -47,3 +47,7 @@
 - [ADR-0044: scribe 連携は adapter 境界に閉じ込める](./0044-scribe-integration-boundary.md)
 - [ADR-0045: transcript は content に直接ひもづく主体として保持する](./0045-transcript-owned-by-content.md)
 - [ADR-0046: transcript 要求と scribe polling は backend job で扱う](./0046-transcript-job-orchestration.md)
+- [ADR-0047: `ObservedAsset` に next-action policy を持たせて後続 job を分岐する](./0047-observed-asset-next-action-policy.md)
+- [ADR-0048: 録画系 acquire は専用 job orchestration と複数 worker 前提で扱う](./0048-recording-job-orchestration.md)
+- [ADR-0049: 録画系 test 用 source は HLS 風 fake server で再現する](./0049-recording-fixture-source-server.md)
+- [ADR-0050: plugin と job の一般インタフェースとして next-action arguments と共通実行 context を定義する](./0050-plugin-and-job-shared-interface.md)

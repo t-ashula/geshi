@@ -119,6 +119,23 @@
   - 必要に応じて次回実行用の plugin 固有 state
     - backend は content / asset 候補の反映が成立した後にこれを保存する
 
+### `observe` の返り値
+
+- `observe` は asset ごとに next-action policy を返す
+- core 側が見る next-action policy は，少なくとも次を含む
+  - `actionKind`
+    - `acquire`
+    - `record`
+  - `scheduledStartAt`
+- `arguments`
+  - 後続 job にそのまま引き継ぐ plugin 固有引数 object
+- `observe-source` はこの値を見て，
+  - すぐ取得する asset
+  - 予約実行する録画 asset
+  を分けて扱う
+- `observe-source` は next-action policy の `arguments` を後続 job の `jobs.metadata.plugin.arguments` へ引き継ぐ
+- 録画条件の詳細や終了判定など，source 固有の知識は core 側 policy に持ち込まず plugin 側へ残す
+
 ### `acquire`
 
 - 対象 `content` をもとに実ファイルを取得する
@@ -137,6 +154,23 @@
   - `storage` に移す，一時ディレクトリへ書き出した成果物一覧
   - `asset` 保存に必要な metadata
   - 必要に応じて次回実行用の plugin 固有 state
+
+### `record`
+
+- 録画系 source collector plugin は，`acquire` とは別に `record` API を持つ
+- `record` は source 固有の録画手順を plugin 側に閉じ込めるための API である
+- plugin は，録画開始後の取得手順，終了判定，必要なら中間生成物の扱いや結合も含めて担う
+- core 側の `record-content` job は，plugin の `record` を呼ぶ
+- `record` の input には，`jobs.metadata.plugin.arguments` から復元した `arguments` を含める
+
+### 共通実行 context
+
+- plugin API は，共通の実行 context を受け取る
+- この context は，`record` だけの特例ではなく，`observe` / `acquire` を含む plugin API 全体で共有する
+- context には，少なくとも metadata 更新 API を含めてよい
+- plugin が更新できる範囲は `jobs.metadata.plugin` 配下に限る
+- `arguments` は実行開始時に worker から通常 input として渡し，実行中の進行情報更新は context 経由で行う
+- metadata の正本保存は core 側が担い，plugin は必要な進行情報を生成して更新 API へ渡す
 
 ## 外部 plugin 開発
 
@@ -211,6 +245,14 @@ export const definition: SourceCollectorPluginDefinition = {
 - 外部 package 例: [test/fixtures/external-plugins/example-feed-plugin](/home/office/src/github.com/t-ashula/geshi/test/fixtures/external-plugins/example-feed-plugin/package.json:1)
 - package plugin 例: [packages/geshi-plugin-go-jp-rss](/home/office/src/github.com/t-ashula/geshi/packages/geshi-plugin-go-jp-rss/package.json:1)
 - SDK: [packages/geshi-sdk/src/index.ts](/home/office/src/github.com/t-ashula/geshi/packages/geshi-sdk/src/index.ts:1)
+
+## 参考資料
+
+- [ADR-0047] ADR-0047: `observe` 結果は asset ごとの next-action policy を含める
+- [ADR-0048] ADR-0048: 録画系 acquire は専用 job orchestration と複数 worker 前提で扱う
+
+[ADR-0047]: ./decisions/0047-observed-asset-next-action-policy.md
+[ADR-0048]: ./decisions/0048-recording-job-orchestration.md
 
 ## `podcast-rss` collector plugin
 
