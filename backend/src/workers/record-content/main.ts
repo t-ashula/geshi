@@ -43,6 +43,7 @@ const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
 const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
+const workStorage = new FilesystemStorage(runtimeConfig.workStorageRootDir);
 const firstJobFinished = Promise.withResolvers<void>();
 let firstJobFinishedResolved = false;
 
@@ -73,6 +74,7 @@ await boss.work<RecordContentJobPayload>(
         logger,
         sourceCollectorRegistry: defaultSourceCollectorRegistry,
         storage,
+        workStorage,
       });
 
       if (!result.ok) {

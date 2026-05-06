@@ -109,6 +109,10 @@ export type SourceCollectorInspectInput = {
 };
 
 export type SourceCollectorExecutionContext = {
+  putWorkObject?(input: {
+    body: Uint8Array;
+    overwrite: boolean;
+  }): Promise<{ byteSize: number; key: string }>;
   replacePluginMetadata?(metadata: JsonObject): Promise<void>;
 };
 
@@ -133,17 +137,35 @@ export type SourceCollectorRecordInput = {
   logger: PluginLogger;
 };
 
+type AssetBodyPayload = {
+  body: Uint8Array;
+  workStorageKey?: never;
+};
+
+type AssetWorkStoragePayload = {
+  body?: never;
+  workStorageKey: string;
+};
+
+type AssetArtifactPayload = AssetBodyPayload | AssetWorkStoragePayload;
+
 export type AcquiredAsset = {
   acquiredFingerprints: string[];
-  body: Uint8Array;
   contentType: string | null;
   kind: string;
   metadata: JsonObject;
   primary: boolean;
   sourceUrl: string | null;
-};
+} & AssetArtifactPayload;
 
-export type RecordedAsset = AcquiredAsset;
+export type RecordedAsset = {
+  acquiredFingerprints: string[];
+  contentType: string | null;
+  kind: string;
+  metadata: JsonObject;
+  primary: boolean;
+  sourceUrl: string | null;
+} & AssetArtifactPayload;
 
 export interface SourceCollectorPlugin {
   supports(

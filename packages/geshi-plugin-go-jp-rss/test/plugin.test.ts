@@ -268,6 +268,9 @@ describe("goJpRss plugin", () => {
 
     expect(asset.contentType).toBe("text/html");
     expect(asset.kind).toBe("html");
+    if (asset.body === undefined) {
+      throw new Error("Expected acquired asset body.");
+    }
     expect(asset.body.byteLength).toBeGreaterThan(0);
   });
 });

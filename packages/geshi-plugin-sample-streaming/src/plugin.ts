@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 
 import type {
+  AcquiredAsset,
   RecordedAsset,
   SourceCollectorAcquireInput,
   SourceCollectorInspectErrorCode,
@@ -109,7 +110,7 @@ export const plugin: SourceCollectorPlugin = {
     };
   },
 
-  acquire(_input: SourceCollectorAcquireInput): Promise<RecordedAsset> {
+  acquire(_input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
     return Promise.reject(
       new Error(
         "sample-streaming assets must be handled by record(), not acquire().",

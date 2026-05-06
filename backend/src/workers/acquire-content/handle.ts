@@ -19,6 +19,7 @@ type HandleAcquireContentJobDependencies = {
   logger: Logger;
   sourceCollectorRegistry: SourceCollectorRegistry;
   storage: Storage;
+  workStorage: Storage;
 };
 
 export async function handleAcquireContentJob(
@@ -58,6 +59,22 @@ export async function handleAcquireContentJob(
       },
       config: payload.collector.config,
       content: payload.content,
+      context: {
+        putWorkObject: async (input) => {
+          const storedWorkObject = await dependencies.workStorage.put({
+            body: input.body,
+            contentType: null,
+            key: createWorkStorageKey(dependencies.workStorage, payload),
+            overwrite: input.overwrite,
+          });
+
+          if (!storedWorkObject.ok) {
+            throw storedWorkObject.error;
+          }
+
+          return storedWorkObject.value;
+        },
+      },
       logger: logger.child({
         operation: "acquire",
       }),
@@ -70,12 +87,37 @@ export async function handleAcquireContentJob(
   }
 
   try {
-    const storedAsset = await dependencies.storage.put({
-      body: acquiredAsset.body,
-      contentType: acquiredAsset.contentType,
-      key: createAssetKey(dependencies.storage, payload, acquiredAsset),
-      overwrite: true,
-    });
+    const acquiredAssetPayload = validateAcquiredAssetPayload(acquiredAsset);
+
+    if (!acquiredAssetPayload.ok) {
+      await failAcquireContentJob(
+        payload,
+        dependencies,
+        logger,
+        acquiredAssetPayload.error,
+      );
+      return acquiredAssetPayload;
+    }
+
+    const assetKey = createAssetKey(
+      dependencies.storage,
+      payload,
+      acquiredAsset,
+    );
+    const storedAsset =
+      acquiredAssetPayload.value.kind === "work-storage-key"
+        ? await storeAcquiredAssetFromWorkStorage(
+            dependencies,
+            acquiredAssetPayload.value.workStorageKey,
+            acquiredAsset.contentType,
+            assetKey,
+          )
+        : await dependencies.storage.put({
+            body: acquiredAssetPayload.value.body,
+            contentType: acquiredAsset.contentType,
+            key: assetKey,
+            overwrite: true,
+          });
 
     if (!storedAsset.ok) {
       await failAcquireContentJob(
@@ -87,13 +129,29 @@ export async function handleAcquireContentJob(
       return storedAsset;
     }
 
+    if (acquiredAssetPayload.value.kind === "work-storage-key") {
+      const deleteWorkFileResult = await dependencies.workStorage.delete(
+        acquiredAssetPayload.value.workStorageKey,
+      );
+
+      if (!deleteWorkFileResult.ok) {
+        logger.warn("acquire job work storage cleanup failed.", {
+          error: deleteWorkFileResult.error.message,
+          workStorageKey: acquiredAssetPayload.value.workStorageKey,
+        });
+      }
+    }
+
     const upsertStoredAssetResult =
       await dependencies.assetService.upsertStoredAsset({
         acquiredFingerprints: acquiredAsset.acquiredFingerprints,
         acquiredAt: new Date(),
         assetId: payload.asset.id,
         byteSize: storedAsset.value.byteSize,
-        checksum: sha256ChecksumString(acquiredAsset.body),
+        checksum:
+          acquiredAssetPayload.value.kind === "body"
+            ? sha256ChecksumString(acquiredAssetPayload.value.body)
+            : null,
         kind: acquiredAsset.kind,
         mimeType: acquiredAsset.contentType,
         primary: acquiredAsset.primary,
@@ -142,6 +200,57 @@ export async function handleAcquireContentJob(
   }
 
   return ok(undefined);
+}
+
+async function storeAcquiredAssetFromWorkStorage(
+  dependencies: HandleAcquireContentJobDependencies,
+  workStorageKey: string,
+  contentType: string | null,
+  storageKey: string,
+): Promise<
+  Result<{ byteSize: number; contentType: string | null; key: string }, Error>
+> {
+  const workStorageBody = await dependencies.workStorage.get(workStorageKey);
+
+  if (!workStorageBody.ok) {
+    return workStorageBody;
+  }
+
+  return dependencies.storage.put({
+    body: workStorageBody.value,
+    contentType,
+    key: storageKey,
+    overwrite: true,
+  });
+}
+
+function validateAcquiredAssetPayload(
+  acquiredAsset: AcquiredAsset,
+): Result<
+  | { kind: "body"; body: Uint8Array }
+  | { kind: "work-storage-key"; workStorageKey: string },
+  Error
+> {
+  const hasBody = acquiredAsset.body !== undefined;
+  const hasWorkStorageKey = acquiredAsset.workStorageKey !== undefined;
+
+  if (hasBody === hasWorkStorageKey) {
+    return err(
+      new Error(
+        "Acquired asset must provide exactly one of body or workStorageKey.",
+      ),
+    );
+  }
+
+  return hasBody
+    ? ok({
+        body: acquiredAsset.body,
+        kind: "body",
+      })
+    : ok({
+        kind: "work-storage-key",
+        workStorageKey: acquiredAsset.workStorageKey,
+      });
 }
 
 async function failAcquireContentJob(
@@ -203,6 +312,19 @@ function createAssetKey(
     payload.asset.id,
     (payload.content.title ?? "").slice(0, 16),
     `${latestAcquiredFingerprint.replace(":", "-")}${toFileExtension(acquiredAsset.contentType)}`,
+  );
+}
+
+function createWorkStorageKey(
+  storage: Storage,
+  payload: AcquireContentJobPayload,
+): string {
+  return storage.pathJoin(
+    payload.source.slug,
+    payload.content.id,
+    payload.asset.id,
+    payload.jobId,
+    "object.bin",
   );
 }
 

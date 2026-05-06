@@ -21,6 +21,7 @@ type HandleRecordContentJobDependencies = {
   logger: Logger;
   sourceCollectorRegistry: SourceCollectorRegistry;
   storage: Storage;
+  workStorage: Storage;
 };
 
 export async function handleRecordContentJob(
@@ -105,6 +106,20 @@ export async function handleRecordContentJob(
       config: payload.collector.config,
       content: payload.content,
       context: {
+        putWorkObject: async (input) => {
+          const storedWorkFile = await dependencies.workStorage.put({
+            body: input.body,
+            contentType: null,
+            key: createWorkStorageKey(dependencies.workStorage, payload),
+            overwrite: input.overwrite,
+          });
+
+          if (!storedWorkFile.ok) {
+            throw storedWorkFile.error;
+          }
+
+          return storedWorkFile.value;
+        },
         replacePluginMetadata: async (pluginMetadata) => {
           const currentMetadata = await dependencies.jobRepository.getMetadata(
             payload.jobId,
@@ -138,12 +153,37 @@ export async function handleRecordContentJob(
   }
 
   try {
-    const storedAsset = await dependencies.storage.put({
-      body: recordedAsset.body,
-      contentType: recordedAsset.contentType,
-      key: createAssetKey(dependencies.storage, payload, recordedAsset),
-      overwrite: true,
-    });
+    const recordedAssetPayload = validateRecordedAssetPayload(recordedAsset);
+
+    if (!recordedAssetPayload.ok) {
+      await failRecordContentJob(
+        payload,
+        dependencies,
+        logger,
+        recordedAssetPayload.error,
+      );
+      return recordedAssetPayload;
+    }
+
+    const storageKey = createAssetKey(
+      dependencies.storage,
+      payload,
+      recordedAsset,
+    );
+    const storedAsset =
+      recordedAssetPayload.value.kind === "work-storage-key"
+        ? await storeRecordedAssetFromWorkStorage(
+            dependencies,
+            recordedAssetPayload.value.workStorageKey,
+            recordedAsset.contentType,
+            storageKey,
+          )
+        : await dependencies.storage.put({
+            body: recordedAssetPayload.value.body,
+            contentType: recordedAsset.contentType,
+            key: storageKey,
+            overwrite: true,
+          });
 
     if (!storedAsset.ok) {
       await failRecordContentJob(
@@ -155,13 +195,29 @@ export async function handleRecordContentJob(
       return storedAsset;
     }
 
+    if (recordedAssetPayload.value.kind === "work-storage-key") {
+      const deleteWorkFileResult = await dependencies.workStorage.delete(
+        recordedAssetPayload.value.workStorageKey,
+      );
+
+      if (!deleteWorkFileResult.ok) {
+        logger.warn("record job work storage cleanup failed.", {
+          error: deleteWorkFileResult.error.message,
+          workStorageKey: recordedAssetPayload.value.workStorageKey,
+        });
+      }
+    }
+
     const upsertStoredAssetResult =
       await dependencies.assetService.upsertStoredAsset({
         acquiredFingerprints: recordedAsset.acquiredFingerprints,
         acquiredAt: new Date(),
         assetId: payload.asset.id,
         byteSize: storedAsset.value.byteSize,
-        checksum: sha256ChecksumString(recordedAsset.body),
+        checksum:
+          recordedAssetPayload.value.kind === "body"
+            ? sha256ChecksumString(recordedAssetPayload.value.body)
+            : null,
         kind: recordedAsset.kind,
         mimeType: recordedAsset.contentType,
         primary: recordedAsset.primary,
@@ -211,6 +267,57 @@ export async function handleRecordContentJob(
       error instanceof Error ? error : new Error("Record content job failed."),
     );
   }
+}
+
+async function storeRecordedAssetFromWorkStorage(
+  dependencies: HandleRecordContentJobDependencies,
+  workStorageKey: string,
+  contentType: string | null,
+  storageKey: string,
+): Promise<
+  Result<{ byteSize: number; contentType: string | null; key: string }, Error>
+> {
+  const workStorageBody = await dependencies.workStorage.get(workStorageKey);
+
+  if (!workStorageBody.ok) {
+    return workStorageBody;
+  }
+
+  return dependencies.storage.put({
+    body: workStorageBody.value,
+    contentType,
+    key: storageKey,
+    overwrite: true,
+  });
+}
+
+function validateRecordedAssetPayload(
+  recordedAsset: RecordedAsset,
+): Result<
+  | { kind: "body"; body: Uint8Array }
+  | { kind: "work-storage-key"; workStorageKey: string },
+  Error
+> {
+  const hasBody = recordedAsset.body !== undefined;
+  const hasWorkStorageKey = recordedAsset.workStorageKey !== undefined;
+
+  if (hasBody === hasWorkStorageKey) {
+    return err(
+      new Error(
+        "Recorded asset must provide exactly one of body or workStorageKey.",
+      ),
+    );
+  }
+
+  return hasBody
+    ? ok({
+        kind: "body",
+        body: recordedAsset.body,
+      })
+    : ok({
+        kind: "work-storage-key",
+        workStorageKey: recordedAsset.workStorageKey,
+      });
 }
 
 async function failRecordContentJob(
@@ -275,6 +382,19 @@ function createAssetKey(
     payload.asset.id,
     (payload.content.title ?? "").slice(0, 16),
     `${latestAcquiredFingerprint.replace(":", "-")}${toFileExtension(recordedAsset.contentType)}`,
+  );
+}
+
+function createWorkStorageKey(
+  storage: Storage,
+  payload: RecordContentJobPayload,
+): string {
+  return storage.pathJoin(
+    payload.source.slug,
+    payload.content.id,
+    payload.asset.id,
+    payload.jobId,
+    "object.bin",
   );
 }
 

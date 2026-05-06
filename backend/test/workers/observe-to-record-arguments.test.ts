@@ -210,6 +210,8 @@ describe("observe to record arguments handoff", () => {
         get: vi.fn(() => observePlugin),
       } as never,
       storage: {
+        delete: vi.fn(() => Promise.resolve(ok(undefined))),
+        get: vi.fn(),
         pathJoin: (...parts: string[]) => parts.join("/"),
         put: vi.fn(() =>
           Promise.resolve(
@@ -220,6 +222,12 @@ describe("observe to record arguments handoff", () => {
           ),
         ),
       } as never,
+      workStorage: {
+        delete: vi.fn(() => Promise.resolve(ok(undefined))),
+        get: vi.fn(),
+        pathJoin: (...parts: string[]) => parts.join("/"),
+        put: vi.fn(),
+      },
     });
 
     expect(recordResult).toEqual(ok(undefined));
