@@ -32,13 +32,42 @@ export type PluginManifest = {
   pluginSlug: string;
 };
 
-export type SourceCollectorNextActionKind = "acquire" | "record";
+export type SourceCollectorNextActionKind = "acquire" | "none" | "record";
 
-export type SourceCollectorNextAction = {
-  actionKind: SourceCollectorNextActionKind;
+export type SourceCollectorNonActionableReason =
+  | "already-ended"
+  | "missed-recording-window"
+  | "outside-retention-window"
+  | "requires-manual-action"
+  | "unsupported";
+
+export type SourceCollectorExpirationAction =
+  | "mark_failed"
+  | "mark_non_actionable";
+
+export type SourceCollectorExpirationPolicy = {
+  action: SourceCollectorExpirationAction;
+  message?: string;
+  reason: SourceCollectorNonActionableReason;
+};
+
+type SourceCollectorScheduledNextAction = {
+  actionKind: "acquire" | "record";
   arguments?: JsonObject;
+  expirationPolicy?: SourceCollectorExpirationPolicy;
+  latestRunnableAt?: Date | null;
   scheduledStartAt?: Date | null;
 };
+
+type SourceCollectorNoneNextAction = {
+  actionKind: "none";
+  message?: string;
+  reason: SourceCollectorNonActionableReason;
+};
+
+export type SourceCollectorNextAction =
+  | SourceCollectorScheduledNextAction
+  | SourceCollectorNoneNextAction;
 
 export type ObservedAsset = {
   kind: string;

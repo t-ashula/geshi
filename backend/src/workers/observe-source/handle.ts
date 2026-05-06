@@ -168,10 +168,30 @@ export async function handleObserveSourceJob(
           return err(error);
         }
 
-        const nextActionKind =
-          observedAsset.nextAction?.actionKind ?? "acquire";
+        const nextAction = observedAsset.nextAction;
+        const nextActionKind = nextAction?.actionKind ?? "acquire";
+
+        if (nextActionKind === "none") {
+          continue;
+        }
 
         if (nextActionKind === "record") {
+          const recordNextAction = observedAsset.nextAction;
+
+          if (
+            recordNextAction === undefined ||
+            recordNextAction.actionKind !== "record"
+          ) {
+            const error = new Error("Expected record next-action policy.");
+            await failObserveSourceJob(
+              payload.jobId,
+              dependencies,
+              logger,
+              error,
+            );
+            return err(error);
+          }
+
           const recordJobId = uuidv7();
           const recordPayload: RecordContentJobPayload = {
             asset: {
@@ -208,13 +228,23 @@ export async function handleObserveSourceJob(
             metadata: {
               core: {
                 actionKind: "record",
+                expirationPolicy:
+                  recordNextAction.expirationPolicy === undefined
+                    ? null
+                    : {
+                        action: recordNextAction.expirationPolicy.action,
+                        message:
+                          recordNextAction.expirationPolicy.message ?? null,
+                        reason: recordNextAction.expirationPolicy.reason,
+                      },
+                latestRunnableAt:
+                  recordNextAction.latestRunnableAt?.toISOString() ?? null,
                 payload: recordPayload,
                 scheduledStartAt:
-                  observedAsset.nextAction?.scheduledStartAt?.toISOString() ??
-                  null,
+                  recordNextAction.scheduledStartAt?.toISOString() ?? null,
               },
               plugin: {
-                arguments: observedAsset.nextAction?.arguments ?? {},
+                arguments: recordNextAction.arguments ?? {},
               },
             },
             retryable: true,

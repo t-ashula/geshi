@@ -11,6 +11,8 @@ import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
 import { createSourceSlug, normalizeOptionalSlug } from "../lib/source-slug.js";
 import { createUrlHash } from "../lib/url-hash.js";
+import type { Logger } from "../logger/index.js";
+import { createLogger } from "../logger/index.js";
 import type { SourceCollectorRegistry } from "../plugins/index.js";
 import { defaultSourceCollectorRegistry } from "../plugins/index.js";
 import type { SourcePeriodicCrawlSettings } from "./periodic-crawl-settings.js";
@@ -82,17 +84,48 @@ export interface SourceService {
   >;
 }
 
+export type CreateSourceServiceDependencies = {
+  logger?: Logger;
+  sourceCollectorRegistry?: SourceCollectorRegistry;
+};
+
 export function createSourceService(
   sourceRepository: SourceRepository,
-  sourceCollectorRegistry: SourceCollectorRegistry = defaultSourceCollectorRegistry,
+  sourceCollectorRegistryOrDependencies:
+    | SourceCollectorRegistry
+    | CreateSourceServiceDependencies = {},
 ): SourceService {
+  const dependencies = isSourceCollectorRegistry(
+    sourceCollectorRegistryOrDependencies,
+  )
+    ? {
+        sourceCollectorRegistry: sourceCollectorRegistryOrDependencies,
+      }
+    : sourceCollectorRegistryOrDependencies;
+  const logger =
+    dependencies.logger ??
+    createLogger({
+      service: "source",
+    });
+  const sourceCollectorRegistry =
+    dependencies.sourceCollectorRegistry ?? defaultSourceCollectorRegistry;
+
   return {
     async createSource(
       request: CreateSourceRequest,
     ): Promise<Result<SourceListItem, CreateSourceError>> {
+      const sourceLogger = logger.child({
+        operation: "source-create",
+        pluginSlug: request.pluginSlug ?? "podcast-rss",
+        requestUrl: request.url,
+        requestSourceSlug: request.sourceSlug,
+      });
       const normalizedUrlResult = normalizeSourceUrl(request.url);
 
       if (!normalizedUrlResult.ok) {
+        sourceLogger.warn("source create rejected invalid URL.", {
+          errorCode: normalizedUrlResult.error.code,
+        });
         return normalizedUrlResult;
       }
 
@@ -102,8 +135,12 @@ export function createSourceService(
         createSourceSlug(normalizedUrl, request.title);
       const pluginSlug = request.pluginSlug ?? "podcast-rss";
       const sourceKind = sourceCollectorRegistry.getSourceKind(pluginSlug);
-
-      return sourceRepository.createSource({
+      sourceLogger.info("source create started.", {
+        normalizedUrl,
+        sourceKind,
+        slug,
+      });
+      const result = await sourceRepository.createSource({
         collectorSettingId: crypto.randomUUID(),
         collectorSettingSnapshotId: crypto.randomUUID(),
         description: normalizeOptionalString(request.description),
@@ -116,6 +153,26 @@ export function createSourceService(
         url: normalizedUrl,
         urlHash: createUrlHash(normalizedUrl),
       });
+
+      if (!result.ok) {
+        const errorCode =
+          isErrorWithCode(result.error) && typeof result.error.code === "string"
+            ? result.error.code
+            : "source_create_failed";
+        sourceLogger.warn("source create failed.", {
+          errorCode,
+          errorMessage: result.error.message,
+        });
+
+        return result;
+      }
+
+      sourceLogger.info("source create completed.", {
+        sourceId: result.value.id,
+        slug: result.value.slug,
+      });
+
+      return result;
     },
 
     async findObserveSourceTarget(
@@ -218,6 +275,27 @@ function normalizeOptionalString(
   const trimmedValue = value?.trim();
 
   return trimmedValue === "" ? undefined : trimmedValue;
+}
+
+function isSourceCollectorRegistry(
+  value: SourceCollectorRegistry | CreateSourceServiceDependencies,
+): value is SourceCollectorRegistry {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "get" in value &&
+    "getSourceKind" in value &&
+    "list" in value
+  );
+}
+
+function isErrorWithCode(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as Record<string, unknown>).code === "string"
+  );
 }
 
 export function normalizeSourceUrl(

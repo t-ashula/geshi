@@ -17,9 +17,14 @@ import {
 } from "../../../endpoints/api/v1/sources.js";
 import type { Result } from "../../../lib/result.js";
 import { err, ok } from "../../../lib/result.js";
+import { createLogger } from "../../../logger/index.js";
 
 export function createSourceRoutes(dependencies: AppDependencies): Hono {
   const router = new Hono();
+  const logger = createLogger({
+    process: "backend",
+    route: "api/v1/sources",
+  });
   const listSources = createListSourcesEndpoint(dependencies);
   const listSourceCollectorPlugins =
     createListSourceCollectorPluginsEndpoint(dependencies);
@@ -51,18 +56,35 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
     const json = await readJsonObject(context);
 
     if (!json.ok) {
+      logger.warn("source create rejected invalid JSON.", {
+        errorCode: json.error.code,
+      });
       return context.json({ error: json.error }, { status: 400 });
     }
 
     const input = toCreateSourceEndpointInput(json.value);
+    logger.info("source create request received.", {
+      pluginSlug: input.pluginSlug ?? "podcast-rss",
+      requestSourceSlug: input.sourceSlug,
+      requestUrl: input.url,
+    });
     const result = await createSource(input);
 
     if (!result.ok) {
+      logger.warn("source create request failed.", {
+        errorCode: result.error.code,
+        errorMessage: result.error.message,
+      });
       return context.json(
         { error: result.error },
         { status: createSourceErrorStatus(result.error.code) },
       );
     }
+
+    logger.info("source create request completed.", {
+      sourceId: result.value.id,
+      slug: result.value.slug,
+    });
 
     return context.json({ data: result.value }, { status: 201 });
   });

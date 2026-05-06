@@ -53,8 +53,16 @@ const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
 const sourceRepository = new SourceRepository(database);
-const sourceService = createSourceService(sourceRepository);
-const sourceInspectService = createSourceInspectService();
+const sourceService = createSourceService(sourceRepository, {
+  logger: logger.child({
+    service: "source",
+  }),
+});
+const sourceInspectService = createSourceInspectService({
+  logger: logger.child({
+    service: "source-inspect",
+  }),
+});
 const jobQueue = new PgBossJobQueue(boss);
 const jobService = createJobService(sourceService, jobRepository, jobQueue);
 const transcriptRepository = new TranscriptRepository(database);

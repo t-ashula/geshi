@@ -1,7 +1,8 @@
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
 import { createSourceSlug } from "../lib/source-slug.js";
-import { createNoopLogger } from "../logger/index.js";
+import type { Logger } from "../logger/index.js";
+import { createLogger } from "../logger/index.js";
 import type { SourceCollectorRegistry } from "../plugins/index.js";
 import { defaultSourceCollectorRegistry } from "../plugins/index.js";
 import type {
@@ -37,12 +38,18 @@ export interface SourceInspectService {
 }
 
 export type CreateSourceInspectServiceDependencies = {
+  logger?: Logger;
   sourceCollectorRegistry?: SourceCollectorRegistry;
 };
 
 export function createSourceInspectService(
   dependencies: CreateSourceInspectServiceDependencies = {},
 ): SourceInspectService {
+  const logger =
+    dependencies.logger ??
+    createLogger({
+      service: "source-inspect",
+    });
   const sourceCollectorRegistry =
     dependencies.sourceCollectorRegistry ?? defaultSourceCollectorRegistry;
 
@@ -50,13 +57,24 @@ export function createSourceInspectService(
     async inspectSource(
       request: InspectSourceRequest,
     ): Promise<Result<InspectSourceResult, InspectSourceError>> {
+      const inspectLogger = logger.child({
+        operation: "source-inspect",
+        pluginSlug: request.pluginSlug ?? "podcast-rss",
+        requestUrl: request.url,
+      });
       const normalizedUrlResult = normalizeSourceUrl(request.url);
 
       if (!normalizedUrlResult.ok) {
+        inspectLogger.warn("source inspect rejected invalid URL.", {
+          errorCode: normalizedUrlResult.error.code,
+        });
         return normalizedUrlResult;
       }
 
       const normalizedUrl = normalizedUrlResult.value;
+      inspectLogger.info("source inspect started.", {
+        normalizedUrl,
+      });
       const plugin = sourceCollectorRegistry.get(
         request.pluginSlug ?? "podcast-rss",
       );
@@ -64,8 +82,14 @@ export function createSourceInspectService(
         const sourceMetadata = await plugin.inspect({
           abortSignal: new AbortController().signal,
           config: {},
-          logger: createNoopLogger(),
+          logger: inspectLogger.child({
+            pluginApi: "inspect",
+          }),
           sourceUrl: normalizedUrl,
+        });
+        inspectLogger.info("source inspect completed.", {
+          metadataUrl: sourceMetadata.url,
+          title: sourceMetadata.title,
         });
 
         return ok({
@@ -77,9 +101,16 @@ export function createSourceInspectService(
         });
       } catch (error) {
         if (isSourceCollectorInspectError(error)) {
+          inspectLogger.warn("source inspect failed with known plugin error.", {
+            errorCode: error.code,
+            errorMessage: error.message,
+          });
           return err(error);
         }
 
+        inspectLogger.error("source inspect failed with unexpected error.", {
+          error,
+        });
         return err({
           code: "source_inspect_failed",
           message:

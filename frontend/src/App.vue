@@ -243,8 +243,13 @@ async function submitSource(): Promise<void> {
 
   try {
     const source = await createSource(form.value);
-
-    await refreshSources();
+    sources.value = [
+      ...sources.value.filter(
+        (existingSource) => existingSource.id !== source.id,
+      ),
+      source,
+    ];
+    void refreshSources();
     form.value = {
       description: "",
       pluginSlug: form.value.pluginSlug,
