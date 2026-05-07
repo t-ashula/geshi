@@ -63,7 +63,7 @@ run_basic() {
   frontend_port="${E2E_FRONTEND_PORT:-4273}"
   backend_port="${E2E_BACKEND_PORT:-3300}"
   source_server_port="${E2E_SOURCE_SERVER_PORT:-3501}"
-  storage_root_dir="$root_dir/.data/e2e-storage"
+  storage_root_dir="$root_dir/.geshi/e2e-storage"
 
   mkdir -p "$log_dir" "$storage_root_dir"
 
@@ -102,8 +102,8 @@ run_transcript() {
   use_real_scribe="${E2E_USE_REAL_SCRIBE:-0}"
   scribe_port="${E2E_SCRIBE_PORT:-58001}"
   scribe_base_url="${E2E_SCRIBE_BASE_URL:-http://127.0.0.1:$scribe_port}"
-  storage_root_dir="$root_dir/.data/e2e-transcript-storage"
-  work_storage_root_dir="$root_dir/.data/e2e-transcript-work-storage"
+  storage_root_dir="$root_dir/.geshi/e2e-transcript-storage"
+  work_storage_root_dir="$root_dir/.geshi/e2e-transcript-work-storage"
   source_mp3_path="${E2E_BOTCHAN_SOURCE_MP3:-$root_dir/tmp/botchan/botchan_01_natsume_64kb.mp3}"
 
   mkdir -p "$log_dir" "$storage_root_dir" "$work_storage_root_dir"
@@ -168,8 +168,8 @@ run_recording() {
 
   backend_port="${E2E_BACKEND_PORT:-3302}"
   source_server_port="${E2E_SOURCE_SERVER_PORT:-3503}"
-  storage_root_dir="$root_dir/.data/e2e-recording-storage"
-  work_storage_root_dir="$root_dir/.data/e2e-recording-work-storage"
+  storage_root_dir="$root_dir/.geshi/e2e-recording-storage"
+  work_storage_root_dir="$root_dir/.geshi/e2e-recording-work-storage"
   stream_source_url="http://localhost:$source_server_port/sources/streams/live-1"
   source_mp3_path="${E2E_BOTCHAN_SOURCE_MP3:-$root_dir/tmp/botchan/botchan_01_natsume_64kb.mp3}"
 

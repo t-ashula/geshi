@@ -16,6 +16,9 @@
 - 当面はローカル filesystem を実装として使う
 - 将来的な保存先差し替えに備えて，interface として規定する
 
+現在の既定の local filesystem 実装では，永続 `storage` は `./.geshi/storage`
+を，作業用 `storage` は `./.geshi/work-storage` を使う．
+
 ## 作業用 storage
 
 `asset` の正本保存とは別に，変換や分割の途中でだけ使う作業用 `storage` を持ってよい．

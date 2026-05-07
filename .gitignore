@@ -1,6 +1,5 @@
 tmp/*
 test/tmp/
-.data/
 node_modules/
 coverage/
 dist/

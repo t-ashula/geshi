@@ -20,8 +20,8 @@ export function getRuntimeConfig(): RuntimeConfig {
     pgUser: process.env.PGUSER ?? "geshi",
     scribeBaseUrl:
       process.env.GESHI_SCRIBE_BASE_URL ?? "http://127.0.0.1:58000",
-    storageRootDir: process.env.GESHI_STORAGE_ROOT_DIR ?? ".data/storage",
+    storageRootDir: process.env.GESHI_STORAGE_ROOT_DIR ?? ".geshi/storage",
     workStorageRootDir:
-      process.env.GESHI_WORK_STORAGE_ROOT_DIR ?? ".data/work-storage",
+      process.env.GESHI_WORK_STORAGE_ROOT_DIR ?? ".geshi/work-storage",
   };
 }

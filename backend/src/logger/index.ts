@@ -1,5 +1,8 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+
 import type { Logger as PinoLogger } from "pino";
-import pino from "pino";
+import pino, { destination } from "pino";
 
 export type LogMetadata = Record<string, unknown>;
 
@@ -11,19 +14,25 @@ export interface Logger {
   child(bindings: LogMetadata): Logger;
 }
 
+const DEFAULT_LOG_FILE_PATH = ".geshi/logs/geshi.log";
+const destinationByPath = new Map<string, ReturnType<typeof destination>>();
+
 export function createLogger(bindings: LogMetadata = {}): Logger {
   return wrapLogger(
-    pino({
-      base: bindings,
-      formatters: {
-        level(label) {
-          return {
-            level: label,
-          };
+    pino(
+      {
+        base: bindings,
+        formatters: {
+          level(label) {
+            return {
+              level: label,
+            };
+          },
         },
+        timestamp: pino.stdTimeFunctions.isoTime,
       },
-      timestamp: pino.stdTimeFunctions.isoTime,
-    }),
+      resolveLoggerDestination(),
+    ),
   );
 }
 
@@ -57,4 +66,31 @@ function wrapLogger(logger: PinoLogger): Logger {
       logger.warn(metadata ?? {}, message);
     },
   };
+}
+
+function resolveLoggerDestination() {
+  if (isTestRuntime()) {
+    return undefined;
+  }
+
+  const logFilePath = process.env.GESHI_LOG_FILE_PATH ?? DEFAULT_LOG_FILE_PATH;
+  const existingDestination = destinationByPath.get(logFilePath);
+
+  if (existingDestination !== undefined) {
+    return existingDestination;
+  }
+
+  mkdirSync(dirname(logFilePath), {
+    recursive: true,
+  });
+  const createdDestination = destination({
+    dest: logFilePath,
+    sync: false,
+  });
+  destinationByPath.set(logFilePath, createdDestination);
+  return createdDestination;
+}
+
+function isTestRuntime(): boolean {
+  return process.env.NODE_ENV === "test" || process.env.VITEST === "true";
 }
