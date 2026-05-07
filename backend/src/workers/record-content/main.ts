@@ -95,9 +95,5 @@ logger.info("worker started.", {
 
 await firstJobFinished.promise;
 
-logger.info("worker completed first job. shutting down.", {
-  queueName: RECORD_CONTENT_JOB_NAME,
-});
-
 await boss.stop();
 await pool.end();
