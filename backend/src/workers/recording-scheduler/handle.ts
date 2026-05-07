@@ -54,11 +54,21 @@ export async function handleRecordingSchedulerJob(
     return queuedJobsResult;
   }
 
+  const dedupeResult = await cleanupSupersededRecordJobs(
+    queuedJobsResult.value,
+    dependencies,
+    logger,
+  );
+
+  if (!dedupeResult.ok) {
+    return dedupeResult;
+  }
+
   const now = Date.now();
   const enqueueWindowEndsAt = now + RECORDING_SCHEDULER_INTERVAL_MS;
   let enqueuedCount = 0;
 
-  for (const job of queuedJobsResult.value) {
+  for (const job of dedupeResult.value) {
     const scheduledStartAt = readScheduledStartAt(job.metadata);
     const latestRunnableAt = readLatestRunnableAt(job.metadata);
     const expirationPolicy = readExpirationPolicy(job.metadata);
@@ -155,6 +165,86 @@ export async function handleRecordingSchedulerJob(
   });
 
   return ok(undefined);
+}
+
+async function cleanupSupersededRecordJobs(
+  jobs: Array<{
+    createdAt: Date;
+    id: string;
+    metadata: Record<string, unknown>;
+  }>,
+  dependencies: HandleRecordingSchedulerJobDependencies,
+  logger: Logger,
+): Promise<
+  Result<
+    Array<{
+      createdAt: Date;
+      id: string;
+      metadata: Record<string, unknown>;
+    }>,
+    Error
+  >
+> {
+  const latestJobByAssetId = new Map<
+    string,
+    {
+      createdAt: Date;
+      id: string;
+      metadata: Record<string, unknown>;
+    }
+  >();
+
+  for (const job of jobs) {
+    const queuePayload = readRecordContentPayload(job.metadata);
+    const assetId = queuePayload?.asset.id;
+
+    if (assetId === undefined) {
+      continue;
+    }
+
+    const existingJob = latestJobByAssetId.get(assetId);
+
+    if (
+      existingJob === undefined ||
+      existingJob.createdAt.getTime() <= job.createdAt.getTime()
+    ) {
+      latestJobByAssetId.set(assetId, job);
+    }
+  }
+
+  const dedupedJobs = [];
+
+  for (const job of jobs) {
+    const queuePayload = readRecordContentPayload(job.metadata);
+    const assetId = queuePayload?.asset.id;
+
+    if (assetId === undefined) {
+      dedupedJobs.push(job);
+      continue;
+    }
+
+    const latestJob = latestJobByAssetId.get(assetId);
+
+    if (latestJob?.id === job.id) {
+      dedupedJobs.push(job);
+      continue;
+    }
+
+    const cleanupResult = await cleanupSupersededRecordJob(
+      job.id,
+      job.metadata,
+      assetId,
+      latestJob?.id ?? null,
+      dependencies,
+      logger,
+    );
+
+    if (!cleanupResult.ok) {
+      return cleanupResult;
+    }
+  }
+
+  return ok(dedupedJobs);
 }
 
 function readScheduledStartAt(metadata: Record<string, unknown>): Date | null {
@@ -270,7 +360,11 @@ async function cleanupExpiredRecordJob(
   dependencies: HandleRecordingSchedulerJobDependencies,
   logger: Logger,
 ): Promise<Result<void, Error>> {
-  const cleanupMetadata = withCleanupMetadata(metadata, expirationPolicy);
+  const cleanupMetadata = withCleanupMetadata(metadata, {
+    action: expirationPolicy.action,
+    message: expirationPolicy.message,
+    reason: expirationPolicy.reason,
+  });
   const replaceMetadataResult =
     await dependencies.jobRepository.replaceMetadata(jobId, cleanupMetadata);
 
@@ -303,10 +397,10 @@ async function cleanupExpiredRecordJob(
 
 function withCleanupMetadata(
   metadata: Record<string, unknown>,
-  expirationPolicy: {
-    action: SourceCollectorExpirationAction;
+  cleanup: {
+    action: string;
     message: string | null;
-    reason: SourceCollectorNonActionableReason;
+    reason: string;
   },
 ): Record<string, unknown> {
   const coreMetadata = metadata.core;
@@ -324,13 +418,57 @@ function withCleanupMetadata(
     core: {
       ...(coreMetadata as Record<string, unknown>),
       cleanup: {
-        action: expirationPolicy.action,
+        action: cleanup.action,
         cleanedUpAt: new Date().toISOString(),
-        message: expirationPolicy.message,
-        reason: expirationPolicy.reason,
+        message: cleanup.message,
+        reason: cleanup.reason,
       },
     },
   };
+}
+
+async function cleanupSupersededRecordJob(
+  jobId: string,
+  metadata: Record<string, unknown>,
+  assetId: string,
+  supersededByJobId: string | null,
+  dependencies: HandleRecordingSchedulerJobDependencies,
+  logger: Logger,
+): Promise<Result<void, Error>> {
+  const failureMessage =
+    supersededByJobId === null
+      ? `Record job superseded by another queued job for asset ${assetId}.`
+      : `Record job superseded by queued job ${supersededByJobId} for asset ${assetId}.`;
+  const cleanupMetadata = withCleanupMetadata(metadata, {
+    action: "mark_failed",
+    message: failureMessage,
+    reason: "superseded-by-newer-record-job",
+  });
+  const replaceMetadataResult =
+    await dependencies.jobRepository.replaceMetadata(jobId, cleanupMetadata);
+
+  if (!replaceMetadataResult.ok) {
+    return replaceMetadataResult;
+  }
+
+  const markFailedResult = await dependencies.jobRepository.markFailed(
+    jobId,
+    failureMessage,
+    false,
+  );
+
+  if (!markFailedResult.ok) {
+    return markFailedResult;
+  }
+
+  logger.warn("recording scheduler cleaned up superseded record job.", {
+    assetId,
+    failureMessage,
+    supersededByJobId,
+    targetJobId: jobId,
+  });
+
+  return ok(undefined);
 }
 
 function readRecordContentPayload(

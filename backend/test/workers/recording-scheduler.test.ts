@@ -436,4 +436,114 @@ describe("recording scheduler", () => {
 
     vi.useRealTimers();
   });
+
+  it("cleans up duplicate queued record jobs for the same asset and keeps only the newest one", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-05T00:00:10.000Z"));
+
+    const enqueue = vi
+      .fn()
+      .mockResolvedValueOnce("queue-record-2")
+      .mockResolvedValueOnce("queue-scheduler-2");
+    const attachQueueJobId = vi.fn(() => Promise.resolve(ok(undefined)));
+    const markFailed = vi.fn(() => Promise.resolve(ok(undefined)));
+    const replaceMetadata = vi.fn(() => Promise.resolve(ok(undefined)));
+    const startRecordContentWorker = vi.fn(() => Promise.resolve());
+
+    const olderJob = createQueuedRecordJob(
+      "record-job-1",
+      "2026-05-05T00:00:00.000Z",
+      null,
+      null,
+    );
+    const newerJob = {
+      ...createQueuedRecordJob(
+        "record-job-2",
+        "2026-05-05T00:00:00.000Z",
+        null,
+        null,
+      ),
+      createdAt: new Date("2026-05-05T00:00:01.000Z"),
+      metadata: {
+        core: {
+          expirationPolicy: null,
+          latestRunnableAt: null,
+          payload: {
+            ...createQueuedRecordJob(
+              "record-job-2",
+              "2026-05-05T00:00:00.000Z",
+              null,
+              null,
+            ).metadata.core.payload,
+            jobId: "record-job-2",
+          },
+          scheduledStartAt: "2026-05-05T00:00:00.000Z",
+        },
+      },
+    };
+
+    const result = await handleRecordingSchedulerJob(
+      {
+        jobId: "recording-scheduler-job-1",
+      },
+      {
+        jobQueue: {
+          enqueue,
+          enqueueAfter: vi.fn(() => Promise.resolve("queue-scheduler-2")),
+        },
+        jobRepository: {
+          attachQueueJobId,
+          createJob: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                id: "next-scheduler-job-1",
+              }),
+            ),
+          ),
+          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+            Promise.resolve(ok([olderJob, newerJob])),
+          ),
+          markFailed,
+          markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
+          markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
+          replaceMetadata,
+        } as never,
+        logger: createNoopLogger(),
+        startRecordContentWorker,
+      },
+    );
+
+    expect(result).toEqual(ok(undefined));
+    expect(markFailed).toHaveBeenCalledWith(
+      "record-job-1",
+      "Record job superseded by queued job record-job-2 for asset asset-1.",
+      false,
+    );
+    expect(enqueue).toHaveBeenCalledWith(
+      RECORD_CONTENT_JOB_NAME,
+      expect.objectContaining({
+        jobId: "record-job-2",
+      }),
+    );
+    expect(startRecordContentWorker).toHaveBeenCalledTimes(1);
+
+    const cleanupMetadataInput = replaceMetadata.mock.calls[0]?.[1] as
+      | {
+          core?: {
+            cleanup?: {
+              action?: string;
+              message?: string | null;
+              reason?: string;
+            };
+          };
+        }
+      | undefined;
+    expect(cleanupMetadataInput?.core?.cleanup).toMatchObject({
+      action: "mark_failed",
+      message: "Record job superseded by queued job record-job-2 for asset asset-1.",
+      reason: "superseded-by-newer-record-job",
+    });
+
+    vi.useRealTimers();
+  });
 });
