@@ -64,6 +64,15 @@ export async function handleRecordingSchedulerJob(
     return dedupeResult;
   }
 
+  const runningAssetIdsResult =
+    await dependencies.jobRepository.listRunningRecordContentAssetIds();
+
+  if (!runningAssetIdsResult.ok) {
+    return runningAssetIdsResult;
+  }
+
+  const runningAssetIds = runningAssetIdsResult.value;
+
   const now = Date.now();
   const enqueueWindowEndsAt = now + RECORDING_SCHEDULER_INTERVAL_MS;
   let enqueuedCount = 0;
@@ -103,6 +112,25 @@ export async function handleRecordingSchedulerJob(
     const queuePayload = readRecordContentPayload(job.metadata);
 
     if (queuePayload === null) {
+      continue;
+    }
+
+    if (runningAssetIds.has(queuePayload.asset.id)) {
+      const cleanupResult = await cleanupSupersededRecordJob(
+        job.id,
+        job.metadata,
+        queuePayload.asset.id,
+        null,
+        dependencies,
+        logger,
+        "running-record-job-already-exists",
+        `Record job skipped because another record job is already running for asset ${queuePayload.asset.id}.`,
+      );
+
+      if (!cleanupResult.ok) {
+        return cleanupResult;
+      }
+
       continue;
     }
 
@@ -434,15 +462,18 @@ async function cleanupSupersededRecordJob(
   supersededByJobId: string | null,
   dependencies: HandleRecordingSchedulerJobDependencies,
   logger: Logger,
+  cleanupReason = "superseded-by-newer-record-job",
+  failureMessageOverride: string | null = null,
 ): Promise<Result<void, Error>> {
   const failureMessage =
-    supersededByJobId === null
+    failureMessageOverride ??
+    (supersededByJobId === null
       ? `Record job superseded by another queued job for asset ${assetId}.`
-      : `Record job superseded by queued job ${supersededByJobId} for asset ${assetId}.`;
+      : `Record job superseded by queued job ${supersededByJobId} for asset ${assetId}.`);
   const cleanupMetadata = withCleanupMetadata(metadata, {
     action: "mark_failed",
     message: failureMessage,
-    reason: "superseded-by-newer-record-job",
+    reason: cleanupReason,
   });
   const replaceMetadataResult =
     await dependencies.jobRepository.replaceMetadata(jobId, cleanupMetadata);

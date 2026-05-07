@@ -297,6 +297,18 @@ export class JobRepository {
   public async listQueuedOrRunningRecordContentAssetIds(): Promise<
     Result<Set<string>, JobRepositoryError>
   > {
+    return this.listRecordContentAssetIdsByStatuses(["queued", "running"]);
+  }
+
+  public async listRunningRecordContentAssetIds(): Promise<
+    Result<Set<string>, JobRepositoryError>
+  > {
+    return this.listRecordContentAssetIdsByStatuses(["running"]);
+  }
+
+  private async listRecordContentAssetIdsByStatuses(
+    statuses: Array<"queued" | "running">,
+  ): Promise<Result<Set<string>, JobRepositoryError>> {
     try {
       const rows = await this.database
         .selectFrom("jobs")
@@ -306,7 +318,7 @@ export class JobRepository {
           ),
         )
         .where("kind", "=", "record-content")
-        .where("status", "in", ["queued", "running"])
+        .where("status", "in", statuses)
         .execute();
 
       return ok(
@@ -320,7 +332,7 @@ export class JobRepository {
       return err(
         toRepositoryError(
           error,
-          "Failed to list queued or running record-content asset ids.",
+          "Failed to list record-content asset ids by status.",
         ),
       );
     }

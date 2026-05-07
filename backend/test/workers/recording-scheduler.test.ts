@@ -156,6 +156,9 @@ describe("recording scheduler", () => {
               ]),
             ),
           ),
+          listRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
+          ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
@@ -246,6 +249,9 @@ describe("recording scheduler", () => {
               ]),
             ),
           ),
+          listRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
+          ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
@@ -327,6 +333,9 @@ describe("recording scheduler", () => {
               ]),
             ),
           ),
+          listRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
+          ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
@@ -388,6 +397,9 @@ describe("recording scheduler", () => {
                 ),
               ]),
             ),
+          ),
+          listRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
           ),
           markFailed,
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
@@ -503,6 +515,9 @@ describe("recording scheduler", () => {
           listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
             Promise.resolve(ok([olderJob, newerJob])),
           ),
+          listRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
+          ),
           markFailed,
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
@@ -542,6 +557,92 @@ describe("recording scheduler", () => {
       action: "mark_failed",
       message: "Record job superseded by queued job record-job-2 for asset asset-1.",
       reason: "superseded-by-newer-record-job",
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("cleans up queued jobs when the same asset already has a running record job", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-05T00:00:10.000Z"));
+
+    const enqueue = vi.fn().mockResolvedValueOnce("queue-scheduler-2");
+    const attachQueueJobId = vi.fn(() => Promise.resolve(ok(undefined)));
+    const markFailed = vi.fn(() => Promise.resolve(ok(undefined)));
+    const replaceMetadata = vi.fn(() => Promise.resolve(ok(undefined)));
+    const startRecordContentWorker = vi.fn(() => Promise.resolve());
+
+    const result = await handleRecordingSchedulerJob(
+      {
+        jobId: "recording-scheduler-job-1",
+      },
+      {
+        jobQueue: {
+          enqueue,
+          enqueueAfter: vi.fn(() => Promise.resolve("queue-scheduler-2")),
+        },
+        jobRepository: {
+          attachQueueJobId,
+          createJob: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                id: "next-scheduler-job-1",
+              }),
+            ),
+          ),
+          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+            Promise.resolve(
+              ok([
+                createQueuedRecordJob(
+                  "record-job-1",
+                  "2026-05-05T00:00:00.000Z",
+                  null,
+                  null,
+                ),
+              ]),
+            ),
+          ),
+          listRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set(["asset-1"]))),
+          ),
+          markFailed,
+          markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
+          markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
+          replaceMetadata,
+        } as never,
+        logger: createNoopLogger(),
+        startRecordContentWorker,
+      },
+    );
+
+    expect(result).toEqual(ok(undefined));
+    expect(markFailed).toHaveBeenCalledWith(
+      "record-job-1",
+      "Record job skipped because another record job is already running for asset asset-1.",
+      false,
+    );
+    expect(enqueue).not.toHaveBeenCalledWith(
+      RECORD_CONTENT_JOB_NAME,
+      expect.anything(),
+    );
+    expect(startRecordContentWorker).not.toHaveBeenCalled();
+
+    const cleanupMetadataInput = replaceMetadata.mock.calls[0]?.[1] as
+      | {
+          core?: {
+            cleanup?: {
+              action?: string;
+              message?: string | null;
+              reason?: string;
+            };
+          };
+        }
+      | undefined;
+    expect(cleanupMetadataInput?.core?.cleanup).toMatchObject({
+      action: "mark_failed",
+      message:
+        "Record job skipped because another record job is already running for asset asset-1.",
+      reason: "running-record-job-already-exists",
     });
 
     vi.useRealTimers();
