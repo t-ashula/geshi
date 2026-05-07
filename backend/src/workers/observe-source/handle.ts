@@ -130,6 +130,22 @@ export async function handleObserveSourceJob(
         return observedAssets;
       }
 
+      const queuedOrRunningRecordAssetIdsResult =
+        await dependencies.jobRepository.listQueuedOrRunningRecordContentAssetIds();
+
+      if (!queuedOrRunningRecordAssetIdsResult.ok) {
+        await failObserveSourceJob(
+          payload.jobId,
+          dependencies,
+          logger,
+          queuedOrRunningRecordAssetIdsResult.error,
+        );
+        return queuedOrRunningRecordAssetIdsResult;
+      }
+
+      const queuedOrRunningRecordAssetIds =
+        queuedOrRunningRecordAssetIdsResult.value;
+
       const observedAssetByFingerprint = new Map(
         observedContent.assets.map((asset) => [
           asset.observedFingerprints[0],
@@ -176,6 +192,10 @@ export async function handleObserveSourceJob(
         }
 
         if (nextActionKind === "record") {
+          if (queuedOrRunningRecordAssetIds.has(assetId)) {
+            continue;
+          }
+
           const recordNextAction = observedAsset.nextAction;
 
           if (
@@ -260,6 +280,8 @@ export async function handleObserveSourceJob(
             );
             return recordJob;
           }
+
+          queuedOrRunningRecordAssetIds.add(assetId);
 
           continue;
         }

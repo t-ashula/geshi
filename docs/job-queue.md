@@ -68,7 +68,7 @@ backend と `observe-source` worker は別 process として起動する．
 ローカルでも deploy でも，`observe-source` worker は専用 command で起動する前提にする．
 
 ローカル開発では，個別 command に加えて `npm run worker:start` で
-`acquire-content` と `observe-source` をまとめて起動してよい．
+worker 群をまとめて起動してよい．停止は `npm run worker:stop` を使う．
 
 ### 録画系 worker の提案中の起動像
 

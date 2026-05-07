@@ -1,3 +1,4 @@
+import { sql } from "kysely";
 import type { Kysely, Selectable } from "kysely";
 
 import type { Result } from "../lib/result.js";
@@ -288,6 +289,38 @@ export class JobRepository {
         toRepositoryError(
           error,
           "Failed to list queued jobs without queue job id.",
+        ),
+      );
+    }
+  }
+
+  public async listQueuedOrRunningRecordContentAssetIds(): Promise<
+    Result<Set<string>, JobRepositoryError>
+  > {
+    try {
+      const rows = await this.database
+        .selectFrom("jobs")
+        .select(
+          sql<string | null>`jobs.metadata -> 'core' -> 'payload' -> 'asset' ->> 'id'`.as(
+            "asset_id",
+          ),
+        )
+        .where("kind", "=", "record-content")
+        .where("status", "in", ["queued", "running"])
+        .execute();
+
+      return ok(
+        new Set(
+          rows
+            .map((row) => row.asset_id)
+            .filter((assetId): assetId is string => assetId !== null),
+        ),
+      );
+    } catch (error) {
+      return err(
+        toRepositoryError(
+          error,
+          "Failed to list queued or running record-content asset ids.",
         ),
       );
     }

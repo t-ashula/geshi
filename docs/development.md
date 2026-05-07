@@ -78,18 +78,18 @@ make dev-up
 
 ### 通常の起動
 
-依存サービスを起動した後は，別 terminal でそれぞれ次を起動する．
+依存サービスを起動した後は，PID 管理付きの script でそれぞれ起動する．
 
 backend:
 
 ```sh
-npm run backend:dev
+npm run backend:dev:start
 ```
 
 frontend:
 
 ```sh
-npm run frontend:dev
+npm run frontend:dev:start
 ```
 
 worker:
@@ -100,10 +100,17 @@ npm run worker:start
 
 補足:
 
-- `backend:dev` は API server を watch モードで起動する
-- `frontend:dev` は Vite dev server を起動する
+- PID file は `./.geshi/pid/*.pid` に保存する
+- log file は `./.geshi/logs/*.log` に保存する
+- 停止は `npm run backend:dev:stop` / `npm run frontend:dev:stop` /
+  `npm run worker:stop` を使う
+- `backend:dev` は API server を watch モードで起動する生 command であり，
+  PID 管理を使わず foreground で直接動かしたいときに使う
+- `frontend:dev` は Vite dev server を起動する生 command であり，PID 管理を
+  使わず foreground で直接動かしたいときに使う
 - `worker:start` は `observe-source` / `acquire-content` / `periodic-crawl` /
-  `transcript-split` / `transcript-chunk` worker をまとめて起動する
+  `recording-scheduler` / `transcript-split` / `transcript-chunk` worker を
+  まとめて起動する
 
 ### transcript 動作確認用 audio
 

@@ -144,6 +144,9 @@ describe("observe to record arguments handoff", () => {
         } as never,
         jobRepository: {
           createJob,
+          listQueuedOrRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
+          ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,

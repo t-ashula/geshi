@@ -114,6 +114,9 @@ describe("observe-source record branching", () => {
         } as never,
         jobRepository: {
           createJob,
+          listQueuedOrRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
+          ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
@@ -268,6 +271,116 @@ describe("observe-source record branching", () => {
         } as never,
         jobRepository: {
           createJob,
+          listQueuedOrRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
+          ),
+          markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
+          markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
+        } as never,
+        logger: createNoopLogger(),
+        sourceCollectorRegistry: {
+          get: vi.fn(() => ({
+            observe,
+          })),
+        } as never,
+      },
+    );
+
+    expect(result).toEqual(ok(undefined));
+    expect(createJob).not.toHaveBeenCalled();
+  });
+
+  it("does not create a duplicate record-content job for an asset that already has one queued or running", async () => {
+    const observe = vi.fn(() =>
+      Promise.resolve({
+        contents: [
+          {
+            assets: [
+              {
+                kind: "audio",
+                nextAction: {
+                  actionKind: "record" as const,
+                  arguments: {
+                    playlistUrl: "http://localhost:3401/streams/live-1.m3u8",
+                  },
+                  scheduledStartAt: new Date("2026-05-05T00:00:00.000Z"),
+                },
+                observedFingerprints: ["stream-observed:1"],
+                primary: true,
+                sourceUrl: "http://localhost:3401/streams/live-1.m3u8",
+              },
+            ],
+            contentFingerprints: ["content:1"],
+            externalId: "live-1",
+            kind: "stream-recording",
+            publishedAt: null,
+            status: "discovered" as const,
+            summary: "fixture stream",
+            title: "Live 1",
+          },
+        ],
+      }),
+    );
+    const createJob = vi.fn();
+
+    const result = await handleObserveSourceJob(
+      {
+        collector: {
+          config: {},
+          pluginSlug: "streaming-plugin-example",
+          settingId: "collector-setting-1",
+          settingSnapshotId: "collector-setting-snapshot-1",
+        },
+        jobId: "observe-job-1",
+        source: {
+          id: "source-1",
+          kind: "streaming",
+          slug: "stream-1",
+          url: "http://localhost:3401/sources/streams/live-1",
+        },
+      },
+      {
+        assetService: {
+          createObservedAssets: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                assetIdsRequiringAcquire: ["asset-1"],
+              }),
+            ),
+          ),
+          findAcquireTargetById: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                id: "asset-1",
+                observedFingerprint: "stream-observed:1",
+              }),
+            ),
+          ),
+        } as never,
+        collectorPluginStateRepository: {
+          findLatestStateByCollectorSettingId: vi.fn(() =>
+            Promise.resolve(ok(undefined)),
+          ),
+          saveState: vi.fn(() => Promise.resolve(ok(undefined))),
+        } as never,
+        contentService: {
+          createObservedContent: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                fingerprintChanged: true,
+                id: "content-1",
+              }),
+            ),
+          ),
+        } as never,
+        jobQueue: {
+          enqueue: vi.fn(),
+        } as never,
+        jobRepository: {
+          createJob,
+          listQueuedOrRunningRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set(["asset-1"]))),
+          ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
