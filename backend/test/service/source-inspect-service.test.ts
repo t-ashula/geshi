@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { createNoopLogger } from "../../src/logger/index.js";
 import { createSourceInspectService } from "../../src/service/source-inspect-service.js";
 import { assertErr, assertOk } from "../support/result.js";
 
@@ -14,6 +15,7 @@ const createRegistryPlugin = () => ({
 describe("source inspect service", () => {
   it("rejects invalid source urls before hitting the plugin", async () => {
     const service = createSourceInspectService({
+      logger: createNoopLogger(),
       sourceCollectorRegistry: {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
@@ -42,6 +44,7 @@ describe("source inspect service", () => {
       url: "https://example.com/shows/example-feed",
     });
     const service = createSourceInspectService({
+      logger: createNoopLogger(),
       sourceCollectorRegistry: {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
@@ -76,6 +79,7 @@ describe("source inspect service", () => {
       message: "upstream failed",
     });
     const service = createSourceInspectService({
+      logger: createNoopLogger(),
       sourceCollectorRegistry: {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),
@@ -99,6 +103,7 @@ describe("source inspect service", () => {
   it("returns unknown plugin failures as results", async () => {
     inspectMock.mockRejectedValueOnce(new Error("boom"));
     const service = createSourceInspectService({
+      logger: createNoopLogger(),
       sourceCollectorRegistry: {
         get: vi.fn(() => ({
           ...createRegistryPlugin(),

@@ -400,17 +400,31 @@ describe("recording scheduler", () => {
     );
 
     expect(result).toEqual(ok(undefined));
-    expect(replaceMetadata).toHaveBeenCalledWith(
-      "record-job-1",
-      expect.objectContaining({
-        core: expect.objectContaining({
-          cleanup: expect.objectContaining({
-            action: "mark_non_actionable",
-            message: "radiko recording window already closed.",
-            reason: "missed-recording-window",
-          }),
-        }),
-      }),
+    const firstReplaceMetadataCall = replaceMetadata.mock.calls[0] as
+      | unknown[]
+      | undefined;
+    const replaceMetadataJobId = firstReplaceMetadataCall?.[0];
+    const replaceMetadataInput = firstReplaceMetadataCall?.[1] as
+      | {
+          core?: {
+            cleanup?: {
+              action?: string;
+              cleanedUpAt?: string;
+              message?: string | null;
+              reason?: string;
+            };
+          };
+        }
+      | undefined;
+
+    expect(replaceMetadataJobId).toBe("record-job-1");
+    expect(replaceMetadataInput?.core?.cleanup).toMatchObject({
+      action: "mark_non_actionable",
+      message: "radiko recording window already closed.",
+      reason: "missed-recording-window",
+    });
+    expect(typeof replaceMetadataInput?.core?.cleanup?.cleanedUpAt).toBe(
+      "string",
     );
     expect(markFailed).toHaveBeenCalledWith(
       "record-job-1",
