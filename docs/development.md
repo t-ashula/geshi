@@ -104,6 +104,9 @@ npm run worker:start
 - log file は `./.geshi/logs/*.log` に保存する
 - 停止は `npm run backend:dev:stop` / `npm run frontend:dev:stop` /
   `npm run worker:stop` を使う
+- `backend:dev:start` は PID 管理付きの background 起動であり，watch はしない
+- `frontend:dev:start` は PID 管理付きの background 起動であり，port が埋まって
+  いるときは別 port へ逃がさず失敗する
 - `backend:dev` は API server を watch モードで起動する生 command であり，
   PID 管理を使わず foreground で直接動かしたいときに使う
 - `frontend:dev` は Vite dev server を起動する生 command であり，PID 管理を

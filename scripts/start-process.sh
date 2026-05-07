@@ -29,7 +29,7 @@ if [ -f "$pid_file" ]; then
   rm -f "$pid_file"
 fi
 
-nohup "$@" >"$log_file" 2>&1 &
+setsid "$@" >"$log_file" 2>&1 &
 pid="$!"
 printf '%s\n' "$pid" >"$pid_file"
 

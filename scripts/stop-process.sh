@@ -46,7 +46,7 @@ if [ -n "$expected_fragment" ]; then
   esac
 fi
 
-kill "$pid" 2>/dev/null || true
+kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
 
 attempt=0
 while kill -0 "$pid" 2>/dev/null; do
@@ -60,7 +60,7 @@ while kill -0 "$pid" 2>/dev/null; do
 done
 
 if kill -0 "$pid" 2>/dev/null; then
-  kill -KILL "$pid" 2>/dev/null || true
+  kill -KILL -- "-$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
 fi
 
 attempt=0

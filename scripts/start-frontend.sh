@@ -11,4 +11,5 @@ sh "$root_dir/scripts/start-process.sh" \
   "$root_dir/node_modules/.bin/vite" \
   --config "$root_dir/frontend/vite.config.ts" \
   --host "$frontend_host" \
-  --port "$frontend_port"
+  --port "$frontend_port" \
+  --strictPort
