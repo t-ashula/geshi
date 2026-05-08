@@ -51,4 +51,6 @@
 - [ADR-0048: 録画系 acquire は専用 job orchestration と複数 worker 前提で扱う](./0048-recording-job-orchestration.md)
 - [ADR-0049: 録画系 test 用 source は HLS 風 fake server で再現する](./0049-recording-fixture-source-server.md)
 - [ADR-0050: plugin と job の一般インタフェースとして next-action arguments と共通実行 context を定義する](./0050-plugin-and-job-shared-interface.md)
+- [ADR-0051: observed asset と record job cleanup は next-action policy で期限と非 action 理由を表現する](./0051-observed-asset-non-actionable-policy.md)
 - [ADR-0052: `acquire` / `record` の artifact 受け渡しは `body` か `work storage key` の排他的 union にする](./0052-record-work-storage-handoff.md)
+- [ADR-0053: observed asset からの後続 job 作成は「要 action 判定」と「job instance 作成判定」を分離する](./0053-follow-up-job-creation-from-observed-assets.md)
