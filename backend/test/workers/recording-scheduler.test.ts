@@ -542,7 +542,10 @@ describe("recording scheduler", () => {
     );
     expect(startRecordContentWorker).toHaveBeenCalledTimes(1);
 
-    const cleanupMetadataInput = replaceMetadata.mock.calls[0]?.[1] as
+    const replaceMetadataCalls = replaceMetadata.mock.calls as unknown as Array<
+      [string, Record<string, unknown>]
+    >;
+    const cleanupMetadataInput = replaceMetadataCalls[0]?.[1] as
       | {
           core?: {
             cleanup?: {
@@ -555,7 +558,8 @@ describe("recording scheduler", () => {
       | undefined;
     expect(cleanupMetadataInput?.core?.cleanup).toMatchObject({
       action: "mark_failed",
-      message: "Record job superseded by queued job record-job-2 for asset asset-1.",
+      message:
+        "Record job superseded by queued job record-job-2 for asset asset-1.",
       reason: "superseded-by-newer-record-job",
     });
 
@@ -627,7 +631,10 @@ describe("recording scheduler", () => {
     );
     expect(startRecordContentWorker).not.toHaveBeenCalled();
 
-    const cleanupMetadataInput = replaceMetadata.mock.calls[0]?.[1] as
+    const replaceMetadataCalls = replaceMetadata.mock.calls as unknown as Array<
+      [string, Record<string, unknown>]
+    >;
+    const cleanupMetadataInput = replaceMetadataCalls[0]?.[1] as
       | {
           core?: {
             cleanup?: {
