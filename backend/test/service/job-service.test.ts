@@ -38,9 +38,9 @@ describe("job service", () => {
       id: "job-uuid-1",
       kind: "observe-source",
       metadata: {},
+      payload: {},
       queueJobId: null,
       retryable: true,
-      sourceId: "source-1",
       startedAt: null,
       status: "queued",
     } satisfies JobListItem;
@@ -69,8 +69,22 @@ describe("job service", () => {
     expect(createJob).toHaveBeenCalledWith({
       id: "job-uuid-1",
       kind: "observe-source",
+      payload: {
+        collector: {
+          config: { category: "news" },
+          pluginSlug: "podcast-rss",
+          settingId: "collector-1",
+          settingSnapshotId: "snapshot-1",
+        },
+        jobId: "job-uuid-1",
+        source: {
+          id: "source-1",
+          kind: "podcast",
+          slug: "example-feed",
+          url: "https://example.com/feed.xml",
+        },
+      },
       retryable: true,
-      sourceId: "source-1",
     });
     expect(enqueue).toHaveBeenCalledWith(OBSERVE_SOURCE_JOB_NAME, {
       collector: {
@@ -112,9 +126,9 @@ describe("job service", () => {
             id: "job-uuid-1",
             kind: "observe-source",
             metadata: {},
+            payload: {},
             queueJobId: null,
             retryable: true,
-            sourceId: "source-1",
             startedAt: null,
             status: "queued",
           } satisfies JobListItem),
@@ -253,9 +267,9 @@ describe("job service", () => {
               id: "job-uuid-1",
               kind: "observe-source",
               metadata: {},
+              payload: {},
               queueJobId: null,
               retryable: true,
-              sourceId: "source-1",
               startedAt: null,
               status: "queued",
             } satisfies JobListItem),
@@ -306,9 +320,9 @@ describe("job service", () => {
       id: "job-1",
       kind: "observe-source",
       metadata: {},
+      payload: {},
       queueJobId: "queue-1",
       retryable: true,
-      sourceId: "source-1",
       startedAt: null,
       status: "queued",
     } satisfies JobListItem;

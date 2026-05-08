@@ -143,35 +143,6 @@ describe("observe-source record branching", () => {
             reason: "missed-recording-window",
           },
           latestRunnableAt: "2026-05-05T01:00:00.000Z",
-          payload: {
-            asset: {
-              id: "asset-1",
-              kind: "audio",
-              observedFingerprint: "stream-observed:1",
-              primary: true,
-              sourceUrl: "http://localhost:3401/streams/live-1.m3u8",
-            },
-            collector: {
-              config: {},
-              pluginSlug: "streaming-plugin-example",
-              settingId: "collector-setting-1",
-              settingSnapshotId: "collector-setting-snapshot-1",
-            },
-            content: {
-              externalId: "live-1",
-              id: "content-1",
-              kind: "stream-recording",
-              publishedAt: null,
-              status: "discovered",
-              summary: "fixture stream",
-              title: "Live 1",
-            },
-            jobId: "record-job-1",
-            source: {
-              id: "source-1",
-              slug: "stream-1",
-            },
-          },
           scheduledStartAt: "2026-05-05T00:00:00.000Z",
         },
         plugin: {
@@ -180,8 +151,36 @@ describe("observe-source record branching", () => {
           },
         },
       },
+      payload: {
+        asset: {
+          id: "asset-1",
+          kind: "audio",
+          observedFingerprint: "stream-observed:1",
+          primary: true,
+          sourceUrl: "http://localhost:3401/streams/live-1.m3u8",
+        },
+        collector: {
+          config: {},
+          pluginSlug: "streaming-plugin-example",
+          settingId: "collector-setting-1",
+          settingSnapshotId: "collector-setting-snapshot-1",
+        },
+        content: {
+          externalId: "live-1",
+          id: "content-1",
+          kind: "stream-recording",
+          publishedAt: null,
+          status: "discovered",
+          summary: "fixture stream",
+          title: "Live 1",
+        },
+        jobId: "record-job-1",
+        source: {
+          id: "source-1",
+          slug: "stream-1",
+        },
+      },
       retryable: true,
-      sourceId: "source-1",
     });
     expect(enqueue).not.toHaveBeenCalled();
   });

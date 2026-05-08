@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { RecordContentJobPayload } from "../../src/job-queue/types.js";
 import {
   RECORD_CONTENT_JOB_NAME,
   RECORDING_SCHEDULER_JOB_NAME,
@@ -38,38 +39,10 @@ describe("recording scheduler", () => {
           reason: "already-ended" | "missed-recording-window";
         } | null;
         latestRunnableAt: string | null;
-        payload: {
-          asset: {
-            id: string;
-            kind: string;
-            observedFingerprint: string;
-            primary: boolean;
-            sourceUrl: string;
-          };
-          collector: {
-            config: Record<string, never>;
-            pluginSlug: string;
-            settingId: string;
-            settingSnapshotId: string;
-          };
-          content: {
-            externalId: string;
-            id: string;
-            kind: string;
-            publishedAt: null;
-            status: string;
-            summary: string;
-            title: string;
-          };
-          jobId: string;
-          source: {
-            id: string;
-            slug: string;
-          };
-        };
         scheduledStartAt: string | null;
       };
     };
+    payload: RecordContentJobPayload;
   } {
     return {
       createdAt: new Date("2026-05-05T00:00:00.000Z"),
@@ -79,36 +52,36 @@ describe("recording scheduler", () => {
         core: {
           expirationPolicy,
           latestRunnableAt,
-          payload: {
-            asset: {
-              id: "asset-1",
-              kind: "audio",
-              observedFingerprint: "stream-observed:1",
-              primary: true,
-              sourceUrl: "http://localhost:3401/streams/live-1",
-            },
-            collector: {
-              config: {},
-              pluginSlug: "streaming-plugin-example",
-              settingId: "collector-setting-1",
-              settingSnapshotId: "collector-setting-snapshot-1",
-            },
-            content: {
-              externalId: "live-1",
-              id: "content-1",
-              kind: "stream-recording",
-              publishedAt: null,
-              status: "discovered",
-              summary: "fixture stream",
-              title: "Live 1",
-            },
-            jobId: id,
-            source: {
-              id: "source-1",
-              slug: "stream-1",
-            },
-          },
           scheduledStartAt,
+        },
+      },
+      payload: {
+        asset: {
+          id: "asset-1",
+          kind: "audio",
+          observedFingerprint: "stream-observed:1",
+          primary: true,
+          sourceUrl: "http://localhost:3401/streams/live-1",
+        },
+        collector: {
+          config: {},
+          pluginSlug: "streaming-plugin-example",
+          settingId: "collector-setting-1",
+          settingSnapshotId: "collector-setting-snapshot-1",
+        },
+        content: {
+          externalId: "live-1",
+          id: "content-1",
+          kind: "stream-recording",
+          publishedAt: null,
+          status: "discovered",
+          summary: "fixture stream",
+          title: "Live 1",
+        },
+        jobId: id,
+        source: {
+          id: "source-1",
+          slug: "stream-1",
         },
       },
     };
@@ -200,8 +173,10 @@ describe("recording scheduler", () => {
     expect(createJob).toHaveBeenCalledWith({
       id: "next-scheduler-job-1",
       kind: RECORDING_SCHEDULER_JOB_NAME,
+      payload: {
+        jobId: "next-scheduler-job-1",
+      },
       retryable: true,
-      sourceId: null,
     });
     expect(attachQueueJobId).toHaveBeenCalledTimes(2);
     expect(startRecordContentWorker).toHaveBeenCalledTimes(1);
@@ -480,17 +455,17 @@ describe("recording scheduler", () => {
         core: {
           expirationPolicy: null,
           latestRunnableAt: null,
-          payload: {
-            ...createQueuedRecordJob(
-              "record-job-2",
-              "2026-05-05T00:00:00.000Z",
-              null,
-              null,
-            ).metadata.core.payload,
-            jobId: "record-job-2",
-          },
           scheduledStartAt: "2026-05-05T00:00:00.000Z",
         },
+      },
+      payload: {
+        ...createQueuedRecordJob(
+          "record-job-2",
+          "2026-05-05T00:00:00.000Z",
+          null,
+          null,
+        ).payload,
+        jobId: "record-job-2",
       },
     };
 

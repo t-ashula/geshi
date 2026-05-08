@@ -259,7 +259,6 @@ export async function handleObserveSourceJob(
                       },
                 latestRunnableAt:
                   recordNextAction.latestRunnableAt?.toISOString() ?? null,
-                payload: recordPayload,
                 scheduledStartAt:
                   recordNextAction.scheduledStartAt?.toISOString() ?? null,
               },
@@ -267,8 +266,8 @@ export async function handleObserveSourceJob(
                 arguments: recordNextAction.arguments ?? {},
               },
             },
+            payload: recordPayload,
             retryable: true,
-            sourceId: payload.source.id,
           });
 
           if (!recordJob.ok) {
@@ -286,11 +285,41 @@ export async function handleObserveSourceJob(
           continue;
         }
 
+        const acquireJobId = uuidv7();
+        const acquirePayload = {
+          asset: {
+            id: assetId,
+            kind: observedAsset.kind,
+            observedFingerprint: persistedAsset.value.observedFingerprint,
+            primary: observedAsset.primary,
+            sourceUrl: observedAsset.sourceUrl,
+          },
+          collector: {
+            config: payload.collector.config,
+            pluginSlug: payload.collector.pluginSlug,
+            settingId: payload.collector.settingId,
+            settingSnapshotId: payload.collector.settingSnapshotId,
+          },
+          content: {
+            externalId: observedContent.externalId,
+            id: storedContent.value.id,
+            kind: observedContent.kind,
+            publishedAt: observedContent.publishedAt,
+            status: observedContent.status,
+            summary: observedContent.summary,
+            title: observedContent.title,
+          },
+          jobId: acquireJobId,
+          source: {
+            id: payload.source.id,
+            slug: payload.source.slug,
+          },
+        };
         const acquireJob = await dependencies.jobRepository.createJob({
-          id: uuidv7(),
+          id: acquireJobId,
           kind: ACQUIRE_CONTENT_JOB_NAME,
+          payload: acquirePayload,
           retryable: true,
-          sourceId: payload.source.id,
         });
         if (!acquireJob.ok) {
           await failObserveSourceJob(
@@ -303,35 +332,7 @@ export async function handleObserveSourceJob(
         }
         const queueJobId = await dependencies.jobQueue.enqueue(
           ACQUIRE_CONTENT_JOB_NAME,
-          {
-            asset: {
-              id: assetId,
-              kind: observedAsset.kind,
-              observedFingerprint: persistedAsset.value.observedFingerprint,
-              primary: observedAsset.primary,
-              sourceUrl: observedAsset.sourceUrl,
-            },
-            collector: {
-              config: payload.collector.config,
-              pluginSlug: payload.collector.pluginSlug,
-              settingId: payload.collector.settingId,
-              settingSnapshotId: payload.collector.settingSnapshotId,
-            },
-            content: {
-              externalId: observedContent.externalId,
-              id: storedContent.value.id,
-              kind: observedContent.kind,
-              publishedAt: observedContent.publishedAt,
-              status: observedContent.status,
-              summary: observedContent.summary,
-              title: observedContent.title,
-            },
-            jobId: acquireJob.value.id,
-            source: {
-              id: payload.source.id,
-              slug: payload.source.slug,
-            },
-          },
+          acquirePayload,
         );
 
         const attachQueueJobIdResult =

@@ -88,11 +88,13 @@ async function seedRecordingSchedulerJob(
     return;
   }
 
+  const jobId = uuidv7();
+  const queuePayload = { jobId };
   const job = await currentJobRepository.createJob({
-    id: uuidv7(),
+    id: jobId,
     kind: RECORDING_SCHEDULER_JOB_NAME,
+    payload: queuePayload,
     retryable: true,
-    sourceId: null,
   });
 
   if (!job.ok) {
@@ -101,9 +103,7 @@ async function seedRecordingSchedulerJob(
 
   const queueJobId = await currentJobQueue.enqueue(
     RECORDING_SCHEDULER_JOB_NAME,
-    {
-      jobId: job.value.id,
-    },
+    queuePayload,
   );
 
   const attachQueueJobIdResult = await currentJobRepository.attachQueueJobId(

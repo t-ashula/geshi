@@ -174,11 +174,13 @@ async function scheduleNextPeriodicCrawlJob(
   settings: PeriodicCrawlAppSettings,
   dependencies: HandlePeriodicCrawlJobDependencies,
 ): Promise<Result<{ nextStartAt: Date }, Error>> {
+  const nextJobId = uuidv7();
+  const queuePayload = { jobId: nextJobId };
   const nextJob = await dependencies.jobRepository.createJob({
-    id: uuidv7(),
+    id: nextJobId,
     kind: PERIODIC_CRAWL_JOB_NAME,
+    payload: queuePayload,
     retryable: true,
-    sourceId: null,
   });
 
   if (!nextJob.ok) {
@@ -190,7 +192,7 @@ async function scheduleNextPeriodicCrawlJob(
   );
   const queueJobId = await dependencies.jobQueue.enqueueAfter(
     PERIODIC_CRAWL_JOB_NAME,
-    { jobId: nextJob.value.id },
+    queuePayload,
     nextStartAt,
   );
   const attachQueueJobIdResult =

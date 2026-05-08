@@ -20,12 +20,14 @@ describe("observe to record arguments handoff", () => {
       | {
           id: string;
           metadata: unknown;
+          payload: Parameters<typeof handleRecordContentJob>[0];
         }
       | undefined;
     let recordedArguments: SourceCollectorRecordInput["arguments"] | undefined;
     type CreatedJobInput = {
       id: string;
       metadata: unknown;
+      payload: Parameters<typeof handleRecordContentJob>[0];
     };
 
     const observePlugin = {
@@ -84,6 +86,7 @@ describe("observe to record arguments handoff", () => {
       createdRecordJob = {
         id: input.id,
         metadata: input.metadata,
+        payload: input.payload,
       };
 
       return Promise.resolve(ok({ id: input.id }));
@@ -165,13 +168,7 @@ describe("observe to record arguments handoff", () => {
         arguments?: SourceCollectorRecordInput["arguments"];
       };
     };
-    const recordPayload = (
-      createdRecordJob?.metadata as {
-        core?: {
-          payload?: Parameters<typeof handleRecordContentJob>[0];
-        };
-      }
-    ).core?.payload;
+    const recordPayload = createdRecordJob?.payload;
 
     expect(recordMetadata.plugin?.arguments).toEqual({
       durationSeconds: 15,

@@ -109,7 +109,7 @@ export async function handleRecordingSchedulerJob(
       continue;
     }
 
-    const queuePayload = readRecordContentPayload(job.metadata);
+    const queuePayload = readRecordContentPayload(job.payload);
 
     if (queuePayload === null) {
       continue;
@@ -151,11 +151,13 @@ export async function handleRecordingSchedulerJob(
     enqueuedCount += 1;
   }
 
+  const nextJobId = uuidv7();
+  const nextPayload = { jobId: nextJobId };
   const nextJob = await dependencies.jobRepository.createJob({
-    id: uuidv7(),
+    id: nextJobId,
     kind: RECORDING_SCHEDULER_JOB_NAME,
+    payload: nextPayload,
     retryable: true,
-    sourceId: null,
   });
 
   if (!nextJob.ok) {
@@ -165,7 +167,7 @@ export async function handleRecordingSchedulerJob(
   const nextStartAt = new Date(Date.now() + RECORDING_SCHEDULER_INTERVAL_MS);
   const queueJobId = await dependencies.jobQueue.enqueueAfter(
     RECORDING_SCHEDULER_JOB_NAME,
-    { jobId: nextJob.value.id },
+    nextPayload,
     nextStartAt,
   );
   const attachQueueJobIdResult =
@@ -200,6 +202,7 @@ async function cleanupSupersededRecordJobs(
     createdAt: Date;
     id: string;
     metadata: Record<string, unknown>;
+    payload: Record<string, unknown>;
   }>,
   dependencies: HandleRecordingSchedulerJobDependencies,
   logger: Logger,
@@ -209,6 +212,7 @@ async function cleanupSupersededRecordJobs(
       createdAt: Date;
       id: string;
       metadata: Record<string, unknown>;
+      payload: Record<string, unknown>;
     }>,
     Error
   >
@@ -219,11 +223,12 @@ async function cleanupSupersededRecordJobs(
       createdAt: Date;
       id: string;
       metadata: Record<string, unknown>;
+      payload: Record<string, unknown>;
     }
   >();
 
   for (const job of jobs) {
-    const queuePayload = readRecordContentPayload(job.metadata);
+    const queuePayload = readRecordContentPayload(job.payload);
     const assetId = queuePayload?.asset.id;
 
     if (assetId === undefined) {
@@ -243,7 +248,7 @@ async function cleanupSupersededRecordJobs(
   const dedupedJobs = [];
 
   for (const job of jobs) {
-    const queuePayload = readRecordContentPayload(job.metadata);
+    const queuePayload = readRecordContentPayload(job.payload);
     const assetId = queuePayload?.asset.id;
 
     if (assetId === undefined) {
@@ -503,20 +508,8 @@ async function cleanupSupersededRecordJob(
 }
 
 function readRecordContentPayload(
-  metadata: Record<string, unknown>,
+  payload: Record<string, unknown>,
 ): RecordContentJobPayload | null {
-  const coreMetadata = metadata.core;
-
-  if (
-    typeof coreMetadata !== "object" ||
-    coreMetadata === null ||
-    Array.isArray(coreMetadata)
-  ) {
-    return null;
-  }
-
-  const payload = (coreMetadata as Record<string, unknown>).payload;
-
   if (
     typeof payload !== "object" ||
     payload === null ||

@@ -1,5 +1,5 @@
-import { sql } from "kysely";
 import type { Kysely, Selectable } from "kysely";
+import { sql } from "kysely";
 
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
@@ -9,8 +9,8 @@ export type CreateJobInput = {
   id: string;
   kind: string;
   metadata?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
   retryable: boolean;
-  sourceId: string | null;
 };
 
 export type JobListItem = {
@@ -21,9 +21,9 @@ export type JobListItem = {
   id: string;
   kind: string;
   metadata: Record<string, unknown>;
+  payload: Record<string, unknown>;
   queueJobId: string | null;
   retryable: boolean;
-  sourceId: string | null;
   startedAt: Date | null;
   status: "queued" | "running" | "succeeded" | "failed";
 };
@@ -48,8 +48,8 @@ export class JobRepository {
           id: input.id,
           kind: input.kind,
           metadata: input.metadata ?? {},
+          payload: input.payload ?? {},
           retryable: input.retryable,
-          source_id: input.sourceId,
           status: "queued",
         })
         .returningAll()
@@ -196,10 +196,11 @@ export class JobRepository {
     try {
       const jobs = await this.database
         .selectFrom("jobs")
-        .select(["source_id"])
+        .select(
+          sql<string | null>`jobs.payload -> 'source' ->> 'id'`.as("source_id"),
+        )
         .where("kind", "=", "observe-source")
         .where("status", "in", ["queued", "running"])
-        .where("source_id", "is not", null)
         .execute();
 
       return ok(
@@ -229,10 +230,16 @@ export class JobRepository {
     try {
       const jobs = await this.database
         .selectFrom("jobs")
-        .select(["created_at", "source_id"])
+        .select([
+          "created_at",
+          sql<string | null>`jobs.payload -> 'source' ->> 'id'`.as("source_id"),
+        ])
         .where("kind", "=", "observe-source")
-        .where("source_id", "in", sourceIds)
-        .orderBy("source_id", "asc")
+        .where(
+          sql<string | null>`jobs.payload -> 'source' ->> 'id'`,
+          "in",
+          sourceIds,
+        )
         .orderBy("created_at", "desc")
         .execute();
       const latestJobsBySourceId = new Map<string, LatestObserveJob>();
@@ -313,9 +320,7 @@ export class JobRepository {
       const rows = await this.database
         .selectFrom("jobs")
         .select(
-          sql<string | null>`jobs.metadata -> 'core' -> 'payload' -> 'asset' ->> 'id'`.as(
-            "asset_id",
-          ),
+          sql<string | null>`jobs.payload -> 'asset' ->> 'id'`.as("asset_id"),
         )
         .where("kind", "=", "record-content")
         .where("status", "in", statuses)
@@ -348,9 +353,9 @@ function toJobListItem(job: Selectable<JobTable>): JobListItem {
     id: job.id,
     kind: job.kind,
     metadata: job.metadata,
+    payload: job.payload,
     queueJobId: job.queue_job_id,
     retryable: job.retryable,
-    sourceId: job.source_id,
     startedAt: job.started_at,
     status: job.status,
   };

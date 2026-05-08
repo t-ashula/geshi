@@ -145,9 +145,9 @@ export type JobTable = {
   id: string;
   kind: string;
   metadata: JsonColumn;
+  payload: JsonColumn;
   queue_job_id: string | null;
   retryable: GeneratedBooleanColumn;
-  source_id: string | null;
   started_at: NullableTimestampColumn;
   status: "queued" | "running" | "succeeded" | "failed";
 };

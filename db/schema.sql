@@ -124,8 +124,8 @@ create table asset_snapshots (
 create table jobs (
     id uuid primary key,
     kind varchar(128) not null,
-    source_id uuid references sources (id),
     queue_job_id text unique,
+    payload jsonb not null default '{}'::jsonb,
     metadata jsonb not null default '{}'::jsonb,
     status text not null constraint jobs_status_check check (
         status = any(
@@ -228,8 +228,6 @@ create index if not exists assets_content_id_observed_fingerprint_idx on assets 
 );
 
 create index if not exists asset_snapshots_asset_id_version_idx on asset_snapshots (asset_id, version desc);
-
-create index if not exists jobs_source_id_created_at_idx on jobs (source_id, created_at desc);
 
 create index if not exists transcripts_content_id_created_at_idx on transcripts (
     content_id,

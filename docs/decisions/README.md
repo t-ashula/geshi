@@ -53,4 +53,5 @@
 - [ADR-0050: plugin と job の一般インタフェースとして next-action arguments と共通実行 context を定義する](./0050-plugin-and-job-shared-interface.md)
 - [ADR-0051: observed asset と record job cleanup は next-action policy で期限と非 action 理由を表現する](./0051-observed-asset-non-actionable-policy.md)
 - [ADR-0052: `acquire` / `record` の artifact 受け渡しは `body` か `work storage key` の排他的 union にする](./0052-record-work-storage-handoff.md)
-- [ADR-0053: observed asset からの後続 job 作成は「要 action 判定」と「job instance 作成判定」を分離する](./0053-follow-up-job-creation-from-observed-assets.md)
+- [ADR-0053: 同じ asset に対する同種 job の重複生成を許容する条件を明示する](./0053-follow-up-job-creation-from-observed-assets.md)
+- [ADR-0054: job の実行入力は `jobs.payload` に保持する](./0054-job-payload-owned-by-job-row.md)
