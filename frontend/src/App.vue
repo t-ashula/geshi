@@ -50,9 +50,11 @@ const isSourceCrawlSubmitting = ref<string | null>(null);
 const isSettingsSubmitting = ref(false);
 const isSourcesLoading = ref(true);
 const isContentsLoading = ref(true);
+const isContentActionsExpanded = ref(false);
 const isDetailLoading = ref(false);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
+const isSourceSettingsExpanded = ref(false);
 const errorMessage = ref<string | null>(null);
 const detailErrorMessage = ref<string | null>(null);
 const inspectErrorMessage = ref<string | null>(null);
@@ -78,6 +80,7 @@ const sourceCrawlForm = ref<PeriodicCrawlSettings>({
   enabled: false,
   intervalMinutes: 60,
 });
+const theme = ref<"light" | "dark">("light");
 
 const selectedSourceSlug = computed(() => {
   switch (routeState.value.kind) {
@@ -101,13 +104,14 @@ const selectedContentId = computed(() =>
 );
 
 const visibleContents = computed(() => {
-  if (selectedSource.value === null) {
-    return contents.value;
-  }
+  const filteredContents =
+    selectedSource.value === null
+      ? contents.value
+      : contents.value.filter(
+          (content) => content.sourceId === selectedSource.value?.id,
+        );
 
-  return contents.value.filter(
-    (content) => content.sourceId === selectedSource.value?.id,
-  );
+  return [...filteredContents].sort(compareContentListItems);
 });
 
 const routeHeadline = computed(() => {
@@ -125,6 +129,9 @@ const routeHeadline = computed(() => {
 watch(
   selectedSource,
   (source) => {
+    isSourceSettingsExpanded.value = false;
+    isContentActionsExpanded.value = false;
+
     if (source === null) {
       return;
     }
@@ -138,11 +145,18 @@ watch(
   { immediate: true },
 );
 
+watch(theme, (currentTheme) => {
+  document.documentElement.dataset.theme = currentTheme;
+  window.localStorage.setItem("geshi-theme", currentTheme);
+});
+
 onMounted(async () => {
   if (window.location.pathname === "/") {
     replaceLocation("/browse");
     routeState.value = normalizeRoute("/browse");
   }
+
+  theme.value = readInitialTheme();
 
   window.addEventListener("popstate", syncRouteFromLocation);
 
@@ -191,6 +205,23 @@ function closeCreateForm(): void {
   inspectErrorMessage.value = null;
   lastInspectedUrl.value = null;
   validationMessage.value = null;
+}
+
+function toggleTheme(): void {
+  theme.value = theme.value === "dark" ? "light" : "dark";
+}
+
+function toggleSourceSettings(): void {
+  isSourceSettingsExpanded.value = !isSourceSettingsExpanded.value;
+  closeContentActions();
+}
+
+function toggleContentActions(): void {
+  isContentActionsExpanded.value = !isContentActionsExpanded.value;
+}
+
+function closeContentActions(): void {
+  isContentActionsExpanded.value = false;
 }
 
 async function inspectCurrentSource(): Promise<void> {
@@ -270,6 +301,7 @@ async function submitSource(): Promise<void> {
 async function runObserve(sourceId: string): Promise<void> {
   isObserveSubmitting.value = sourceId;
   observeErrorMessage.value = null;
+  closeContentActions();
 
   try {
     await observeSource(sourceId);
@@ -373,6 +405,7 @@ async function refreshSourceCollectorPlugins(): Promise<void> {
 
 async function refreshContents(): Promise<void> {
   isContentsLoading.value = true;
+  closeContentActions();
 
   try {
     contents.value = await listContents();
@@ -514,6 +547,63 @@ function isContentSelected(content: ContentListItem): boolean {
   return selectedContentId.value === content.id;
 }
 
+function compareContentListItems(
+  left: ContentListItem,
+  right: ContentListItem,
+): number {
+  const statusDifference =
+    contentStatusRank(left.status) - contentStatusRank(right.status);
+
+  if (statusDifference !== 0) {
+    return statusDifference;
+  }
+
+  const publishedAtDifference =
+    new Date(right.publishedAt ?? 0).getTime() -
+    new Date(left.publishedAt ?? 0).getTime();
+
+  if (publishedAtDifference !== 0) {
+    return publishedAtDifference;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
+function contentStatusRank(status: ContentListItem["status"]): number {
+  switch (status) {
+    case "stored": {
+      return 0;
+    }
+    case "failed": {
+      return 1;
+    }
+    case "discovered": {
+      return 2;
+    }
+  }
+}
+
+function readInitialTheme(): "light" | "dark" {
+  const storedTheme = window.localStorage.getItem("geshi-theme");
+
+  if (storedTheme === "light" || storedTheme === "dark") {
+    document.documentElement.dataset.theme = storedTheme;
+    return storedTheme;
+  }
+
+  const initialTheme = "dark";
+  document.documentElement.dataset.theme = initialTheme;
+  return initialTheme;
+}
+
+function sourceDomainLabel(sourceUrl: string): string {
+  try {
+    return new URL(sourceUrl).hostname.replace(/^www\./u, "");
+  } catch {
+    return sourceUrl;
+  }
+}
+
 function formatDate(value: string | null): string {
   if (value === null) {
     return "Unknown date";
@@ -560,8 +650,8 @@ function renderContentSummaryPreview(summary: string | null): string {
 <template>
   <main class="workspace">
     <header class="workspace-header">
-      <div>
-        <p class="eyebrow">Geshi</p>
+      <div class="workspace-title">
+        <p class="eyebrow">Geshi Media Archive</p>
         <h1>
           {{
             routeState.kind === "settings"
@@ -569,6 +659,12 @@ function renderContentSummaryPreview(summary: string | null): string {
               : "Browse Archive"
           }}
         </h1>
+        <p class="workspace-summary">
+          {{ sources.length }} sources · {{ contents.length }} entries
+          <template v-if="selectedSource !== null">
+            · focused on {{ selectedSource.title ?? selectedSource.slug }}
+          </template>
+        </p>
       </div>
       <div class="workspace-actions">
         <nav class="view-nav" aria-label="Primary">
@@ -589,6 +685,9 @@ function renderContentSummaryPreview(summary: string | null): string {
             Settings
           </button>
         </nav>
+        <button class="ghost-button" type="button" @click="toggleTheme">
+          {{ theme === "dark" ? "Light" : "Dark" }}
+        </button>
         <button
           v-if="routeState.kind !== 'settings'"
           class="primary-button"
@@ -779,10 +878,12 @@ function renderContentSummaryPreview(summary: string | null): string {
       <section class="browser-shell">
         <aside class="pane pane-sources">
           <div class="pane-header">
-            <div>
+            <div class="pane-heading">
               <p class="eyebrow">Feeds</p>
               <h2>Sources</h2>
+              <p class="pane-caption">Registered feeds and collectors</p>
             </div>
+            <span class="pane-count">{{ sources.length }}</span>
           </div>
 
           <div v-if="isSourcesLoading" class="empty-state">
@@ -797,17 +898,34 @@ function renderContentSummaryPreview(summary: string | null): string {
                 :class="{ selected: isSourceSelected(source) }"
                 @click="openFeed(source)"
               >
-                <span class="source-row-title">
-                  {{ source.title ?? source.slug }}
+                <span class="source-row-head">
+                  <span class="source-row-title">
+                    {{ source.title ?? source.slug }}
+                  </span>
+                  <span
+                    class="source-row-status"
+                    :class="{
+                      active: source.periodicCrawlEnabled,
+                      idle: !source.periodicCrawlEnabled,
+                    }"
+                  >
+                    {{
+                      source.periodicCrawlEnabled
+                        ? `Auto ${source.periodicCrawlIntervalMinutes}m`
+                        : "Manual"
+                    }}
+                  </span>
                 </span>
-                <span class="source-row-url">{{ source.url }}</span>
-                <span class="source-row-meta">
-                  {{ source.kind }} ·
-                  {{
-                    source.periodicCrawlEnabled
-                      ? `Auto ${source.periodicCrawlIntervalMinutes}m`
-                      : "Auto off"
-                  }}
+                <span class="source-row-meta-line">
+                  <span class="source-row-domain">
+                    {{ sourceDomainLabel(source.url) }}
+                  </span>
+                  <span class="source-row-meta"
+                    >{{ source.kind }} · {{ source.slug }}</span
+                  >
+                </span>
+                <span v-if="source.description" class="source-row-description">
+                  {{ source.description }}
                 </span>
               </button>
             </li>
@@ -817,79 +935,159 @@ function renderContentSummaryPreview(summary: string | null): string {
             No sources registered yet. Add a feed to get started.
           </div>
 
-          <section v-if="selectedSource" class="source-settings-card">
-            <div class="detail-section-header">
-              <div>
-                <p class="eyebrow">Per source</p>
-                <h3>Autonomous Crawl</h3>
+        </aside>
+
+        <section class="pane pane-contents">
+          <div class="pane-header">
+            <div class="pane-heading">
+              <p class="eyebrow">Entries</p>
+              <h2>{{ routeHeadline }}</h2>
+              <p class="pane-caption">
+                {{
+                  selectedSource === null
+                    ? "Across every registered source"
+                    : sourceDomainLabel(selectedSource.url)
+                }}
+              </p>
+            </div>
+            <span class="pane-count">{{ visibleContents.length }}</span>
+            <div class="pane-actions">
+              <div class="menu-shell">
+                <button
+                  type="button"
+                  class="ghost-button menu-toggle-button"
+                  :aria-expanded="isContentActionsExpanded"
+                  aria-label="Entry actions"
+                  @click="toggleContentActions"
+                >
+                  <svg
+                    aria-hidden="true"
+                    class="button-icon"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      d="M4 7h16M4 12h16M4 17h16"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-linecap="square"
+                      stroke-width="1.8"
+                    />
+                  </svg>
+                </button>
+
+                <div
+                  v-if="isContentActionsExpanded"
+                  class="menu-panel"
+                  role="menu"
+                >
+                  <button
+                    v-if="selectedSource"
+                    type="button"
+                    class="menu-item menu-item-with-icon"
+                    role="menuitem"
+                    @click="toggleSourceSettings"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      class="button-icon"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        d="M21 7.5a5.5 5.5 0 0 1-7.75 5.03L6.78 19 5 17.22l6.47-6.47A5.5 5.5 0 1 1 16.5 3l-2.25 2.25.75 2.25 2.25.75L19.5 6A5.48 5.48 0 0 1 21 7.5Z"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-linejoin="miter"
+                        stroke-width="1.6"
+                      />
+                    </svg>
+                    <span>{{
+                      isSourceSettingsExpanded
+                        ? "Hide source settings"
+                        : "Source settings"
+                    }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="menu-item"
+                    role="menuitem"
+                    @click="refreshContents"
+                  >
+                    Refresh entries
+                  </button>
+                  <button
+                    v-if="selectedSource"
+                    type="button"
+                    class="menu-item"
+                    role="menuitem"
+                    :disabled="isObserveSubmitting === selectedSource.id"
+                    @click="runObserve(selectedSource.id)"
+                  >
+                    {{
+                      isObserveSubmitting === selectedSource.id
+                        ? "Running observe..."
+                        : "Observe source"
+                    }}
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+
+          <section
+            v-if="selectedSource && isSourceSettingsExpanded"
+            class="source-settings-panel"
+          >
+            <div class="source-settings-panel-header">
+              <div>
+                <p class="eyebrow">Source settings</p>
+                <h3>{{ selectedSource.title ?? selectedSource.slug }}</h3>
+              </div>
+              <p class="source-settings-summary">
+                {{
+                  selectedSource.periodicCrawlEnabled
+                    ? `Auto crawl every ${selectedSource.periodicCrawlIntervalMinutes} minutes`
+                    : "Auto crawl disabled"
+                }}
+              </p>
             </div>
 
             <p v-if="sourceCrawlErrorMessage" class="feedback error">
               {{ sourceCrawlErrorMessage }}
             </p>
 
-            <label class="toggle-field">
-              <span>Enabled</span>
-              <input v-model="sourceCrawlForm.enabled" type="checkbox" />
-            </label>
+            <div class="source-settings-grid">
+              <label class="toggle-field">
+                <span>Enabled</span>
+                <input v-model="sourceCrawlForm.enabled" type="checkbox" />
+              </label>
 
-            <label>
-              <span>Interval Minutes</span>
-              <input
-                v-model.number="sourceCrawlForm.intervalMinutes"
-                min="1"
-                step="1"
-                type="number"
-              />
-            </label>
+              <label>
+                <span>Interval Minutes</span>
+                <input
+                  v-model.number="sourceCrawlForm.intervalMinutes"
+                  min="1"
+                  step="1"
+                  type="number"
+                />
+              </label>
 
-            <div class="actions">
-              <button
-                type="button"
-                class="secondary-button"
-                :disabled="isSourceCrawlSubmitting === selectedSource.id"
-                @click="saveSelectedSourceCrawlSettings"
-              >
-                {{
-                  isSourceCrawlSubmitting === selectedSource.id
-                    ? "Saving..."
-                    : "Save source settings"
-                }}
-              </button>
+              <div class="actions source-settings-actions">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="isSourceCrawlSubmitting === selectedSource.id"
+                  @click="saveSelectedSourceCrawlSettings"
+                >
+                  {{
+                    isSourceCrawlSubmitting === selectedSource.id
+                      ? "Saving..."
+                      : "Save source settings"
+                  }}
+                </button>
+              </div>
             </div>
           </section>
-        </aside>
-
-        <section class="pane pane-contents">
-          <div class="pane-header">
-            <div>
-              <p class="eyebrow">Entries</p>
-              <h2>{{ routeHeadline }}</h2>
-            </div>
-            <div class="pane-actions">
-              <button
-                type="button"
-                class="ghost-button"
-                @click="refreshContents"
-              >
-                Refresh
-              </button>
-              <button
-                v-if="selectedSource"
-                type="button"
-                class="secondary-button"
-                :disabled="isObserveSubmitting === selectedSource.id"
-                @click="runObserve(selectedSource.id)"
-              >
-                {{
-                  isObserveSubmitting === selectedSource.id
-                    ? "Running..."
-                    : "Observe"
-                }}
-              </button>
-            </div>
-          </div>
 
           <div
             v-if="
@@ -918,14 +1116,28 @@ function renderContentSummaryPreview(summary: string | null): string {
                 :class="{ selected: isContentSelected(content) }"
                 @click="openEntry(content)"
               >
-                <span class="content-row-title">
-                  {{ content.title ?? "Untitled entry" }}
-                </span>
-                <span class="content-row-meta">
-                  {{ formatDate(content.publishedAt) }} · {{ content.status }}
-                </span>
-                <span v-if="content.summary" class="content-row-summary">
-                  {{ renderContentSummaryPreview(content.summary) }}
+                <span class="content-row-thumb" aria-hidden="true"></span>
+                <span class="content-row-body">
+                  <span class="content-row-head">
+                    <span class="content-row-title">
+                      {{ content.title ?? "Untitled entry" }}
+                    </span>
+                    <span
+                      class="content-row-status"
+                      :class="content.status"
+                    >
+                      {{ content.status }}
+                    </span>
+                  </span>
+                  <span class="content-row-meta">
+                    <span>{{ formatDate(content.publishedAt) }}</span>
+                    <span>{{
+                      selectedSource === null ? content.sourceSlug : content.kind
+                    }}</span>
+                  </span>
+                  <span v-if="content.summary" class="content-row-summary">
+                    {{ renderContentSummaryPreview(content.summary) }}
+                  </span>
                 </span>
               </button>
             </li>
@@ -936,7 +1148,7 @@ function renderContentSummaryPreview(summary: string | null): string {
 
         <section class="pane pane-detail">
           <div class="pane-header">
-            <div>
+            <div class="pane-heading">
               <p class="eyebrow">Detail</p>
               <h2>
                 {{
@@ -946,6 +1158,13 @@ function renderContentSummaryPreview(summary: string | null): string {
                     : "Select an entry")
                 }}
               </h2>
+              <p class="pane-caption">
+                {{
+                  contentDetail?.source.title ??
+                  contentDetail?.source.slug ??
+                  "Summary, transcript, and stored assets"
+                }}
+              </p>
             </div>
           </div>
 
