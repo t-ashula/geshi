@@ -105,7 +105,7 @@ export async function handleObserveSourceJob(
   }
 
   const queuedOrRunningRecordAssetIdsResult =
-    await dependencies.jobRepository.listQueuedOrRunningRecordContentAssetIds();
+    await dependencies.jobRepository.listIncompleteRecordContentAssetIds();
 
   if (!queuedOrRunningRecordAssetIdsResult.ok) {
     await failObserveSourceJob(

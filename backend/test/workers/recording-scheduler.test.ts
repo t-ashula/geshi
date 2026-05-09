@@ -117,7 +117,7 @@ describe("recording scheduler", () => {
         jobRepository: {
           attachQueueJobId,
           createJob,
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(
@@ -212,7 +212,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(
@@ -296,7 +296,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(
@@ -357,7 +357,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(
@@ -487,7 +487,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(ok([olderJob, newerJob])),
           ),
           listRunningRecordContentAssetIds: vi.fn(() =>
@@ -569,7 +569,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(

@@ -94,7 +94,7 @@ async function seedPeriodicCrawlJob(
   currentJobRepository: JobRepository,
   currentJobQueue: PgBossJobQueue,
 ): Promise<void> {
-  const existingJob = await currentJobRepository.findQueuedOrRunningJobByKind(
+  const existingJob = await currentJobRepository.findIncompleteJobByKind(
     PERIODIC_CRAWL_JOB_NAME,
   );
 

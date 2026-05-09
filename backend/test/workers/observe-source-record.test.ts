@@ -114,7 +114,7 @@ describe("observe-source record branching", () => {
         } as never,
         jobRepository: {
           createJob,
-          listQueuedOrRunningRecordContentAssetIds: vi.fn(() =>
+          listIncompleteRecordContentAssetIds: vi.fn(() =>
             Promise.resolve(ok(new Set())),
           ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
@@ -270,7 +270,7 @@ describe("observe-source record branching", () => {
         } as never,
         jobRepository: {
           createJob,
-          listQueuedOrRunningRecordContentAssetIds: vi.fn(() =>
+          listIncompleteRecordContentAssetIds: vi.fn(() =>
             Promise.resolve(ok(new Set())),
           ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
@@ -377,7 +377,7 @@ describe("observe-source record branching", () => {
         } as never,
         jobRepository: {
           createJob,
-          listQueuedOrRunningRecordContentAssetIds: vi.fn(() =>
+          listIncompleteRecordContentAssetIds: vi.fn(() =>
             Promise.resolve(ok(new Set(["asset-1"]))),
           ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
@@ -493,7 +493,7 @@ describe("observe-source record branching", () => {
         } as never,
         jobRepository: {
           createJob,
-          listQueuedOrRunningRecordContentAssetIds: vi.fn(() =>
+          listIncompleteRecordContentAssetIds: vi.fn(() =>
             Promise.resolve(ok(new Set())),
           ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),

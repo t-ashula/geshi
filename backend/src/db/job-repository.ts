@@ -13,6 +13,13 @@ export type CreateJobInput = {
   retryable: boolean;
 };
 
+export type JobStatus =
+  | "planned"
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed";
+
 export type JobListItem = {
   attemptCount: number;
   createdAt: Date;
@@ -25,7 +32,7 @@ export type JobListItem = {
   queueJobId: string | null;
   retryable: boolean;
   startedAt: Date | null;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: JobStatus;
 };
 
 export type LatestObserveJob = {
@@ -50,7 +57,7 @@ export class JobRepository {
           metadata: input.metadata ?? {},
           payload: input.payload ?? {},
           retryable: input.retryable,
-          status: "queued",
+          status: "planned",
         })
         .returningAll()
         .executeTakeFirstOrThrow();
@@ -70,6 +77,7 @@ export class JobRepository {
         .updateTable("jobs")
         .set({
           queue_job_id: queueJobId,
+          status: queueJobId === null ? "planned" : "queued",
         })
         .where("id", "=", id)
         .executeTakeFirstOrThrow();
@@ -190,7 +198,7 @@ export class JobRepository {
     }
   }
 
-  public async listQueuedOrRunningObserveSourceIds(): Promise<
+  public async listIncompleteObserveSourceIds(): Promise<
     Result<Set<string>, JobRepositoryError>
   > {
     try {
@@ -200,7 +208,7 @@ export class JobRepository {
           sql<string | null>`jobs.payload -> 'source' ->> 'id'`.as("source_id"),
         )
         .where("kind", "=", "observe-source")
-        .where("status", "in", ["queued", "running"])
+        .where("status", "in", ["planned", "queued", "running"])
         .execute();
 
       return ok(
@@ -214,7 +222,7 @@ export class JobRepository {
       return err(
         toRepositoryError(
           error,
-          "Failed to list queued or running observe source ids.",
+          "Failed to list incomplete observe source ids.",
         ),
       );
     }
@@ -263,21 +271,21 @@ export class JobRepository {
     }
   }
 
-  public async findQueuedOrRunningJobByKind(
+  public async findIncompleteJobByKind(
     kind: string,
   ): Promise<JobListItem | null> {
     const job = await this.database
       .selectFrom("jobs")
       .selectAll()
       .where("kind", "=", kind)
-      .where("status", "in", ["queued", "running"])
+      .where("status", "in", ["planned", "queued", "running"])
       .orderBy("created_at", "desc")
       .executeTakeFirst();
 
     return job === undefined ? null : toJobListItem(job);
   }
 
-  public async listQueuedJobsWithoutQueueIdByKind(
+  public async listPlannedJobsByKind(
     kind: string,
   ): Promise<Result<JobListItem[], JobRepositoryError>> {
     try {
@@ -285,26 +293,32 @@ export class JobRepository {
         .selectFrom("jobs")
         .selectAll()
         .where("kind", "=", kind)
-        .where("status", "=", "queued")
-        .where("queue_job_id", "is", null)
+        .where((expressionBuilder) =>
+          expressionBuilder.or([
+            expressionBuilder("status", "=", "planned"),
+            expressionBuilder.and([
+              expressionBuilder("status", "=", "queued"),
+              expressionBuilder("queue_job_id", "is", null),
+            ]),
+          ]),
+        )
         .orderBy("created_at", "asc")
         .execute();
 
       return ok(jobs.map(toJobListItem));
     } catch (error) {
-      return err(
-        toRepositoryError(
-          error,
-          "Failed to list queued jobs without queue job id.",
-        ),
-      );
+      return err(toRepositoryError(error, "Failed to list planned jobs."));
     }
   }
 
-  public async listQueuedOrRunningRecordContentAssetIds(): Promise<
+  public async listIncompleteRecordContentAssetIds(): Promise<
     Result<Set<string>, JobRepositoryError>
   > {
-    return this.listRecordContentAssetIdsByStatuses(["queued", "running"]);
+    return this.listRecordContentAssetIdsByStatuses([
+      "planned",
+      "queued",
+      "running",
+    ]);
   }
 
   public async listRunningRecordContentAssetIds(): Promise<
@@ -314,7 +328,7 @@ export class JobRepository {
   }
 
   private async listRecordContentAssetIdsByStatuses(
-    statuses: Array<"queued" | "running">,
+    statuses: Array<"planned" | "queued" | "running">,
   ): Promise<Result<Set<string>, JobRepositoryError>> {
     try {
       const rows = await this.database

@@ -149,7 +149,7 @@ export type JobTable = {
   queue_job_id: string | null;
   retryable: GeneratedBooleanColumn;
   started_at: NullableTimestampColumn;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "planned" | "queued" | "running" | "succeeded" | "failed";
 };
 
 export type TranscriptTable = {

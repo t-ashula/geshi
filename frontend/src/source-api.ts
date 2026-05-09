@@ -130,7 +130,7 @@ export type JobListItem = {
   retryable: boolean;
   sourceId: string | null;
   startedAt: string | null;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "planned" | "queued" | "running" | "succeeded" | "failed";
 };
 
 type CreateSourceResponse = {

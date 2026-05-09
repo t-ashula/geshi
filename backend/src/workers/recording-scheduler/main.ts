@@ -80,7 +80,7 @@ async function seedRecordingSchedulerJob(
   currentJobRepository: JobRepository,
   currentJobQueue: PgBossJobQueue,
 ): Promise<void> {
-  const existingJob = await currentJobRepository.findQueuedOrRunningJobByKind(
+  const existingJob = await currentJobRepository.findIncompleteJobByKind(
     RECORDING_SCHEDULER_JOB_NAME,
   );
 

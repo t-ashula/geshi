@@ -42,13 +42,17 @@ describe("job service", () => {
       queueJobId: null,
       retryable: true,
       startedAt: null,
-      status: "queued",
+      status: "planned",
     } satisfies JobListItem;
     const enqueue = vi.fn(() => Promise.resolve("queue-job-1"));
     const attachQueueJobId = vi.fn(() => Promise.resolve(ok(undefined)));
     const createJob = vi.fn(() => Promise.resolve(ok(createdJob)));
     const findJobById = vi.fn(() =>
-      Promise.resolve({ ...createdJob, queueJobId: "queue-job-1" }),
+      Promise.resolve({
+        ...createdJob,
+        queueJobId: "queue-job-1",
+        status: "queued",
+      }),
     );
     const queue = {
       enqueue,
@@ -105,6 +109,7 @@ describe("job service", () => {
       ok({
         ...createdJob,
         queueJobId: "queue-job-1",
+        status: "queued",
       }),
     );
   });
@@ -130,7 +135,7 @@ describe("job service", () => {
             queueJobId: null,
             retryable: true,
             startedAt: null,
-            status: "queued",
+            status: "planned",
           } satisfies JobListItem),
         ),
       ),
@@ -271,7 +276,7 @@ describe("job service", () => {
               queueJobId: null,
               retryable: true,
               startedAt: null,
-              status: "queued",
+              status: "planned",
             } satisfies JobListItem),
           ),
         ),

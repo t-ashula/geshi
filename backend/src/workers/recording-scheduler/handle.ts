@@ -45,17 +45,17 @@ export async function handleRecordingSchedulerJob(
 
   logger.info("recording scheduler job started.");
 
-  const queuedJobsResult =
-    await dependencies.jobRepository.listQueuedJobsWithoutQueueIdByKind(
+  const plannedJobsResult =
+    await dependencies.jobRepository.listPlannedJobsByKind(
       RECORD_CONTENT_JOB_NAME,
     );
 
-  if (!queuedJobsResult.ok) {
-    return queuedJobsResult;
+  if (!plannedJobsResult.ok) {
+    return plannedJobsResult;
   }
 
   const dedupeResult = await cleanupSupersededRecordJobs(
-    queuedJobsResult.value,
+    plannedJobsResult.value,
     dependencies,
     logger,
   );

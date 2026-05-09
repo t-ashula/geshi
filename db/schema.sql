@@ -129,7 +129,7 @@ create table jobs (
     metadata jsonb not null default '{}'::jsonb,
     status text not null constraint jobs_status_check check (
         status = any(
-            array ['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text]
+            array ['planned'::text, 'queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text]
         )
     ),
     attempt_count integer not null default 0,
