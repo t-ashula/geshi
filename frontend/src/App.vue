@@ -984,11 +984,7 @@ function renderContentSummaryPreview(summary: string | null): string {
                 :disabled="isContentsLoading"
                 @click="refreshContents"
               >
-                <svg
-                  aria-hidden="true"
-                  class="button-icon"
-                  viewBox="0 0 24 24"
-                >
+                <svg aria-hidden="true" class="button-icon" viewBox="0 0 24 24">
                   <path
                     d="M20 12a8 8 0 1 1-2.34-5.66M20 4v6h-6"
                     fill="none"
