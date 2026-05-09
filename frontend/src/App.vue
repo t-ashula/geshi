@@ -976,6 +976,29 @@ function renderContentSummaryPreview(summary: string | null): string {
             </div>
             <span class="pane-count">{{ visibleContents.length }}</span>
             <div class="pane-actions">
+              <button
+                type="button"
+                class="ghost-button menu-toggle-button pane-reload-button"
+                aria-label="Reload entries"
+                title="Reload"
+                :disabled="isContentsLoading"
+                @click="refreshContents"
+              >
+                <svg
+                  aria-hidden="true"
+                  class="button-icon"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    d="M20 12a8 8 0 1 1-2.34-5.66M20 4v6h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="square"
+                    stroke-linejoin="miter"
+                    stroke-width="1.8"
+                  />
+                </svg>
+              </button>
               <div class="menu-shell">
                 <button
                   type="button"
@@ -1007,37 +1030,15 @@ function renderContentSummaryPreview(summary: string | null): string {
                   <button
                     v-if="selectedSource"
                     type="button"
-                    class="menu-item menu-item-with-icon"
+                    class="menu-item"
                     role="menuitem"
                     @click="toggleSourceSettings"
                   >
-                    <svg
-                      aria-hidden="true"
-                      class="button-icon"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        d="M21 7.5a5.5 5.5 0 0 1-7.75 5.03L6.78 19 5 17.22l6.47-6.47A5.5 5.5 0 1 1 16.5 3l-2.25 2.25.75 2.25 2.25.75L19.5 6A5.48 5.48 0 0 1 21 7.5Z"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-linecap="square"
-                        stroke-linejoin="miter"
-                        stroke-width="1.6"
-                      />
-                    </svg>
-                    <span>{{
+                    {{
                       isSourceSettingsExpanded
                         ? "Hide source settings"
                         : "Source settings"
-                    }}</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="menu-item"
-                    role="menuitem"
-                    @click="refreshContents"
-                  >
-                    Refresh entries
+                    }}
                   </button>
                   <button
                     v-if="selectedSource"
@@ -1049,8 +1050,8 @@ function renderContentSummaryPreview(summary: string | null): string {
                   >
                     {{
                       isObserveSubmitting === selectedSource.id
-                        ? "Running observe..."
-                        : "Observe source"
+                        ? "Crawling..."
+                        : "Crawl"
                     }}
                   </button>
                 </div>
