@@ -82,11 +82,7 @@
   --status-failed-bg: rgb(178 78 78 / 0.18);
   --status-failed-text: #ffb3b3;
   --page-background:
-    radial-gradient(
-      circle at top left,
-      rgb(42 80 122 / 0.18),
-      transparent 24%
-    ),
+    radial-gradient(circle at top left, rgb(42 80 122 / 0.18), transparent 24%),
     linear-gradient(180deg, #090d12 0%, #0d1218 100%);
 }
 
@@ -294,6 +290,11 @@ h3 {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.pane-add-button {
+  min-width: 2rem;
+  min-height: 2rem;
 }
 
 .menu-shell {

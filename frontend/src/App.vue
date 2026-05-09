@@ -64,6 +64,7 @@ const sourceCrawlErrorMessage = ref<string | null>(null);
 const transcriptActionErrorMessage = ref<string | null>(null);
 const validationMessage = ref<string | null>(null);
 const lastInspectedUrl = ref<string | null>(null);
+const lastInspectedPluginSlug = ref<string | null>(null);
 const routeState = ref<RouteState>(normalizeRoute(window.location.pathname));
 const form = ref<CreateSourceRequest>({
   description: "",
@@ -183,6 +184,7 @@ function openCreateForm(): void {
   errorMessage.value = null;
   inspectErrorMessage.value = null;
   lastInspectedUrl.value = null;
+  lastInspectedPluginSlug.value = null;
   validationMessage.value = null;
 }
 
@@ -192,8 +194,13 @@ function handlePluginSlugChange(pluginSlug: string): void {
   form.value.sourceSlug = "";
   form.value.title = "";
   lastInspectedUrl.value = null;
+  lastInspectedPluginSlug.value = null;
   inspectErrorMessage.value = null;
   validationMessage.value = null;
+
+  if (form.value.url.trim() !== "") {
+    void inspectCurrentSource();
+  }
 }
 
 function handlePluginSelection(event: Event): void {
@@ -204,6 +211,7 @@ function closeCreateForm(): void {
   isCreateFormVisible.value = false;
   inspectErrorMessage.value = null;
   lastInspectedUrl.value = null;
+  lastInspectedPluginSlug.value = null;
   validationMessage.value = null;
 }
 
@@ -226,8 +234,13 @@ function closeContentActions(): void {
 
 async function inspectCurrentSource(): Promise<void> {
   const trimmedUrl = form.value.url.trim();
+  const trimmedPluginSlug = (form.value.pluginSlug ?? "").trim();
 
-  if (trimmedUrl === "" || lastInspectedUrl.value === trimmedUrl) {
+  if (
+    trimmedUrl === "" ||
+    (lastInspectedUrl.value === trimmedUrl &&
+      lastInspectedPluginSlug.value === trimmedPluginSlug)
+  ) {
     return;
   }
 
@@ -254,6 +267,7 @@ async function inspectCurrentSource(): Promise<void> {
       url: draft.url,
     };
     lastInspectedUrl.value = draft.url;
+    lastInspectedPluginSlug.value = trimmedPluginSlug;
   } catch (error) {
     inspectErrorMessage.value =
       error instanceof Error ? error.message : "Source inspect failed.";
@@ -688,14 +702,6 @@ function renderContentSummaryPreview(summary: string | null): string {
         <button class="ghost-button" type="button" @click="toggleTheme">
           {{ theme === "dark" ? "Light" : "Dark" }}
         </button>
-        <button
-          v-if="routeState.kind !== 'settings'"
-          class="primary-button"
-          type="button"
-          @click="openCreateForm"
-        >
-          Add source
-        </button>
       </div>
     </header>
 
@@ -884,6 +890,25 @@ function renderContentSummaryPreview(summary: string | null): string {
               <p class="pane-caption">Registered feeds and collectors</p>
             </div>
             <span class="pane-count">{{ sources.length }}</span>
+            <div class="pane-actions">
+              <button
+                type="button"
+                class="ghost-button menu-toggle-button pane-add-button"
+                aria-label="Add source"
+                title="Add source"
+                @click="openCreateForm"
+              >
+                <svg aria-hidden="true" class="button-icon" viewBox="0 0 24 24">
+                  <path
+                    d="M12 5v14M5 12h14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="square"
+                    stroke-width="1.8"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div v-if="isSourcesLoading" class="empty-state">
@@ -934,7 +959,6 @@ function renderContentSummaryPreview(summary: string | null): string {
           <div v-else class="empty-state">
             No sources registered yet. Add a feed to get started.
           </div>
-
         </aside>
 
         <section class="pane pane-contents">
@@ -1122,17 +1146,16 @@ function renderContentSummaryPreview(summary: string | null): string {
                     <span class="content-row-title">
                       {{ content.title ?? "Untitled entry" }}
                     </span>
-                    <span
-                      class="content-row-status"
-                      :class="content.status"
-                    >
+                    <span class="content-row-status" :class="content.status">
                       {{ content.status }}
                     </span>
                   </span>
                   <span class="content-row-meta">
                     <span>{{ formatDate(content.publishedAt) }}</span>
                     <span>{{
-                      selectedSource === null ? content.sourceSlug : content.kind
+                      selectedSource === null
+                        ? content.sourceSlug
+                        : content.kind
                     }}</span>
                   </span>
                   <span v-if="content.summary" class="content-row-summary">
