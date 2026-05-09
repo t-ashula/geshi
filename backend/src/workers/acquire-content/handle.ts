@@ -28,10 +28,13 @@ export async function handleAcquireContentJob(
 ): Promise<Result<void, Error>> {
   const logger = dependencies.logger.child({
     assetId: payload.asset.id,
+    assetKind: payload.asset.kind,
+    assetSourceUrl: payload.asset.sourceUrl,
     contentId: payload.content.id,
     jobId: payload.jobId,
     pluginSlug: payload.collector.pluginSlug,
     sourceId: payload.source.id,
+    sourceSlug: payload.source.slug,
   });
 
   const markRunningResult = await dependencies.jobRepository.markRunning(
