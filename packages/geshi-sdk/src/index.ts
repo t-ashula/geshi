@@ -212,3 +212,9 @@ export type SourceCollectorPluginDefinition = {
   manifest: PluginManifest;
   plugin: SourceCollectorPlugin;
 };
+
+export {
+  assertAcquiredAssetContract,
+  assertRecordedAssetContract,
+  assertSourceCollectorObserveResultContract,
+} from "./testing.js";
