@@ -13,6 +13,7 @@ import {
   ACQUIRE_CONTENT_JOB_NAME,
   RECORD_CONTENT_JOB_NAME,
 } from "../../job-queue/types.js";
+import { findLatestFingerprint } from "../../lib/fingerprint.js";
 import type { Result } from "../../lib/result.js";
 import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
@@ -269,10 +270,15 @@ function indexObservedAssetsByFingerprint(
   observedAssetByFingerprint: Map<string, ObservedAsset>,
 ): void {
   for (const observedAsset of observedAssets) {
-    observedAssetByFingerprint.set(
-      observedAsset.observedFingerprints[0] ?? "",
-      observedAsset,
+    const latestObservedFingerprint = findLatestFingerprint(
+      observedAsset.observedFingerprints,
     );
+
+    if (latestObservedFingerprint === undefined) {
+      continue;
+    }
+
+    observedAssetByFingerprint.set(latestObservedFingerprint, observedAsset);
   }
 }
 

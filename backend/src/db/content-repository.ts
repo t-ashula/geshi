@@ -119,6 +119,10 @@ export class ContentRepository {
           const snapshotChanged =
             latestSnapshot?.title !== input.title ||
             latestSnapshot?.summary !== input.summary;
+          const nextStatus = mergeObservedContentStatus(
+            insertedContent.status,
+            input.status,
+          );
 
           await transaction
             .updateTable("contents")
@@ -128,7 +132,7 @@ export class ContentRepository {
               external_id: input.externalId,
               kind: input.kind,
               published_at: input.publishedAt,
-              status: input.status,
+              status: nextStatus,
             })
             .where("id", "=", insertedContent.id)
             .executeTakeFirstOrThrow();
@@ -327,6 +331,17 @@ export class ContentRepository {
       title: contentSnapshot?.title ?? null,
     };
   }
+}
+
+export function mergeObservedContentStatus(
+  currentStatus: "discovered" | "stored" | "failed",
+  observedStatus: "discovered" | "stored" | "failed",
+): "discovered" | "stored" | "failed" {
+  if (observedStatus !== "discovered") {
+    return observedStatus;
+  }
+
+  return currentStatus === "discovered" ? observedStatus : currentStatus;
 }
 
 function toContentInsert(
