@@ -56,3 +56,4 @@
 - [ADR-0053: 同じ asset に対する同種 job の重複生成を許容する条件を明示する](./0053-follow-up-job-creation-from-observed-assets.md)
 - [ADR-0054: job の実行入力は `jobs.payload` に保持する](./0054-job-payload-owned-by-job-row.md)
 - [ADR-0055: fingerprint 移行期間は legacy prefix を versioned fingerprint より古く扱う](./0055-legacy-fingerprint-compatibility.md)
+- [ADR-0056: job lifecycle を `planned` を含む状態語彙へ再定義する](./0056-job-lifecycle-state-interpretation.md)
