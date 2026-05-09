@@ -216,6 +216,9 @@ function toObservedAssets(item: RssItem): ObservedAsset[] {
   if (pageUrl !== null) {
     assets.push({
       kind: "html",
+      nextAction: {
+        actionKind: "acquire",
+      },
       observedFingerprints: createObservedAssetFingerprints({
         kind: "html",
         primary: true,
@@ -229,6 +232,9 @@ function toObservedAssets(item: RssItem): ObservedAsset[] {
   if (audioUrl !== null) {
     assets.push({
       kind: "audio",
+      nextAction: {
+        actionKind: "acquire",
+      },
       observedFingerprints: createObservedAssetFingerprints({
         kind: "audio",
         primary: false,

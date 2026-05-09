@@ -56,6 +56,9 @@ export async function handleAcquireContentJob(
       abortSignal: AbortSignal.timeout(30_000),
       asset: {
         kind: payload.asset.kind,
+        nextAction: {
+          actionKind: "acquire",
+        },
         observedFingerprints: [payload.asset.observedFingerprint],
         primary: payload.asset.primary,
         sourceUrl: payload.asset.sourceUrl,

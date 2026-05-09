@@ -185,7 +185,7 @@ export async function handleObserveSourceJob(
         }
 
         const nextAction = observedAsset.nextAction;
-        const nextActionKind = nextAction?.actionKind ?? "acquire";
+        const nextActionKind = nextAction.actionKind;
 
         if (nextActionKind === "none") {
           continue;

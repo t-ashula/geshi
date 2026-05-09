@@ -86,6 +86,12 @@ describe("sampleStreaming plugin", () => {
       },
       asset: {
         kind: "audio",
+        nextAction: {
+          actionKind: "record",
+          arguments: {
+            playlistUrl: "http://localhost:3401/streams/live-1.m3u8",
+          },
+        },
         observedFingerprints: ["sample-stream-observed:a"],
         primary: true,
         sourceUrl: "http://localhost:3401/streams/live-1.m3u8",

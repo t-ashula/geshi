@@ -366,6 +366,9 @@ function toObservedContent(entry: GovOnlineEntry): ObservedContent {
     assets: [
       {
         kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
         observedFingerprints: [
           createFingerprint("observed-html-url", entry.url),
         ],

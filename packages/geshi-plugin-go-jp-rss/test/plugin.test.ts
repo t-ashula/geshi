@@ -167,6 +167,16 @@ describe("goJpRss plugin", () => {
       summary: "2099年5月23日 内閣府 記事1",
       title: "記事1",
     });
+    expect(observed.contents[0]?.assets).toEqual([
+      expect.objectContaining({
+        kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
+        primary: true,
+        sourceUrl: "https://example.go.jp/news/1",
+      }),
+    ]);
   });
 
   it("stops observing when entries are older than one week", async () => {
@@ -225,6 +235,16 @@ describe("goJpRss plugin", () => {
     expect(observed.contents[0]?.externalId).toBe(
       "https://example.go.jp/news/recent",
     );
+    expect(observed.contents[0]?.assets).toEqual([
+      expect.objectContaining({
+        kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
+        primary: true,
+        sourceUrl: "https://example.go.jp/news/recent",
+      }),
+    ]);
 
     vi.useRealTimers();
   });
@@ -248,6 +268,9 @@ describe("goJpRss plugin", () => {
       abortSignal: new AbortController().signal,
       asset: {
         kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
         observedFingerprints: [
           "observed-html-url:https://example.go.jp/news/1",
         ],

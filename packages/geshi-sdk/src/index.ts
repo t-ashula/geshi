@@ -71,7 +71,7 @@ export type SourceCollectorNextAction =
 
 export type ObservedAsset = {
   kind: string;
-  nextAction?: SourceCollectorNextAction;
+  nextAction: SourceCollectorNextAction;
   observedFingerprints: string[];
   primary: boolean;
   sourceUrl: string | null;

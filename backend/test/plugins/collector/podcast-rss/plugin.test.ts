@@ -45,11 +45,17 @@ describe("podcastRssPlugin.observe fixtures", () => {
     expect(contents[0]?.assets).toEqual([
       expect.objectContaining({
         kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
         primary: true,
         sourceUrl: "https://www.nytimes.com/the-daily",
       }),
       expect.objectContaining({
         kind: "audio",
+        nextAction: {
+          actionKind: "acquire",
+        },
         primary: false,
         sourceUrl: "https://dts.podtrac.com/redirect.mp3/example-1.mp3",
       }),
@@ -77,6 +83,9 @@ describe("podcastRssPlugin.observe fixtures", () => {
     expect(contents[0]?.assets).toEqual([
       expect.objectContaining({
         kind: "audio",
+        nextAction: {
+          actionKind: "acquire",
+        },
         primary: false,
         sourceUrl:
           "https://rss.art19.com/episodes/e2e424f9-09ee-44e8-951f-2d6dff4fc3fd.mp3",
@@ -137,11 +146,17 @@ describe("podcastRssPlugin.observe", () => {
     expect(contents[0]?.assets).toEqual([
       expect.objectContaining({
         kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
         primary: true,
         sourceUrl: "https://example.com/episodes/1",
       }),
       expect.objectContaining({
         kind: "audio",
+        nextAction: {
+          actionKind: "acquire",
+        },
         primary: false,
         sourceUrl: "https://cdn.example.com/audio/1.mp3",
       }),
@@ -197,6 +212,9 @@ describe("podcastRssPlugin.observe", () => {
     expect(contents[0]?.assets).toEqual([
       expect.objectContaining({
         kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
         primary: true,
         sourceUrl: "https://example.com/episodes/2",
       }),
@@ -208,6 +226,9 @@ describe("podcastRssPlugin.observe", () => {
     expect(contents[1]?.assets).toEqual([
       expect.objectContaining({
         kind: "audio",
+        nextAction: {
+          actionKind: "acquire",
+        },
         primary: false,
         sourceUrl: "https://cdn.example.com/audio/3.mp3",
       }),
@@ -342,6 +363,9 @@ describe("podcastRssPlugin.acquire", () => {
       abortSignal: new AbortController().signal,
       asset: {
         kind: "audio",
+        nextAction: {
+          actionKind: "acquire",
+        },
         observedFingerprints: [
           "2026-04-28:audio:https://cdn.example.com/1.mp3",
         ],
@@ -380,6 +404,9 @@ describe("podcastRssPlugin.acquire", () => {
         abortSignal: new AbortController().signal,
         asset: {
           kind: "audio",
+          nextAction: {
+            actionKind: "acquire",
+          },
           observedFingerprints: ["2026-04-28:audio:null"],
           primary: false,
           sourceUrl: null,
@@ -409,6 +436,9 @@ describe("podcastRssPlugin.acquire", () => {
         abortSignal: new AbortController().signal,
         asset: {
           kind: "audio",
+          nextAction: {
+            actionKind: "acquire",
+          },
           observedFingerprints: [
             "2026-04-28:audio:https://cdn.example.com/1.mp3",
           ],
