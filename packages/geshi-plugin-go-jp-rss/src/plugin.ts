@@ -14,7 +14,7 @@ import type {
   SourceCollectorSupportsInput,
   SourceMetadata,
 } from "@geshi/sdk";
-
+import { extractHtmlDetailBody } from "./html-detail-body.js";
 import { manifest } from "./manifest.js";
 
 const DEFAULT_CONTENT_TYPE = "text/html";
@@ -161,9 +161,15 @@ export const plugin: SourceCollectorPlugin = {
   },
 
   extract(
-    _input: SourceCollectorExtractInput,
+    input: SourceCollectorExtractInput,
   ): Promise<ExtractedDetailBody | null> {
-    return Promise.resolve(null);
+    if (input.asset.kind !== "html") {
+      return Promise.resolve(null);
+    }
+
+    const html = new TextDecoder().decode(input.asset.body);
+
+    return Promise.resolve(extractHtmlDetailBody(html, input.asset.sourceUrl));
   },
 
   async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {

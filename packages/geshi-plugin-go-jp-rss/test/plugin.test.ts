@@ -315,4 +315,36 @@ describe("goJpRss plugin", () => {
     }
     expect(asset.body.byteLength).toBeGreaterThan(0);
   });
+
+  it("extracts a sanitized html detail body", async () => {
+    await expect(
+      plugin.extract({
+        asset: {
+          body: new TextEncoder().encode(
+            `
+              <html>
+                <body>
+                  <main class="article-body">
+                    <h1>記事タイトル</h1>
+                    <p>本文 <strong>その1</strong></p>
+                    <div>
+                      <p><a href="/info/example.html">詳細ページ</a></p>
+                    </div>
+                    <style>.hidden { display: none; }</style>
+                  </main>
+                </body>
+              </html>
+            `,
+          ),
+          kind: "html",
+          mimeType: "text/html",
+          sourceUrl: "https://www.gov-online.go.jp/example.html",
+        },
+        context: createPluginContext(),
+      }),
+    ).resolves.toEqual({
+      body: '<article><h1>記事タイトル</h1><p>本文 <strong>その1</strong></p><p><a href="https://www.gov-online.go.jp/info/example.html">詳細ページ</a></p></article>',
+      format: "html",
+    });
+  });
 });

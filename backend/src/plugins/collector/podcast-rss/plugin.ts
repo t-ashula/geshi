@@ -27,6 +27,7 @@ import {
   CONTENT_FINGERPRINT_SPECS,
   OBSERVED_ASSET_FINGERPRINT_SPECS,
 } from "./fingerprint.js";
+import { extractHtmlDetailBody } from "./html-detail-body.js";
 import { manifest } from "./manifest.js";
 
 type RssChannel = {
@@ -154,9 +155,15 @@ export const plugin: SourceCollectorPlugin = {
   },
 
   extract(
-    _input: SourceCollectorExtractInput,
+    input: SourceCollectorExtractInput,
   ): Promise<ExtractedDetailBody | null> {
-    return Promise.resolve(null);
+    if (input.asset.kind !== "html") {
+      return Promise.resolve(null);
+    }
+
+    const html = new TextDecoder().decode(input.asset.body);
+
+    return Promise.resolve(extractHtmlDetailBody(html, input.asset.sourceUrl));
   },
 
   async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {

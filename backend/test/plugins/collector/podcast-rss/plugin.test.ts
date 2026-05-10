@@ -356,12 +356,12 @@ describe("podcastRssPlugin.inspect", () => {
 });
 
 describe("podcastRssPlugin.extract", () => {
-  it("returns null until html parser based extraction is implemented", async () => {
+  it("extracts a sanitized html detail body", async () => {
     await expect(
       podcastRssPlugin.extract({
         asset: {
           body: new TextEncoder().encode(
-            "<html><body><article><h1>Episode 1</h1><p>Hello <strong>world</strong>.</p></article></body></html>",
+            `<html><body><article><h1>Episode 1</h1><p>Hello <strong>world</strong>.</p><script>alert("x")</script><p><a href="https://example.com/show-notes">Show notes</a></p></article></body></html>`,
           ),
           kind: "html",
           mimeType: "text/html",
@@ -369,7 +369,10 @@ describe("podcastRssPlugin.extract", () => {
         },
         context: createPluginContext(),
       }),
-    ).resolves.toBeNull();
+    ).resolves.toEqual({
+      body: '<article><h1>Episode 1</h1><p>Hello <strong>world</strong>.</p><p><a href="https://example.com/show-notes">Show notes</a></p></article>',
+      format: "html",
+    });
   });
 });
 

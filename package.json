@@ -64,13 +64,14 @@
     "vue-tsc": "^3.2.7"
   },
   "dependencies": {
-    "@geshi/sdk": "file:packages/geshi-sdk",
     "@geshi/plugin-go-jp-rss": "file:packages/geshi-plugin-go-jp-rss",
     "@geshi/plugin-sample-streaming": "file:packages/geshi-plugin-sample-streaming",
+    "@geshi/sdk": "file:packages/geshi-sdk",
     "@hono/node-server": "^2.0.0",
     "fast-xml-parser": "^5.7.2",
     "hono": "^4.12.15",
     "kysely": "^0.28.16",
+    "parse5": "^8.0.1",
     "pg": "^8.20.0",
     "pg-boss": "^12.18.1",
     "pino": "^10.3.1",
