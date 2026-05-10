@@ -5,6 +5,7 @@ const sourceFeedUrl =
 const nonRssSourceUrl =
   process.env.E2E_NON_RSS_SOURCE_URL ??
   "http://127.0.0.1:3401/feeds/not-rss.xml";
+const sourceOrigin = new URL(sourceFeedUrl).origin;
 
 test("shows available external plugin in source registration", async ({
   page,
@@ -18,7 +19,7 @@ test("shows available external plugin in source registration", async ({
   });
 
   await expect(pluginSelect).toBeVisible();
-  await expect(pluginSelect).toContainText("Example External Feed (feed)");
+  await expect(pluginSelect).toContainText("Radiko (streaming)");
 });
 
 test("autofills source fields via inspect", async ({ page }) => {
@@ -65,9 +66,8 @@ test("allows manual registration after inspect failure", async ({ page }) => {
   await page
     .getByRole("textbox", { name: "Description" })
     .fill("Registered after inspect failure.");
-  await page.getByRole("button", { name: "Register" }).click();
+  await page.getByRole("button", { name: "Register", exact: true }).click();
 
-  await expect(page.getByText(nonRssSourceUrl)).toBeVisible();
   await expect(
     page.getByRole("heading", { level: 2, name: "Manual Source" }),
   ).toBeVisible();
@@ -83,11 +83,14 @@ test("registers a source and observes contents", async ({ page, request }) => {
   const urlInput = page.getByRole("textbox", { name: "Source URL" });
   await urlInput.fill(sourceFeedUrl);
   await urlInput.blur();
-  await page.getByRole("button", { name: "Register" }).click();
+  await page.getByRole("button", { name: "Register", exact: true }).click();
 
-  await expect(page.getByText(sourceFeedUrl)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Geshi E2E Feed" }),
+  ).toBeVisible();
 
-  await page.getByRole("button", { name: "Observe" }).click();
+  await page.getByRole("button", { name: "Entry actions" }).click();
+  await page.getByRole("menuitem", { name: "Crawl" }).click();
 
   await expect
     .poll(
@@ -105,7 +108,7 @@ test("registers a source and observes contents", async ({ page, request }) => {
     )
     .toBe(true);
 
-  await page.getByRole("button", { name: "Refresh" }).click();
+  await page.getByRole("button", { name: "Reload entries" }).click();
   await expect(page.getByText("Episode 1")).toBeVisible();
   await expect(page.getByText("Hello from E2E fixture.")).toBeVisible();
 });
@@ -125,9 +128,11 @@ test("opens entry detail and exposes playable audio", async ({
   const urlInput = page.getByRole("textbox", { name: "Source URL" });
   await urlInput.fill(playbackSourceFeedUrl);
   await urlInput.blur();
-  await page.getByRole("button", { name: "Register" }).click();
+  await page.getByRole("button", { name: "Register", exact: true }).click();
 
-  await expect(page.getByText(playbackSourceFeedUrl)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Geshi E2E Feed" }),
+  ).toBeVisible();
   const sourcesResponse = await request.get("/api/v1/sources");
   const sourcesPayload = (await sourcesResponse.json()) as {
     data: Array<{ slug: string; url: string }>;
@@ -139,7 +144,8 @@ test("opens entry detail and exposes playable audio", async ({
   expect(playbackSource).toBeDefined();
   const playbackSourceSlug = playbackSource?.slug ?? "";
 
-  await page.getByRole("button", { name: "Observe" }).click();
+  await page.getByRole("button", { name: "Entry actions" }).click();
+  await page.getByRole("menuitem", { name: "Crawl" }).click();
 
   await expect
     .poll(
@@ -200,6 +206,9 @@ test("opens entry detail and exposes playable audio", async ({
   await page.goto(`/browse/entry/${entry?.id}`);
 
   await expect(page).toHaveURL(/\/browse\/entry\//);
+  await expect(
+    page.getByRole("link", { name: "Original page" }),
+  ).toHaveAttribute("href", `${sourceOrigin}/episodes/1.html`);
 
   const audio = page.locator("audio");
   await expect(audio).toBeVisible();
@@ -215,4 +224,9 @@ test("opens entry detail and exposes playable audio", async ({
 
   expect(mediaResponse.status()).toBe(200);
   expect(mediaResponse.headers()["content-type"]).toBe("audio/mpeg");
+
+  await page.getByRole("button", { name: "Asset actions" }).first().click();
+  await expect(
+    page.getByRole("menuitem", { name: "Request transcripts" }),
+  ).toBeVisible();
 });

@@ -52,6 +52,7 @@ const isSourcesLoading = ref(true);
 const isContentsLoading = ref(true);
 const isContentActionsExpanded = ref(false);
 const isDetailLoading = ref(false);
+const expandedAssetMenuId = ref<string | null>(null);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
 const isSourceSettingsExpanded = ref(false);
@@ -230,6 +231,15 @@ function toggleContentActions(): void {
 
 function closeContentActions(): void {
   isContentActionsExpanded.value = false;
+}
+
+function toggleAssetMenu(assetId: string): void {
+  expandedAssetMenuId.value =
+    expandedAssetMenuId.value === assetId ? null : assetId;
+}
+
+function closeAssetMenu(): void {
+  expandedAssetMenuId.value = null;
 }
 
 async function inspectCurrentSource(): Promise<void> {
@@ -447,6 +457,8 @@ async function refreshSettings(): Promise<void> {
 }
 
 async function syncDetailWithRoute(): Promise<void> {
+  closeAssetMenu();
+
   if (routeState.value.kind !== "browse-entry") {
     contentDetail.value = null;
     detailErrorMessage.value = null;
@@ -471,6 +483,7 @@ async function syncDetailWithRoute(): Promise<void> {
 async function requestContentTranscripts(contentId: string): Promise<void> {
   isTranscriptSubmitting.value = contentId;
   transcriptActionErrorMessage.value = null;
+  closeAssetMenu();
 
   try {
     await requestTranscripts(contentId);
@@ -489,6 +502,7 @@ async function retryFailedTranscript(
 ): Promise<void> {
   isTranscriptSubmitting.value = transcriptId;
   transcriptActionErrorMessage.value = null;
+  closeAssetMenu();
 
   try {
     await retryTranscript(contentId, transcriptId);
@@ -627,11 +641,27 @@ function formatDate(value: string | null): string {
 }
 
 function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
-  return detail.assets.filter((asset) => asset.url !== null);
+  return detail.assets.filter(isPlayableAsset);
 }
 
-function detailAudioAssets(detail: ContentDetailItem): ContentDetailAsset[] {
-  return detail.assets.filter((asset) => asset.kind === "audio");
+function isPlayableAsset(asset: ContentDetailAsset): boolean {
+  if (asset.url === null || asset.mimeType === null) {
+    return false;
+  }
+
+  return (
+    asset.mimeType.startsWith("audio/") || asset.mimeType.startsWith("video/")
+  );
+}
+
+function detailOriginalPageUrl(detail: ContentDetailItem): string | null {
+  const primaryHtmlAsset =
+    detail.assets.find(
+      (asset) => asset.kind === "html" && asset.primary && asset.sourceUrl,
+    ) ??
+    detail.assets.find((asset) => asset.kind === "html" && asset.sourceUrl);
+
+  return primaryHtmlAsset?.sourceUrl ?? null;
 }
 
 function transcriptSourceLabel(transcript: ContentTranscriptItem): string {
@@ -1205,6 +1235,15 @@ function renderContentSummaryPreview(summary: string | null): string {
               <span>{{ contentDetail.kind }}</span>
               <span>{{ contentDetail.status }}</span>
               <span>{{ formatDate(contentDetail.publishedAt) }}</span>
+              <a
+                v-if="detailOriginalPageUrl(contentDetail)"
+                class="detail-meta-link"
+                :href="detailOriginalPageUrl(contentDetail) ?? undefined"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Original page
+              </a>
             </div>
 
             <div
@@ -1213,7 +1252,10 @@ function renderContentSummaryPreview(summary: string | null): string {
               v-html="renderContentSummary(contentDetail.summary)"
             ></div>
 
-            <section class="detail-section">
+            <section
+              v-if="contentDetail.transcripts.length > 0"
+              class="detail-section"
+            >
               <div class="detail-section-header">
                 <div>
                   <h3>Transcripts</h3>
@@ -1221,35 +1263,13 @@ function renderContentSummaryPreview(summary: string | null): string {
                     {{ contentDetail.transcripts.length }}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  class="secondary-button"
-                  :disabled="
-                    detailAudioAssets(contentDetail).length === 0 ||
-                    isTranscriptSubmitting === contentDetail.id
-                  "
-                  @click="requestContentTranscripts(contentDetail.id)"
-                >
-                  {{
-                    isTranscriptSubmitting === contentDetail.id
-                      ? "Requesting..."
-                      : "Request transcripts"
-                  }}
-                </button>
               </div>
 
               <p v-if="transcriptActionErrorMessage" class="feedback error">
                 {{ transcriptActionErrorMessage }}
               </p>
 
-              <div
-                v-if="contentDetail.transcripts.length === 0"
-                class="empty-inline"
-              >
-                No transcripts yet.
-              </div>
-
-              <ul v-else class="asset-list">
+              <ul class="asset-list">
                 <li
                   v-for="transcript in contentDetail.transcripts"
                   :key="transcript.id"
@@ -1301,7 +1321,10 @@ function renderContentSummaryPreview(summary: string | null): string {
               </ul>
             </section>
 
-            <section class="detail-section">
+            <section
+              v-if="detailPlayableAssets(contentDetail).length > 0"
+              class="detail-section"
+            >
               <div class="detail-section-header">
                 <h3>Playable assets</h3>
                 <span class="detail-count">
@@ -1309,24 +1332,91 @@ function renderContentSummaryPreview(summary: string | null): string {
                 </span>
               </div>
 
-              <div
-                v-if="detailPlayableAssets(contentDetail).length === 0"
-                class="empty-inline"
-              >
-                No playable assets stored yet.
-              </div>
+              <p v-if="transcriptActionErrorMessage" class="feedback error">
+                {{ transcriptActionErrorMessage }}
+              </p>
 
-              <ul v-else class="asset-list">
+              <ul class="asset-list">
                 <li
                   v-for="asset in detailPlayableAssets(contentDetail)"
                   :key="asset.id"
                   class="asset-card"
                 >
                   <div class="asset-card-header">
-                    <strong>{{ asset.kind }}</strong>
-                    <span class="asset-meta">
-                      {{ asset.primary ? "Primary" : "Supplemental" }}
-                    </span>
+                    <div class="asset-card-heading">
+                      <strong>{{ asset.kind }}</strong>
+                      <span class="asset-meta">
+                        {{ asset.primary ? "Primary" : "Supplemental" }}
+                      </span>
+                    </div>
+                    <div class="asset-card-actions">
+                      <div class="menu-shell">
+                        <button
+                          type="button"
+                          class="ghost-button menu-toggle-button"
+                          :aria-expanded="expandedAssetMenuId === asset.id"
+                          aria-label="Asset actions"
+                          @click="toggleAssetMenu(asset.id)"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            class="button-icon"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              d="M6 12h.01M12 12h.01M18 12h.01"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-width="2.2"
+                            />
+                          </svg>
+                        </button>
+
+                        <div
+                          v-if="expandedAssetMenuId === asset.id"
+                          class="menu-panel"
+                          role="menu"
+                        >
+                          <a
+                            v-if="asset.url"
+                            class="menu-item"
+                            role="menuitem"
+                            :href="asset.url"
+                            target="_blank"
+                            rel="noreferrer"
+                            @click="closeAssetMenu"
+                          >
+                            Open asset
+                          </a>
+                          <a
+                            v-if="detailOriginalPageUrl(contentDetail)"
+                            class="menu-item"
+                            role="menuitem"
+                            :href="detailOriginalPageUrl(contentDetail) ?? undefined"
+                            target="_blank"
+                            rel="noreferrer"
+                            @click="closeAssetMenu"
+                          >
+                            Original page
+                          </a>
+                          <button
+                            v-if="asset.kind === 'audio'"
+                            type="button"
+                            class="menu-item"
+                            role="menuitem"
+                            :disabled="isTranscriptSubmitting === contentDetail.id"
+                            @click="requestContentTranscripts(contentDetail.id)"
+                          >
+                            {{
+                              isTranscriptSubmitting === contentDetail.id
+                                ? "Requesting..."
+                                : "Request transcripts"
+                            }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <audio v-if="asset.mimeType?.startsWith('audio/')" controls>
@@ -1336,15 +1426,15 @@ function renderContentSummaryPreview(summary: string | null): string {
                     />
                   </audio>
 
-                  <a
-                    v-else-if="asset.url"
-                    class="asset-link"
-                    :href="asset.url"
-                    target="_blank"
-                    rel="noreferrer"
+                  <video
+                    v-else-if="asset.mimeType?.startsWith('video/')"
+                    controls
                   >
-                    Open asset
-                  </a>
+                    <source
+                      :src="asset.url ?? undefined"
+                      :type="asset.mimeType"
+                    />
+                  </video>
 
                   <p class="asset-meta">
                     {{ asset.mimeType ?? "Unknown mime" }}
