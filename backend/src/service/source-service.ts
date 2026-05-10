@@ -3,6 +3,7 @@ import type {
   DuplicateSourceUrlHashError,
   ObserveSourceTarget,
   PeriodicCrawlSourceTarget,
+  SourceCollectorSettingsRecord,
   SourceListItem,
   SourceRepository,
   SourceRepositoryError,
@@ -15,6 +16,11 @@ import type { Logger } from "../logger/index.js";
 import { createLogger } from "../logger/index.js";
 import type { SourceCollectorRegistry } from "../plugins/index.js";
 import { defaultSourceCollectorRegistry } from "../plugins/index.js";
+import type {
+  JsonValue,
+  SourceCollectorSettingSchemaField,
+  SourceCollectorSettingValue as PluginSourceCollectorSettingValue,
+} from "../plugins/types.js";
 import type { SourcePeriodicCrawlSettings } from "./periodic-crawl-settings.js";
 
 export type CreateSourceRequest = {
@@ -44,6 +50,11 @@ export type FindObserveSourceTargetError = {
   message: string;
 };
 
+export type GetSourceCollectorSettingsError = {
+  code: "source_not_found";
+  message: string;
+};
+
 export type SourceCollectorPluginListItem = {
   message: string | null;
   description: string | null;
@@ -51,6 +62,20 @@ export type SourceCollectorPluginListItem = {
   pluginSlug: string;
   sourceKind: "feed" | "podcast" | "streaming";
   status: "available" | "unavailable";
+};
+
+export type SourceCollectorSettingItem = {
+  key: string;
+  type: SourceCollectorSettingSchemaField["type"];
+  value: PluginSourceCollectorSettingValue;
+};
+
+export type SourceCollectorSettingValue = PluginSourceCollectorSettingValue;
+
+export type SourceCollectorSettingsDetail = {
+  baseVersion: number;
+  items: SourceCollectorSettingItem[];
+  periodicCrawl: SourcePeriodicCrawlSettings;
 };
 
 export interface SourceService {
@@ -65,6 +90,14 @@ export interface SourceService {
       FindObserveSourceTargetError | SourceRepositoryError
     >
   >;
+  getSourceCollectorSettings(
+    sourceId: string,
+  ): Promise<
+    Result<
+      SourceCollectorSettingsDetail,
+      GetSourceCollectorSettingsError | SourceRepositoryError
+    >
+  >;
   listSourceCollectorPlugins(): Result<SourceCollectorPluginListItem[], Error>;
   listPeriodicCrawlTargets(): Promise<
     Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
@@ -74,6 +107,7 @@ export interface SourceService {
     sourceId: string,
     settings: SourcePeriodicCrawlSettings,
     baseVersion: number,
+    items?: Array<{ key: string; value: PluginSourceCollectorSettingValue }>,
   ): Promise<
     Result<
       SourceListItem,
@@ -199,6 +233,44 @@ export function createSourceService(
       return ok(source.value);
     },
 
+    async getSourceCollectorSettings(
+      sourceId: string,
+    ): Promise<
+      Result<
+        SourceCollectorSettingsDetail,
+        GetSourceCollectorSettingsError | SourceRepositoryError
+      >
+    > {
+      const currentSettings =
+        await sourceRepository.findSourceCollectorSettings(sourceId);
+
+      if (!currentSettings.ok) {
+        return currentSettings;
+      }
+
+      if (currentSettings.value === null) {
+        return err({
+          code: "source_not_found",
+          message: "Source not found.",
+        });
+      }
+
+      try {
+        return ok(
+          await toSourceCollectorSettingsDetail(
+            sourceCollectorRegistry,
+            currentSettings.value,
+          ),
+        );
+      } catch (error) {
+        return err(
+          error instanceof Error
+            ? error
+            : new Error("Failed to get source collector settings."),
+        );
+      }
+    },
+
     listSourceCollectorPlugins(): Result<
       SourceCollectorPluginListItem[],
       Error
@@ -239,6 +311,10 @@ export function createSourceService(
       sourceId: string,
       settings: SourcePeriodicCrawlSettings,
       baseVersion: number,
+      items: Array<{
+        key: string;
+        value: PluginSourceCollectorSettingValue;
+      }> = [],
     ): Promise<
       Result<
         SourceListItem,
@@ -247,10 +323,29 @@ export function createSourceService(
         | SourceRepositoryError
       >
     > {
+      const currentSettings =
+        await sourceRepository.findSourceCollectorSettings(sourceId);
+
+      if (!currentSettings.ok) {
+        return currentSettings;
+      }
+
+      if (currentSettings.value === null) {
+        return err({
+          code: "source_not_found",
+          message: "Source not found.",
+        });
+      }
+
+      const nextConfig = {
+        ...currentSettings.value.config,
+        ...Object.fromEntries(items.map((item) => [item.key, item.value])),
+      };
       const source = await sourceRepository.updateSourceCollectorSettings(
         sourceId,
         settings,
         baseVersion,
+        nextConfig,
       );
 
       if (!source.ok) {
@@ -267,6 +362,34 @@ export function createSourceService(
       return ok(source.value);
     },
   };
+}
+
+async function toSourceCollectorSettingsDetail(
+  sourceCollectorRegistry: SourceCollectorRegistry,
+  settings: SourceCollectorSettingsRecord,
+): Promise<SourceCollectorSettingsDetail> {
+  const plugin = sourceCollectorRegistry.get(settings.pluginSlug);
+  const schema = (await plugin.settingSchema?.()) ?? [];
+
+  return {
+    baseVersion: settings.baseVersion,
+    items: schema.map((field) => ({
+      key: field.key,
+      type: field.type,
+      value: readCollectorSettingValue(settings.config, field.key),
+    })),
+    periodicCrawl: {
+      enabled: settings.periodicCrawlEnabled,
+      intervalMinutes: settings.periodicCrawlIntervalMinutes,
+    },
+  };
+}
+
+function readCollectorSettingValue(
+  config: Record<string, JsonValue>,
+  key: string,
+): SourceCollectorSettingValue {
+  return key in config ? (config[key] ?? null) : null;
 }
 
 function normalizeOptionalString(

@@ -7,6 +7,7 @@ export type {
   PluginCapability,
   PluginLogger,
   PluginManifest,
+  PluginWebClient,
   RecordedAsset,
   SourceCollectorAcquireInput,
   SourceCollectorExecutionContext,
@@ -24,6 +25,9 @@ export type {
   SourceCollectorPluginCapability,
   SourceCollectorPluginDefinition,
   SourceCollectorRecordInput,
+  SourceCollectorSettingFieldType,
+  SourceCollectorSettingSchemaField,
+  SourceCollectorSettingValue,
   SourceCollectorSourceKind,
   SourceMetadata,
 } from "@geshi/sdk";

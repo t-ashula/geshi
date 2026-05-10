@@ -74,6 +74,10 @@ export const plugin: SourceCollectorPlugin = {
     });
   },
 
+  settingSchema() {
+    return [];
+  },
+
   async inspect(input: SourceCollectorInspectInput) {
     const response = await fetch(input.sourceUrl, {
       signal: input.abortSignal,

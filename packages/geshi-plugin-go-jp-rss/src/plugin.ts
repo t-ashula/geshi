@@ -56,6 +56,10 @@ export const plugin: SourceCollectorPlugin = {
     });
   },
 
+  settingSchema() {
+    return [];
+  },
+
   async inspect(input: SourceCollectorInspectInput) {
     assertSupportedSourceUrl(input.sourceUrl);
 

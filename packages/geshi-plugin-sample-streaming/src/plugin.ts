@@ -45,6 +45,10 @@ export const plugin: SourceCollectorPlugin = {
     });
   },
 
+  settingSchema() {
+    return [];
+  },
+
   async inspect(input: SourceCollectorInspectInput) {
     const descriptor = await fetchStreamDescriptor(
       input.sourceUrl,

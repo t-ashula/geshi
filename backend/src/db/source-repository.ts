@@ -3,7 +3,7 @@ import { sql } from "kysely";
 
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
-import type { SourceCollectorSourceKind } from "../plugins/types.js";
+import type { JsonValue, SourceCollectorSourceKind } from "../plugins/types.js";
 import type { SourcePeriodicCrawlSettings } from "../service/periodic-crawl-settings.js";
 import { defaultSourcePeriodicCrawlSettings } from "../service/periodic-crawl-settings.js";
 import type {
@@ -58,6 +58,13 @@ export type SourceListItem = {
 };
 
 export type PeriodicCrawlSourceTarget = ObserveSourceTarget;
+export type SourceCollectorSettingsRecord = {
+  baseVersion: number;
+  config: Record<string, JsonValue>;
+  periodicCrawlEnabled: boolean;
+  periodicCrawlIntervalMinutes: number;
+  pluginSlug: string;
+};
 export type SourceRepositoryError =
   | CollectorSettingsVersionConflictError
   | DuplicateSourceUrlHashError
@@ -312,10 +319,57 @@ export class SourceRepository {
     }
   }
 
+  public async findSourceCollectorSettings(
+    sourceId: string,
+  ): Promise<
+    Result<SourceCollectorSettingsRecord | null, SourceRepositoryError>
+  > {
+    try {
+      const currentSetting = await this.database
+        .selectFrom("collector_setting_snapshots as css")
+        .innerJoin(
+          "collector_settings as cs",
+          "css.collector_setting_id",
+          "cs.id",
+        )
+        .select([
+          "cs.plugin_slug",
+          "css.config",
+          "css.periodical",
+          "css.periodical_interval_minutes",
+          "css.version as collector_setting_version",
+        ])
+        .where("cs.source_id", "=", sourceId)
+        .orderBy("css.version", "desc")
+        .limit(1)
+        .executeTakeFirst();
+
+      if (currentSetting === undefined) {
+        return ok(null);
+      }
+
+      return ok({
+        baseVersion: currentSetting.collector_setting_version,
+        config: currentSetting.config as Record<string, JsonValue>,
+        periodicCrawlEnabled: currentSetting.periodical,
+        periodicCrawlIntervalMinutes:
+          currentSetting.periodical_interval_minutes,
+        pluginSlug: currentSetting.plugin_slug,
+      });
+    } catch (error) {
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to find source collector settings."),
+      );
+    }
+  }
+
   public async updateSourceCollectorSettings(
     sourceId: string,
     settings: SourcePeriodicCrawlSettings,
     baseVersion: number,
+    config: Record<string, JsonValue>,
   ): Promise<Result<SourceListItem | null, SourceRepositoryError>> {
     try {
       return ok(
@@ -353,7 +407,7 @@ export class SourceRepository {
             .insertInto("collector_setting_snapshots")
             .values({
               collector_setting_id: currentSetting.collector_setting_id,
-              config: currentSetting.config,
+              config,
               enabled: currentSetting.enabled,
               id: crypto.randomUUID(),
               periodical: settings.enabled,

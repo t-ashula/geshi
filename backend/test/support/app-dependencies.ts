@@ -146,6 +146,18 @@ export function createTestAppDependencies(
           },
         ]),
       ),
+      getSourceCollectorSettings: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            baseVersion: 1,
+            items: [],
+            periodicCrawl: {
+              enabled: true,
+              intervalMinutes: 60,
+            },
+          }),
+        ),
+      ),
       listSources: vi.fn(() => Promise.resolve(ok([]))),
       updateSourceCollectorSettings: vi.fn(() =>
         Promise.resolve(

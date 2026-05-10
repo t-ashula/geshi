@@ -9,12 +9,15 @@ import type {
   CreateSourceRequest,
   PeriodicCrawlSettings,
   SourceCollectorPluginListItem,
+  SourceCollectorSettingItem,
+  SourceCollectorSettingsDetail,
   SourceListItem,
 } from "./source-api.js";
 import {
   createSource,
   getContentDetail,
   getPeriodicCrawlSettings,
+  getSourceCollectorSettings,
   inspectSource,
   listSourceCollectorPlugins,
   listContents,
@@ -56,6 +59,7 @@ const expandedAssetMenuId = ref<string | null>(null);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
 const isSourceSettingsExpanded = ref(false);
+const isSourceCollectorSettingsLoading = ref(false);
 const errorMessage = ref<string | null>(null);
 const detailErrorMessage = ref<string | null>(null);
 const inspectErrorMessage = ref<string | null>(null);
@@ -82,6 +86,8 @@ const sourceCrawlForm = ref<PeriodicCrawlSettings>({
   enabled: false,
   intervalMinutes: 60,
 });
+const sourceCollectorSettings = ref<SourceCollectorSettingsDetail | null>(null);
+const sourceCollectorItemsForm = ref<Record<string, unknown>>({});
 const theme = ref<"light" | "dark">("light");
 
 const selectedSourceSlug = computed(() => {
@@ -135,6 +141,8 @@ watch(
     isContentActionsExpanded.value = false;
 
     if (source === null) {
+      sourceCollectorSettings.value = null;
+      sourceCollectorItemsForm.value = {};
       return;
     }
 
@@ -142,7 +150,10 @@ watch(
       enabled: source.periodicCrawlEnabled,
       intervalMinutes: source.periodicCrawlIntervalMinutes,
     };
+    sourceCollectorSettings.value = null;
+    sourceCollectorItemsForm.value = {};
     sourceCrawlErrorMessage.value = null;
+    void refreshSelectedSourceCollectorSettings(source.id);
   },
   { immediate: true },
 );
@@ -361,7 +372,12 @@ async function saveSelectedSourceCrawlSettings(): Promise<void> {
     return;
   }
 
-  if (selectedSource.value.collectorSettingsVersion === null) {
+  if (sourceCollectorSettings.value === null) {
+    sourceCrawlErrorMessage.value = "Source collector settings unavailable.";
+    return;
+  }
+
+  if (sourceCollectorSettings.value.baseVersion === null) {
     sourceCrawlErrorMessage.value =
       "Source collector settings version missing.";
     return;
@@ -374,15 +390,23 @@ async function saveSelectedSourceCrawlSettings(): Promise<void> {
     const updatedSource = await updateSourceCollectorSettings(
       selectedSource.value.id,
       {
-        baseVersion: selectedSource.value.collectorSettingsVersion,
+        baseVersion: sourceCollectorSettings.value.baseVersion,
         enabled: sourceCrawlForm.value.enabled,
         intervalMinutes: Number(sourceCrawlForm.value.intervalMinutes),
+        items: sourceCollectorSettings.value.items.map((item) => ({
+          key: item.key,
+          value: normalizeCollectorSettingFormValue(
+            item,
+            sourceCollectorItemsForm.value[item.key],
+          ),
+        })),
       },
     );
 
     sources.value = sources.value.map((source) =>
       source.id === updatedSource.id ? updatedSource : source,
     );
+    await refreshSelectedSourceCollectorSettings(updatedSource.id);
   } catch (error) {
     sourceCrawlErrorMessage.value =
       error instanceof Error
@@ -424,6 +448,40 @@ async function refreshSourceCollectorPlugins(): Promise<void> {
       error instanceof Error
         ? error.message
         : "Failed to load source collector plugins.";
+  }
+}
+
+async function refreshSelectedSourceCollectorSettings(
+  sourceId: string,
+): Promise<void> {
+  isSourceCollectorSettingsLoading.value = true;
+
+  try {
+    const settings = await getSourceCollectorSettings(sourceId);
+
+    if (selectedSource.value?.id !== sourceId) {
+      return;
+    }
+
+    sourceCollectorSettings.value = settings;
+    sourceCrawlForm.value = {
+      enabled: settings.periodicCrawl.enabled,
+      intervalMinutes: settings.periodicCrawl.intervalMinutes,
+    };
+    sourceCollectorItemsForm.value = Object.fromEntries(
+      settings.items.map((item) => [item.key, item.value]),
+    );
+  } catch (error) {
+    if (selectedSource.value?.id === sourceId) {
+      sourceCrawlErrorMessage.value =
+        error instanceof Error
+          ? error.message
+          : "Failed to load source collector settings.";
+    }
+  } finally {
+    if (selectedSource.value?.id === sourceId) {
+      isSourceCollectorSettingsLoading.value = false;
+    }
   }
 }
 
@@ -688,6 +746,33 @@ function renderContentSummaryPreview(summary: string | null): string {
   }
 
   return summarizeContentSummary(summary);
+}
+
+function isCheckboxCollectorSetting(item: SourceCollectorSettingItem): boolean {
+  return item.type.type === "checkbox";
+}
+
+function isNumberCollectorSetting(item: SourceCollectorSettingItem): boolean {
+  return item.type.type === "number";
+}
+
+function normalizeCollectorSettingFormValue(
+  item: SourceCollectorSettingItem,
+  value: unknown,
+): SourceCollectorSettingItem["value"] {
+  if (item.type.type === "checkbox") {
+    return value === true;
+  }
+
+  if (item.type.type === "number") {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+
+  return typeof value === "string"
+    ? value
+    : value === null
+      ? null
+      : String(value ?? "");
 }
 </script>
 
@@ -1138,6 +1223,44 @@ function renderContentSummaryPreview(summary: string | null): string {
                 </button>
               </div>
             </div>
+
+            <div class="source-settings-grid plugin-settings-grid">
+              <p v-if="isSourceCollectorSettingsLoading" class="feedback">
+                Loading plugin settings...
+              </p>
+
+              <template
+                v-else-if="
+                  sourceCollectorSettings !== null &&
+                  sourceCollectorSettings.items.length > 0
+                "
+              >
+                <label
+                  v-for="item in sourceCollectorSettings.items"
+                  :key="item.key"
+                  :class="{ 'toggle-field': isCheckboxCollectorSetting(item) }"
+                >
+                  <span>{{ item.key }}</span>
+                  <input
+                    v-if="isCheckboxCollectorSetting(item)"
+                    v-model="sourceCollectorItemsForm[item.key]"
+                    type="checkbox"
+                  />
+                  <input
+                    v-else-if="isNumberCollectorSetting(item)"
+                    v-model.number="sourceCollectorItemsForm[item.key]"
+                    type="number"
+                  />
+                  <input
+                    v-else
+                    v-model="sourceCollectorItemsForm[item.key]"
+                    type="text"
+                  />
+                </label>
+              </template>
+
+              <p v-else class="feedback">No plugin settings.</p>
+            </div>
           </section>
 
           <div
@@ -1393,7 +1516,9 @@ function renderContentSummaryPreview(summary: string | null): string {
                             v-if="detailOriginalPageUrl(contentDetail)"
                             class="menu-item"
                             role="menuitem"
-                            :href="detailOriginalPageUrl(contentDetail) ?? undefined"
+                            :href="
+                              detailOriginalPageUrl(contentDetail) ?? undefined
+                            "
                             target="_blank"
                             rel="noreferrer"
                             @click="closeAssetMenu"
@@ -1405,7 +1530,9 @@ function renderContentSummaryPreview(summary: string | null): string {
                             type="button"
                             class="menu-item"
                             role="menuitem"
-                            :disabled="isTranscriptSubmitting === contentDetail.id"
+                            :disabled="
+                              isTranscriptSubmitting === contentDetail.id
+                            "
                             @click="requestContentTranscripts(contentDetail.id)"
                           >
                             {{
