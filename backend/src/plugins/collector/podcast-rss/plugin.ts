@@ -2,9 +2,11 @@ import { XMLParser } from "fast-xml-parser";
 
 import type {
   AcquiredAsset,
+  ExtractedDetailBody,
   ObservedAsset,
   ObservedContent,
   SourceCollectorAcquireInput,
+  SourceCollectorExtractInput,
   SourceCollectorInspectErrorCode,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
@@ -79,11 +81,25 @@ export const plugin: SourceCollectorPlugin = {
   },
 
   async inspect(input: SourceCollectorInspectInput) {
-    const response = await fetch(input.sourceUrl, {
-      signal: input.abortSignal,
-    }).catch(() => null);
+    const webClient = await input.context.getWebClient({
+      kind: "fetch",
+    });
+    let response: Response;
 
-    if (response === null || !response.ok) {
+    try {
+      response = await webClient.fetch(
+        new Request(input.sourceUrl, {
+          signal: input.abortSignal,
+        }),
+      );
+    } catch {
+      throw new SourceCollectorInspectPluginError(
+        "source_inspect_fetch_failed",
+        "Failed to fetch source metadata.",
+      );
+    }
+
+    if (!response.ok) {
       throw new SourceCollectorInspectPluginError(
         "source_inspect_fetch_failed",
         "Failed to fetch source metadata.",
@@ -110,9 +126,14 @@ export const plugin: SourceCollectorPlugin = {
   async observe(
     input: SourceCollectorObserveInput,
   ): Promise<{ contents: ObservedContent[] }> {
-    const response = await fetch(input.sourceUrl, {
-      signal: input.abortSignal,
+    const webClient = await input.context.getWebClient({
+      kind: "fetch",
     });
+    const response = await webClient.fetch(
+      new Request(input.sourceUrl, {
+        signal: input.abortSignal,
+      }),
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch RSS feed: ${response.status}`);
@@ -132,14 +153,25 @@ export const plugin: SourceCollectorPlugin = {
     };
   },
 
+  extract(
+    _input: SourceCollectorExtractInput,
+  ): Promise<ExtractedDetailBody | null> {
+    return Promise.resolve(null);
+  },
+
   async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
     if (input.asset.sourceUrl === null) {
       throw new Error("Podcast RSS asset sourceUrl is required.");
     }
 
-    const response = await fetch(input.asset.sourceUrl, {
-      signal: input.abortSignal,
+    const webClient = await input.context.getWebClient({
+      kind: "fetch",
     });
+    const response = await webClient.fetch(
+      new Request(input.asset.sourceUrl, {
+        signal: input.abortSignal,
+      }),
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch asset: ${response.status}`);

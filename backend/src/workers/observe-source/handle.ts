@@ -88,13 +88,20 @@ export async function handleObserveSourceJob(
   let observeResult;
 
   try {
+    const pluginLogger = logger.child({
+      operation: "observe",
+    });
     observeResult = await plugin.observe({
       abortSignal: AbortSignal.timeout(30_000),
       collectorPluginState: collectorPluginStateResult.value,
       config: payload.collector.config,
-      logger: logger.child({
-        operation: "observe",
-      }),
+      context: {
+        logger: pluginLogger,
+        getWebClient: (_input) =>
+          Promise.resolve({
+            fetch: async (request) => fetch(request),
+          }),
+      },
       sourceUrl: payload.source.url,
     });
   } catch (error) {

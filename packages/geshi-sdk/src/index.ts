@@ -17,6 +17,18 @@ export type SourceCollectorSettingSchemaField = {
 
 export type SourceCollectorSettingValue = JsonValue | null;
 
+export type ExtractorAsset = {
+  body: Uint8Array;
+  kind: string;
+  mimeType: string | null;
+  sourceUrl: string | null;
+};
+
+export type ExtractedDetailBody = {
+  body: string;
+  format: "html" | "markdown" | "plain";
+};
+
 export type PluginLogMetadata = Record<string, unknown>;
 
 export interface PluginLogger {
@@ -108,15 +120,13 @@ export type SourceCollectorObserveInput = {
   abortSignal: AbortSignal;
   collectorPluginState?: JsonObject;
   config: Record<string, unknown>;
-  context?: SourceCollectorExecutionContext;
-  logger: PluginLogger;
+  context: SourceCollectorExecutionContext;
   sourceUrl: string;
 };
 
 export type SourceCollectorSupportsInput = {
   config: Record<string, unknown>;
-  context?: SourceCollectorExecutionContext;
-  logger: PluginLogger;
+  context: SourceCollectorExecutionContext;
   sourceUrl: string;
 };
 
@@ -143,13 +153,13 @@ export type SourceCollectorInspectError = {
 export type SourceCollectorInspectInput = {
   abortSignal: AbortSignal;
   config: Record<string, unknown>;
-  context?: SourceCollectorExecutionContext;
-  logger: PluginLogger;
+  context: SourceCollectorExecutionContext;
   sourceUrl: string;
 };
 
 export type SourceCollectorExecutionContext = {
-  getWebClient?(): Promise<PluginWebClient>;
+  logger: PluginLogger;
+  getWebClient(input: GetWebClientInput): Promise<PluginWebClient>;
   putWorkObject?(input: {
     body: Uint8Array;
     overwrite: boolean;
@@ -157,25 +167,12 @@ export type SourceCollectorExecutionContext = {
   replacePluginMetadata?(metadata: JsonObject): Promise<void>;
 };
 
+export type GetWebClientInput = {
+  kind: "browser" | "fetch";
+};
+
 export interface PluginWebClient {
   fetch(request: Request): Promise<Response>;
-  getBrowser?(): Promise<unknown>;
-}
-
-export function createPluginWebClient(input: {
-  fetch(request: Request): Promise<Response>;
-  getBrowser?(): Promise<unknown>;
-}): PluginWebClient {
-  let getBrowser: (() => Promise<unknown>) | undefined;
-
-  if (input.getBrowser !== undefined) {
-    getBrowser = (): Promise<unknown> => input.getBrowser!();
-  }
-
-  return {
-    fetch: (request) => input.fetch(request),
-    getBrowser,
-  };
 }
 
 export type SourceCollectorAcquireInput = {
@@ -184,8 +181,12 @@ export type SourceCollectorAcquireInput = {
   collectorPluginState?: JsonObject;
   config: Record<string, unknown>;
   content: Omit<ObservedContent, "assets" | "contentFingerprints">;
-  context?: SourceCollectorExecutionContext;
-  logger: PluginLogger;
+  context: SourceCollectorExecutionContext;
+};
+
+export type SourceCollectorExtractInput = {
+  asset: ExtractorAsset;
+  context: SourceCollectorExecutionContext;
 };
 
 export type SourceCollectorRecordInput = {
@@ -196,7 +197,6 @@ export type SourceCollectorRecordInput = {
   config: Record<string, unknown>;
   content: Omit<ObservedContent, "assets" | "contentFingerprints">;
   context: SourceCollectorExecutionContext;
-  logger: PluginLogger;
 };
 
 type AssetBodyPayload = {
@@ -233,13 +233,16 @@ export interface SourceCollectorPlugin {
   supports(
     input: SourceCollectorSupportsInput,
   ): Promise<SourceCollectorSupportsResult>;
-  settingSchema?():
+  settingSchema():
     | SourceCollectorSettingSchemaField[]
     | Promise<SourceCollectorSettingSchemaField[]>;
   inspect(input: SourceCollectorInspectInput): Promise<SourceMetadata>;
   observe(
     input: SourceCollectorObserveInput,
   ): Promise<SourceCollectorObserveResult>;
+  extract(
+    input: SourceCollectorExtractInput,
+  ): Promise<ExtractedDetailBody | null>;
   acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset>;
   record?(input: SourceCollectorRecordInput): Promise<RecordedAsset>;
 }

@@ -18,6 +18,7 @@ import { assertErr, assertOk } from "../support/result.js";
 
 const sourceCollectorPlugin = {
   acquire: vi.fn(),
+  extract: vi.fn(() => Promise.resolve(null)),
   inspect: vi.fn(),
   observe: vi.fn(),
   settingSchema: vi.fn(() => []),

@@ -1,5 +1,8 @@
 export type {
   AcquiredAsset,
+  ExtractedDetailBody,
+  ExtractorAsset,
+  GetWebClientInput,
   JsonObject,
   JsonValue,
   ObservedAsset,
@@ -13,6 +16,7 @@ export type {
   SourceCollectorExecutionContext,
   SourceCollectorExpirationAction,
   SourceCollectorExpirationPolicy,
+  SourceCollectorExtractInput,
   SourceCollectorInspectError,
   SourceCollectorInspectErrorCode,
   SourceCollectorInspectInput,

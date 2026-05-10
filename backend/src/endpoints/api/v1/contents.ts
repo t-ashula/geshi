@@ -7,13 +7,20 @@ import type { TranscriptListItem } from "../../../db/transcript-repository.js";
 import type { AppDependencies } from "../../../deps.js";
 import { contentTypeToExtension } from "../../../lib/content-type-extension.js";
 import type { Result } from "../../../lib/result.js";
-import { ok } from "../../../lib/result.js";
+import { err, ok } from "../../../lib/result.js";
 import type { FindContentDetailError } from "../../../service/content-service.js";
 import type {
   EnqueueTranscriptResult,
   RetryTranscriptResult,
   TranscriptServiceError,
 } from "../../../service/transcript-service.js";
+
+export type GetContentDetailEndpointError =
+  | FindContentDetailError
+  | {
+      code: "content_detail_failed";
+      message: string;
+    };
 
 export type ContentDetailEndpointValue = ContentDetailItem & {
   assets: Array<
@@ -32,7 +39,9 @@ export function createListContentsEndpoint(dependencies: AppDependencies) {
 export function createGetContentDetailEndpoint(dependencies: AppDependencies) {
   return async (
     contentId: string,
-  ): Promise<Result<ContentDetailEndpointValue, FindContentDetailError>> => {
+  ): Promise<
+    Result<ContentDetailEndpointValue, GetContentDetailEndpointError>
+  > => {
     const result =
       await dependencies.contentService.findContentDetail(contentId);
 
@@ -41,6 +50,18 @@ export function createGetContentDetailEndpoint(dependencies: AppDependencies) {
     }
 
     const content = result.value;
+    const detailBody =
+      await dependencies.detailBodyService.findOrCreateDetailBodyByContentId(
+        content.id,
+      );
+
+    if (!detailBody.ok) {
+      return err({
+        code: "content_detail_failed",
+        message: detailBody.error.message,
+      });
+    }
+
     const assets = await dependencies.assetService.listAssetsByContentId(
       content.id,
     );
@@ -50,11 +71,21 @@ export function createGetContentDetailEndpoint(dependencies: AppDependencies) {
       );
 
     if (!transcripts.ok) {
-      throw new Error(transcripts.error.message);
+      return err({
+        code: "content_detail_failed",
+        message: transcripts.error.message,
+      });
     }
 
     return ok({
       ...content,
+      detailBody:
+        detailBody.value === null
+          ? null
+          : {
+              body: detailBody.value.body,
+              format: detailBody.value.format,
+            },
       assets: assets.map((asset) => ({
         ...asset,
         url: buildAssetUrl(asset.id, asset.mimeType),

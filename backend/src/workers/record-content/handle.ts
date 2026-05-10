@@ -89,6 +89,9 @@ export async function handleRecordContentJob(
   let recordedAsset;
 
   try {
+    const pluginLogger = logger.child({
+      operation: "record",
+    });
     recordedAsset = await plugin.record({
       abortSignal: new AbortController().signal,
       arguments: argumentsObject,
@@ -106,6 +109,11 @@ export async function handleRecordContentJob(
       config: payload.collector.config,
       content: payload.content,
       context: {
+        logger: pluginLogger,
+        getWebClient: (_input) =>
+          Promise.resolve({
+            fetch: async (request) => fetch(request),
+          }),
         putWorkObject: async (input) => {
           const storedWorkFile = await dependencies.workStorage.put({
             body: input.body,
@@ -141,9 +149,6 @@ export async function handleRecordContentJob(
           });
         },
       },
-      logger: logger.child({
-        operation: "record",
-      }),
     });
   } catch (error) {
     await failRecordContentJob(payload, dependencies, logger, error);

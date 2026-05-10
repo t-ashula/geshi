@@ -79,12 +79,19 @@ export function createSourceInspectService(
         request.pluginSlug ?? "podcast-rss",
       );
       try {
+        const pluginLogger = inspectLogger.child({
+          pluginApi: "inspect",
+        });
         const sourceMetadata = await plugin.inspect({
           abortSignal: new AbortController().signal,
           config: {},
-          logger: inspectLogger.child({
-            pluginApi: "inspect",
-          }),
+          context: {
+            logger: pluginLogger,
+            getWebClient: (_input) =>
+              Promise.resolve({
+                fetch: async (request) => fetch(request),
+              }),
+          },
           sourceUrl: normalizedUrl,
         });
         inspectLogger.info("source inspect completed.", {

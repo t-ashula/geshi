@@ -1,8 +1,10 @@
 import type {
   AcquiredAsset,
+  ExtractedDetailBody,
   JsonObject,
   ObservedContent,
   SourceCollectorAcquireInput,
+  SourceCollectorExtractInput,
   SourceCollectorInspectErrorCode,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
@@ -63,7 +65,11 @@ export const plugin: SourceCollectorPlugin = {
   async inspect(input: SourceCollectorInspectInput) {
     assertSupportedSourceUrl(input.sourceUrl);
 
-    const page = await fetchGovOnlinePage(input.sourceUrl, input.abortSignal);
+    const page = await fetchGovOnlinePage(
+      input.context,
+      input.sourceUrl,
+      input.abortSignal,
+    );
 
     if (page.metadata.title === null && page.metadata.description === null) {
       throw new SourceCollectorInspectPluginError(
@@ -92,7 +98,11 @@ export const plugin: SourceCollectorPlugin = {
     let currentUrl = input.sourceUrl;
 
     while (observedContents.length < MAX_ITEMS) {
-      const page = await fetchGovOnlinePage(currentUrl, input.abortSignal);
+      const page = await fetchGovOnlinePage(
+        input.context,
+        currentUrl,
+        input.abortSignal,
+      );
 
       if (page.entries.length === 0) {
         break;
@@ -150,17 +160,28 @@ export const plugin: SourceCollectorPlugin = {
     };
   },
 
+  extract(
+    _input: SourceCollectorExtractInput,
+  ): Promise<ExtractedDetailBody | null> {
+    return Promise.resolve(null);
+  },
+
   async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
     if (input.asset.sourceUrl === null) {
       throw new Error("go-jp-rss asset sourceUrl is required.");
     }
 
-    const response = await fetch(input.asset.sourceUrl, {
-      headers: {
-        "User-Agent": DEFAULT_USER_AGENT,
-      },
-      signal: input.abortSignal,
+    const webClient = await input.context.getWebClient({
+      kind: "fetch",
     });
+    const response = await webClient.fetch(
+      new Request(input.asset.sourceUrl, {
+        headers: {
+          "User-Agent": DEFAULT_USER_AGENT,
+        },
+        signal: input.abortSignal,
+      }),
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch asset: ${response.status}`);
@@ -216,17 +237,32 @@ function isSupportedSourceUrl(sourceUrl: string): boolean {
 }
 
 async function fetchGovOnlinePage(
+  context: SourceCollectorInspectInput["context"],
   sourceUrl: string,
   abortSignal: AbortSignal,
 ): Promise<GovOnlinePage> {
-  const response = await fetch(sourceUrl, {
-    headers: {
-      "User-Agent": DEFAULT_USER_AGENT,
-    },
-    signal: abortSignal,
-  }).catch(() => null);
+  const webClient = await context.getWebClient({
+    kind: "fetch",
+  });
+  let response: Response;
 
-  if (response === null || !response.ok) {
+  try {
+    response = await webClient.fetch(
+      new Request(sourceUrl, {
+        headers: {
+          "User-Agent": DEFAULT_USER_AGENT,
+        },
+        signal: abortSignal,
+      }),
+    );
+  } catch {
+    throw new SourceCollectorInspectPluginError(
+      "source_inspect_fetch_failed",
+      "Failed to fetch gov-online source.",
+    );
+  }
+
+  if (!response.ok) {
     throw new SourceCollectorInspectPluginError(
       "source_inspect_fetch_failed",
       "Failed to fetch gov-online source.",

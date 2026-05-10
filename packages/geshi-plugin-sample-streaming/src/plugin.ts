@@ -2,8 +2,10 @@ import { spawn } from "node:child_process";
 
 import type {
   AcquiredAsset,
+  ExtractedDetailBody,
   RecordedAsset,
   SourceCollectorAcquireInput,
+  SourceCollectorExtractInput,
   SourceCollectorInspectErrorCode,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
@@ -51,6 +53,7 @@ export const plugin: SourceCollectorPlugin = {
 
   async inspect(input: SourceCollectorInspectInput) {
     const descriptor = await fetchStreamDescriptor(
+      input.context,
       input.sourceUrl,
       input.abortSignal,
     );
@@ -66,6 +69,7 @@ export const plugin: SourceCollectorPlugin = {
     input: SourceCollectorObserveInput,
   ): Promise<SourceCollectorObserveResult> {
     const descriptor = await fetchStreamDescriptor(
+      input.context,
       input.sourceUrl,
       input.abortSignal,
     );
@@ -122,6 +126,12 @@ export const plugin: SourceCollectorPlugin = {
     );
   },
 
+  extract(
+    _input: SourceCollectorExtractInput,
+  ): Promise<ExtractedDetailBody | null> {
+    return Promise.resolve(null);
+  },
+
   async record(input: SourceCollectorRecordInput): Promise<RecordedAsset> {
     const playlistUrl =
       typeof input.arguments.playlistUrl === "string"
@@ -173,6 +183,7 @@ export const definition: SourceCollectorPluginDefinition = {
 };
 
 async function fetchStreamDescriptor(
+  context: SourceCollectorInspectInput["context"],
   sourceUrl: string,
   abortSignal: AbortSignal,
 ): Promise<StreamDescriptor> {
@@ -181,9 +192,14 @@ async function fetchStreamDescriptor(
   let response: Response;
 
   try {
-    response = await fetch(sourceUrl, {
-      signal: abortSignal,
+    const webClient = await context.getWebClient({
+      kind: "fetch",
     });
+    response = await webClient.fetch(
+      new Request(sourceUrl, {
+        signal: abortSignal,
+      }),
+    );
   } catch {
     throw new SourceCollectorInspectPluginError(
       "source_inspect_fetch_failed",

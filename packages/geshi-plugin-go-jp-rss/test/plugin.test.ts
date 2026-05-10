@@ -2,12 +2,31 @@ import { describe, expect, it, vi } from "vitest";
 
 import { plugin } from "../src/index.js";
 
+function createNoopPluginLogger() {
+  return {
+    debug() {},
+    error() {},
+    info() {},
+    warn() {},
+  };
+}
+
+function createPluginContext() {
+  return {
+    logger: createNoopPluginLogger(),
+    getWebClient: (_input: { kind: "browser" | "fetch" }) =>
+      Promise.resolve({
+        fetch: (request: Request) => fetch(request),
+      }),
+  };
+}
+
 describe("goJpRss plugin", () => {
   it("reports support only for gov-online ministry news urls", async () => {
     await expect(
       plugin.supports({
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://www.gov-online.go.jp/info/index.html",
       }),
     ).resolves.toEqual({
@@ -17,7 +36,7 @@ describe("goJpRss plugin", () => {
     await expect(
       plugin.supports({
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://example.com/info/index.html",
       }),
     ).resolves.toEqual({
@@ -50,7 +69,7 @@ describe("goJpRss plugin", () => {
       plugin.inspect({
         abortSignal: new AbortController().signal,
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://www.gov-online.go.jp/info/index.html",
       }),
     ).resolves.toEqual({
@@ -66,7 +85,7 @@ describe("goJpRss plugin", () => {
       plugin.inspect({
         abortSignal: new AbortController().signal,
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://example.com/info/index.html",
       }),
     ).rejects.toMatchObject({
@@ -148,7 +167,7 @@ describe("goJpRss plugin", () => {
         lastProcessedUrl: "https://example.go.jp/news/4",
       },
       config: {},
-      logger: createNoopPluginLogger(),
+      context: createPluginContext(),
       sourceUrl: "https://www.gov-online.go.jp/info/index.html",
     });
 
@@ -224,7 +243,7 @@ describe("goJpRss plugin", () => {
     const observed = await plugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
-      logger: createNoopPluginLogger(),
+      context: createPluginContext(),
       sourceUrl: "https://www.gov-online.go.jp/info/index.html",
     });
 
@@ -286,7 +305,7 @@ describe("goJpRss plugin", () => {
         summary: null,
         title: "記事1",
       },
-      logger: createNoopPluginLogger(),
+      context: createPluginContext(),
     });
 
     expect(asset.contentType).toBe("text/html");
@@ -297,12 +316,3 @@ describe("goJpRss plugin", () => {
     expect(asset.body.byteLength).toBeGreaterThan(0);
   });
 });
-
-function createNoopPluginLogger() {
-  return {
-    debug() {},
-    error() {},
-    info() {},
-    warn() {},
-  };
-}

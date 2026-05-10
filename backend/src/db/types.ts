@@ -165,6 +165,15 @@ export type TranscriptTable = {
   status: "queued" | "running" | "succeeded" | "failed";
 };
 
+export type DetailBodyTable = {
+  body: string;
+  content_id: string;
+  created_at: TimestampColumn;
+  format: "html" | "markdown" | "plain";
+  id: string;
+  source_asset_snapshot_id: string;
+};
+
 export type TranscriptChunkTable = {
   body: string | null;
   chunk_index: number;
@@ -191,6 +200,7 @@ export type GeshiDatabase = {
   collector_settings: CollectorSettingTable;
   content_snapshots: ContentSnapshotTable;
   contents: ContentTable;
+  detail_bodies: DetailBodyTable;
   jobs: JobTable;
   transcript_chunks: TranscriptChunkTable;
   transcripts: TranscriptTable;

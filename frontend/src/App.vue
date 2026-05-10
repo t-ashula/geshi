@@ -702,6 +702,12 @@ function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
   return detail.assets.filter(isPlayableAsset);
 }
 
+function detailReferenceAssets(
+  detail: ContentDetailItem,
+): ContentDetailAsset[] {
+  return detail.assets.filter((asset) => !isPlayableAsset(asset));
+}
+
 function isPlayableAsset(asset: ContentDetailAsset): boolean {
   if (asset.url === null || asset.mimeType === null) {
     return false;
@@ -738,6 +744,16 @@ function renderContentSummary(summary: string | null): string {
   }
 
   return sanitizeContentSummary(summary);
+}
+
+function detailDisplayBody(detail: ContentDetailItem): string | null {
+  return detail.detailBody?.body ?? null;
+}
+
+function detailDisplayFormat(
+  detail: ContentDetailItem,
+): "html" | "markdown" | "plain" | null {
+  return detail.detailBody?.format ?? null;
 }
 
 function renderContentSummaryPreview(summary: string | null): string {
@@ -1369,8 +1385,17 @@ function normalizeCollectorSettingFormValue(
               </a>
             </div>
 
+            <div v-if="detailDisplayBody(contentDetail)" class="detail-summary">
+              <pre
+                v-if="detailDisplayFormat(contentDetail) === 'plain'"
+                class="detail-body-text"
+                >{{ detailDisplayBody(contentDetail) }}</pre
+              >
+              <div v-else v-html="detailDisplayBody(contentDetail) ?? ''"></div>
+            </div>
+
             <div
-              v-if="contentDetail.summary"
+              v-else-if="contentDetail.summary"
               class="detail-summary"
               v-html="renderContentSummary(contentDetail.summary)"
             ></div>
@@ -1569,6 +1594,46 @@ function normalizeCollectorSettingFormValue(
                       · {{ asset.byteSize }} bytes
                     </template>
                   </p>
+                </li>
+              </ul>
+            </section>
+
+            <section
+              v-if="detailReferenceAssets(contentDetail).length > 0"
+              class="detail-section"
+            >
+              <div class="detail-section-header">
+                <h3>Reference assets</h3>
+                <span class="detail-count">
+                  {{ detailReferenceAssets(contentDetail).length }}
+                </span>
+              </div>
+
+              <ul class="asset-list">
+                <li
+                  v-for="asset in detailReferenceAssets(contentDetail)"
+                  :key="asset.id"
+                  class="asset-card"
+                >
+                  <div class="asset-card-header">
+                    <div class="asset-card-heading">
+                      <strong>{{ asset.kind }}</strong>
+                      <span class="asset-meta">
+                        {{ asset.mimeType ?? "unknown type" }}
+                      </span>
+                    </div>
+                    <div class="asset-card-actions">
+                      <a
+                        v-if="asset.url"
+                        class="ghost-button"
+                        :href="asset.url"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open stored asset
+                      </a>
+                    </div>
+                  </div>
                 </li>
               </ul>
             </section>

@@ -52,6 +52,9 @@ export async function handleAcquireContentJob(
   let acquiredAsset;
 
   try {
+    const pluginLogger = logger.child({
+      operation: "acquire",
+    });
     acquiredAsset = await plugin.acquire({
       abortSignal: AbortSignal.timeout(30_000),
       asset: {
@@ -66,6 +69,11 @@ export async function handleAcquireContentJob(
       config: payload.collector.config,
       content: payload.content,
       context: {
+        logger: pluginLogger,
+        getWebClient: (_input) =>
+          Promise.resolve({
+            fetch: async (request) => fetch(request),
+          }),
         putWorkObject: async (input) => {
           const storedWorkObject = await dependencies.workStorage.put({
             body: input.body,
@@ -81,9 +89,6 @@ export async function handleAcquireContentJob(
           return storedWorkObject.value;
         },
       },
-      logger: logger.child({
-        operation: "acquire",
-      }),
     });
   } catch (error) {
     await failAcquireContentJob(payload, dependencies, logger, error);

@@ -125,6 +125,10 @@ export type ContentTranscriptItem = {
 export type ContentDetailItem = {
   assets: ContentDetailAsset[];
   collectedAt: string;
+  detailBody: {
+    body: string;
+    format: "html" | "markdown" | "plain";
+  } | null;
   id: string;
   kind: string;
   publishedAt: string | null;

@@ -50,6 +50,7 @@ export function createTestAppDependencies(
         Promise.resolve(
           ok({
             collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+            detailBody: null,
             id: "content-1",
             kind: "podcast-episode",
             publishedAt: null,
@@ -66,6 +67,9 @@ export function createTestAppDependencies(
       ),
       listContents: vi.fn(() => Promise.resolve([])),
     } as unknown as ContentService,
+    detailBodyService: {
+      findOrCreateDetailBodyByContentId: vi.fn(() => Promise.resolve(ok(null))),
+    },
     jobService: {
       enqueueObserveSourceJob: vi.fn(() =>
         Promise.resolve(
