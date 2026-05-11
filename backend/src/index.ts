@@ -23,6 +23,7 @@ import {
   TRANSCRIPT_SPLIT_JOB_NAME,
 } from "./job-queue/types.js";
 import { createLogger } from "./logger/index.js";
+import { getWebClient } from "./plugins/web-client.js";
 import { getRuntimeConfig } from "./runtime-config.js";
 import { createAppSettingService } from "./service/app-setting-service.js";
 import { createAssetService } from "./service/asset-service.js";
@@ -80,6 +81,12 @@ const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
 const detailBodyService = createDetailBodyService(
   detailBodyRepository,
   storage,
+  {
+    getWebClient,
+    logger: logger.child({
+      service: "detail-body",
+    }),
+  },
 );
 
 boss.on("error", (error) => {

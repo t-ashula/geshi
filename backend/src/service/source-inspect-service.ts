@@ -9,6 +9,7 @@ import type {
   SourceCollectorInspectError,
   SourceMetadata,
 } from "../plugins/types.js";
+import { getWebClient } from "../plugins/web-client.js";
 import type { SourceUrlError } from "./source-service.js";
 import { normalizeSourceUrl } from "./source-service.js";
 
@@ -86,11 +87,10 @@ export function createSourceInspectService(
           abortSignal: new AbortController().signal,
           config: {},
           context: {
+            getWebClient(input) {
+              return getWebClient(input, pluginLogger);
+            },
             logger: pluginLogger,
-            getWebClient: (_input) =>
-              Promise.resolve({
-                fetch: async (request) => fetch(request),
-              }),
           },
           sourceUrl: normalizedUrl,
         });

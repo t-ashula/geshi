@@ -315,7 +315,6 @@ describe("goJpRss plugin", () => {
     }
     expect(asset.body.byteLength).toBeGreaterThan(0);
   });
-
   it("extracts a sanitized html detail body", async () => {
     await expect(
       plugin.extract({

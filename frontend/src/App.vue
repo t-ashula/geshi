@@ -32,6 +32,10 @@ import {
   sanitizeContentSummary,
   summarizeContentSummary,
 } from "./content-summary.js";
+import {
+  detailOriginalPageUrl,
+  selectDetailDisplayContent,
+} from "./content-detail.js";
 import { validateCreateSourceRequest } from "./source-form.js";
 
 type RouteState =
@@ -91,11 +95,17 @@ const sourceCollectorItemsForm = ref<Record<string, unknown>>({});
 const theme = ref<"light" | "dark">("light");
 
 const selectedSourceSlug = computed(() => {
-  switch (routeState.value.kind) {
+  const route = routeState.value;
+
+  switch (route.kind) {
     case "browse-feed":
-      return routeState.value.feedSlug;
-    case "browse-entry":
-      return contentDetail.value?.source.slug ?? null;
+      return route.feedSlug;
+    case "browse-entry": {
+      const content = contents.value.find(
+        (entry) => entry.id === route.entryId,
+      );
+      return content?.sourceSlug ?? contentDetail.value?.source.slug ?? null;
+    }
     default:
       return null;
   }
@@ -718,16 +728,6 @@ function isPlayableAsset(asset: ContentDetailAsset): boolean {
   );
 }
 
-function detailOriginalPageUrl(detail: ContentDetailItem): string | null {
-  const primaryHtmlAsset =
-    detail.assets.find(
-      (asset) => asset.kind === "html" && asset.primary && asset.sourceUrl,
-    ) ??
-    detail.assets.find((asset) => asset.kind === "html" && asset.sourceUrl);
-
-  return primaryHtmlAsset?.sourceUrl ?? null;
-}
-
 function transcriptSourceLabel(transcript: ContentTranscriptItem): string {
   const source = transcript.sourceAsset;
 
@@ -747,13 +747,23 @@ function renderContentSummary(summary: string | null): string {
 }
 
 function detailDisplayBody(detail: ContentDetailItem): string | null {
-  return detail.detailBody?.body ?? null;
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "detail-body" ? display.body : null;
 }
 
 function detailDisplayFormat(
   detail: ContentDetailItem,
 ): "html" | "markdown" | "plain" | null {
-  return detail.detailBody?.format ?? null;
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "detail-body" ? display.format : null;
+}
+
+function detailDisplaySummary(detail: ContentDetailItem): string | null {
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "summary" ? display.summary : null;
 }
 
 function renderContentSummaryPreview(summary: string | null): string {
@@ -1395,9 +1405,9 @@ function normalizeCollectorSettingFormValue(
             </div>
 
             <div
-              v-else-if="contentDetail.summary"
+              v-else-if="detailDisplaySummary(contentDetail)"
               class="detail-summary"
-              v-html="renderContentSummary(contentDetail.summary)"
+              v-html="renderContentSummary(detailDisplaySummary(contentDetail))"
             ></div>
 
             <section

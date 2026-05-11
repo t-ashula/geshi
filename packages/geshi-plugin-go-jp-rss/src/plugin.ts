@@ -14,6 +14,7 @@ import type {
   SourceCollectorSupportsInput,
   SourceMetadata,
 } from "@geshi/sdk";
+
 import { extractHtmlDetailBody } from "./html-detail-body.js";
 import { manifest } from "./manifest.js";
 

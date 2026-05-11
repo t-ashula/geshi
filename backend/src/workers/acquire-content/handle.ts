@@ -8,6 +8,7 @@ import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import type { AcquiredAsset } from "../../plugins/types.js";
+import { getWebClient } from "../../plugins/web-client.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
 import type { Storage } from "../../storage/types.js";
@@ -69,11 +70,10 @@ export async function handleAcquireContentJob(
       config: payload.collector.config,
       content: payload.content,
       context: {
+        getWebClient(input) {
+          return getWebClient(input, pluginLogger);
+        },
         logger: pluginLogger,
-        getWebClient: (_input) =>
-          Promise.resolve({
-            fetch: async (request) => fetch(request),
-          }),
         putWorkObject: async (input) => {
           const storedWorkObject = await dependencies.workStorage.put({
             body: input.body,

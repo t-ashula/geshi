@@ -19,6 +19,7 @@ import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import type { ObservedAsset, ObservedContent } from "../../plugins/types.js";
+import { getWebClient } from "../../plugins/web-client.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
 
@@ -96,11 +97,10 @@ export async function handleObserveSourceJob(
       collectorPluginState: collectorPluginStateResult.value,
       config: payload.collector.config,
       context: {
+        getWebClient(input) {
+          return getWebClient(input, pluginLogger);
+        },
         logger: pluginLogger,
-        getWebClient: (_input) =>
-          Promise.resolve({
-            fetch: async (request) => fetch(request),
-          }),
       },
       sourceUrl: payload.source.url,
     });

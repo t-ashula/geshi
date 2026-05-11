@@ -7,7 +7,7 @@ import type { TranscriptListItem } from "../../../db/transcript-repository.js";
 import type { AppDependencies } from "../../../deps.js";
 import { contentTypeToExtension } from "../../../lib/content-type-extension.js";
 import type { Result } from "../../../lib/result.js";
-import { err, ok } from "../../../lib/result.js";
+import { ok } from "../../../lib/result.js";
 import type { FindContentDetailError } from "../../../service/content-service.js";
 import type {
   EnqueueTranscriptResult,
@@ -15,12 +15,7 @@ import type {
   TranscriptServiceError,
 } from "../../../service/transcript-service.js";
 
-export type GetContentDetailEndpointError =
-  | FindContentDetailError
-  | {
-      code: "content_detail_failed";
-      message: string;
-    };
+export type GetContentDetailEndpointError = FindContentDetailError;
 
 export type ContentDetailEndpointValue = ContentDetailItem & {
   assets: Array<
@@ -54,43 +49,26 @@ export function createGetContentDetailEndpoint(dependencies: AppDependencies) {
       await dependencies.detailBodyService.findOrCreateDetailBodyByContentId(
         content.id,
       );
-
-    if (!detailBody.ok) {
-      return err({
-        code: "content_detail_failed",
-        message: detailBody.error.message,
-      });
-    }
-
-    const assets = await dependencies.assetService.listAssetsByContentId(
-      content.id,
-    );
+    const assetsResult = await listDetailAssets(dependencies, content.id);
     const transcripts =
       await dependencies.transcriptService.listTranscriptsByContentId(
         content.id,
       );
 
-    if (!transcripts.ok) {
-      return err({
-        code: "content_detail_failed",
-        message: transcripts.error.message,
-      });
-    }
-
     return ok({
       ...content,
       detailBody:
-        detailBody.value === null
+        !detailBody.ok || detailBody.value === null
           ? null
           : {
               body: detailBody.value.body,
               format: detailBody.value.format,
             },
-      assets: assets.map((asset) => ({
+      assets: assetsResult.map((asset) => ({
         ...asset,
         url: buildAssetUrl(asset.id, asset.mimeType),
       })),
-      transcripts: transcripts.value,
+      transcripts: transcripts.ok ? transcripts.value : [],
     });
   };
 }
@@ -123,4 +101,15 @@ function buildAssetUrl(
   }
 
   return `/media/assets/${assetId}.${extension}`;
+}
+
+async function listDetailAssets(
+  dependencies: AppDependencies,
+  contentId: string,
+): Promise<ContentDetailAsset[]> {
+  try {
+    return await dependencies.assetService.listAssetsByContentId(contentId);
+  } catch {
+    return [];
+  }
 }

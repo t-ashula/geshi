@@ -130,6 +130,9 @@ async function spawnRecordContentWorker(): Promise<void> {
 
     child.once("error", reject);
     child.once("spawn", () => {
+      logger.info("record-content worker process spawned.", {
+        pid: child.pid,
+      });
       child.unref();
       resolve();
     });

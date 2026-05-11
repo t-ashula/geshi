@@ -139,7 +139,10 @@ function collectElementNodes(root: Parse5Node): Parse5Node[] {
   return nodes;
 }
 
-function visitNode(root: Parse5Node, visitor: (node: Parse5Node) => void): void {
+function visitNode(
+  root: Parse5Node,
+  visitor: (node: Parse5Node) => void,
+): void {
   visitor(root);
 
   for (const childNode of root.childNodes ?? []) {
@@ -233,7 +236,10 @@ function extractTextContent(root: Parse5Node): string {
   return segments.join(" ").trim();
 }
 
-function serializeContentRoot(root: Parse5Node, sourceUrl: string | null): string {
+function serializeContentRoot(
+  root: Parse5Node,
+  sourceUrl: string | null,
+): string {
   return serializeChildren(root, {
     insidePreformattedText: false,
     sourceUrl,
@@ -340,7 +346,9 @@ function resolveSafeHref(
 
   try {
     const resolvedUrl =
-      sourceUrl === null ? new URL(href.trim()) : new URL(href.trim(), sourceUrl);
+      sourceUrl === null
+        ? new URL(href.trim())
+        : new URL(href.trim(), sourceUrl);
     const protocol = resolvedUrl.protocol.toLowerCase();
 
     if (protocol !== "http:" && protocol !== "https:") {

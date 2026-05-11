@@ -201,11 +201,11 @@ describe("content endpoints", () => {
     );
   });
 
-  it("returns result error when detail body generation fails", async () => {
+  it("falls back to summary when detail body generation fails", async () => {
     const endpoint = createGetContentDetailEndpoint(
       createTestAppDependencies({
         assetService: {
-          listAssetsByContentId: vi.fn(),
+          listAssetsByContentId: vi.fn(() => Promise.resolve([])),
         } as unknown as AssetService,
         contentService: {
           findContentDetail: vi.fn(() =>
@@ -232,13 +232,91 @@ describe("content endpoints", () => {
             Promise.resolve(err(new Error("detail body failed"))),
           ),
         } as unknown as DetailBodyService,
+        transcriptService: {
+          listTranscriptsByContentId: vi.fn(() => Promise.resolve(ok([]))),
+        } as unknown as TranscriptService,
       }),
     );
 
     await expect(endpoint("content-1")).resolves.toEqual(
-      err({
-        code: "content_detail_failed",
-        message: "detail body failed",
+      ok({
+        assets: [],
+        collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+        detailBody: null,
+        id: "content-1",
+        kind: "podcast-episode",
+        publishedAt: new Date("2026-04-30T00:00:00.000Z"),
+        source: {
+          id: "source-1",
+          slug: "example-feed",
+          title: "Example Feed",
+        },
+        status: "stored",
+        summary: "Episode summary",
+        title: "Episode 1",
+        transcripts: [],
+      }),
+    );
+  });
+
+  it("returns summary-only detail when assets and transcripts fail", async () => {
+    const endpoint = createGetContentDetailEndpoint(
+      createTestAppDependencies({
+        assetService: {
+          listAssetsByContentId: vi.fn(() =>
+            Promise.reject(new Error("assets failed")),
+          ),
+        } as unknown as AssetService,
+        contentService: {
+          findContentDetail: vi.fn(() =>
+            ok({
+              collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+              detailBody: null,
+              id: "content-1",
+              kind: "podcast-episode",
+              publishedAt: new Date("2026-04-30T00:00:00.000Z"),
+              source: {
+                id: "source-1",
+                slug: "example-feed",
+                title: "Example Feed",
+              },
+              status: "stored",
+              summary: "Episode summary",
+              title: "Episode 1",
+            }),
+          ),
+          listContents: vi.fn(),
+        } as unknown as ContentService,
+        detailBodyService: {
+          findOrCreateDetailBodyByContentId: vi.fn(() =>
+            Promise.resolve(err(new Error("detail body failed"))),
+          ),
+        } as unknown as DetailBodyService,
+        transcriptService: {
+          listTranscriptsByContentId: vi.fn(() =>
+            Promise.resolve(err(new Error("transcripts failed"))),
+          ),
+        } as unknown as TranscriptService,
+      }),
+    );
+
+    await expect(endpoint("content-1")).resolves.toEqual(
+      ok({
+        assets: [],
+        collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+        detailBody: null,
+        id: "content-1",
+        kind: "podcast-episode",
+        publishedAt: new Date("2026-04-30T00:00:00.000Z"),
+        source: {
+          id: "source-1",
+          slug: "example-feed",
+          title: "Example Feed",
+        },
+        status: "stored",
+        summary: "Episode summary",
+        title: "Episode 1",
+        transcripts: [],
       }),
     );
   });

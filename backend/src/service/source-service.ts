@@ -369,7 +369,7 @@ async function toSourceCollectorSettingsDetail(
   settings: SourceCollectorSettingsRecord,
 ): Promise<SourceCollectorSettingsDetail> {
   const plugin = sourceCollectorRegistry.get(settings.pluginSlug);
-  const schema = (await plugin.settingSchema?.()) ?? [];
+  const schema = await plugin.settingSchema();
 
   return {
     baseVersion: settings.baseVersion,
