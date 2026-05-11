@@ -173,6 +173,7 @@ export type GetWebClientInput = {
 
 export interface PluginWebClient {
   fetch(request: Request): Promise<Response>;
+  getBrowser?(): Promise<unknown>;
 }
 
 export type SourceCollectorAcquireInput = {

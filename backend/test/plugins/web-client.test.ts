@@ -134,5 +134,32 @@ describe("fetchWithBrowser", () => {
     );
 
     expect(typeof webClient.fetch).toBe("function");
+    expect("getBrowser" in webClient).toBe(false);
+  });
+
+  it("returns a browser-backed client with browser escape hatch", async () => {
+    const webClient = await getWebClient(
+      { kind: "browser" },
+      createNoopPluginLogger(),
+    );
+
+    expect(typeof webClient.fetch).toBe("function");
+    expect(typeof webClient.getBrowser).toBe("function");
+
+    if (webClient.getBrowser === undefined) {
+      throw new Error("browser webClient must expose getBrowser()");
+    }
+
+    const browserUnknown: unknown = await webClient.getBrowser();
+
+    expect(browserUnknown).toBeDefined();
+    expect(typeof browserUnknown).toBe("object");
+
+    if (typeof browserUnknown !== "object" || browserUnknown === null) {
+      throw new Error("browser escape hatch must return an object");
+    }
+
+    expect("close" in browserUnknown).toBe(true);
+    expect("newContext" in browserUnknown).toBe(true);
   });
 });

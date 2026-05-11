@@ -18,6 +18,10 @@ export function getWebClient(
     input.kind === "browser"
       ? {
           fetch: (request) => fetchWithBrowser(request, logger),
+          getBrowser: () =>
+            chromium.launch({
+              headless: true,
+            }),
         }
       : {
           fetch: (request) => fetch(request),
