@@ -102,6 +102,9 @@ npm run worker:start
 
 - PID file は `./.geshi/pid/*.pid` に保存する
 - log file は `./.geshi/logs/*.log` に保存する
+- log rotate は application 側ではなく OS 側の `logrotate` などで行う前提にする
+  - sample は [docs/examples/logrotate/geshi.conf.sample](./examples/logrotate/geshi.conf.sample) を参照する
+  - `scripts/start-process.sh` は各 process を log file へ直接 redirect しているため，sample では `copytruncate` を使っている
 - 停止は `npm run backend:dev:stop` / `npm run frontend:dev:stop` /
   `npm run worker:stop` を使う
 - `backend:dev:start` は PID 管理付きの background 起動であり，watch はしない

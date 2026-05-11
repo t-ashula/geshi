@@ -1,0 +1,10 @@
+/home/office/src/github.com/t-ashula/geshi/.geshi/logs/*.log {
+  daily
+  rotate 14
+  compress
+  delaycompress
+  missingok
+  notifempty
+  copytruncate
+  su office office
+}
