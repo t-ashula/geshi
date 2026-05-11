@@ -9,7 +9,7 @@ import { createPgBoss, ensureQueue } from "../../job-queue/pg-boss.js";
 import type { RecordContentJobPayload } from "../../job-queue/types.js";
 import { RECORD_CONTENT_JOB_NAME } from "../../job-queue/types.js";
 import { createLogger } from "../../logger/index.js";
-import { defaultSourceCollectorRegistry } from "../../plugins/index.js";
+import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import { getRuntimeConfig } from "../../runtime-config.js";
 import { createAssetService } from "../../service/asset-service.js";
 import { createContentService } from "../../service/content-service.js";
@@ -47,14 +47,41 @@ const workStorage = new FilesystemStorage(runtimeConfig.workStorageRootDir);
 const firstJobFinished = Promise.withResolvers<void>();
 let firstJobFinishedResolved = false;
 
+logger.info("worker bootstrap started.", {
+  pid: process.pid,
+  queueName: RECORD_CONTENT_JOB_NAME,
+});
+
 boss.on("error", (error) => {
   logger.error("job queue runtime failed.", { error });
 });
 
 await boss.start();
+logger.info("job queue runtime started.", {
+  pid: process.pid,
+  queueName: RECORD_CONTENT_JOB_NAME,
+});
+
 await ensureQueue(boss, RECORD_CONTENT_JOB_NAME, {
   expireInSeconds: RECORD_CONTENT_EXPIRE_IN_SECONDS,
   heartbeatSeconds: RECORD_CONTENT_HEARTBEAT_SECONDS,
+});
+logger.info("job queue ensured.", {
+  pid: process.pid,
+  queueName: RECORD_CONTENT_JOB_NAME,
+});
+
+logger.info("source collector registry loading started.", {
+  pid: process.pid,
+});
+const sourceCollectorRegistryLoadStartedAt = Date.now();
+const { defaultSourceCollectorRegistry } =
+  (await import("../../plugins/index.js")) as {
+    defaultSourceCollectorRegistry: SourceCollectorRegistry;
+  };
+logger.info("source collector registry loading completed.", {
+  elapsedMilliseconds: Date.now() - sourceCollectorRegistryLoadStartedAt,
+  pid: process.pid,
 });
 
 await boss.work<RecordContentJobPayload>(
@@ -66,6 +93,12 @@ await boss.work<RecordContentJobPayload>(
   },
   async ([job]) => {
     try {
+      logger.info("worker started.", {
+        jobId: job.data.jobId,
+        queueJobId: job.id,
+        queueName: RECORD_CONTENT_JOB_NAME,
+      });
+
       const result = await handleRecordContentJob(job.data, {
         assetService,
         collectorPluginStateRepository,
@@ -88,8 +121,14 @@ await boss.work<RecordContentJobPayload>(
     }
   },
 );
+logger.info("job queue worker registered.", {
+  pid: process.pid,
+  pollingIntervalSeconds: RECORD_CONTENT_POLLING_INTERVAL_SECONDS,
+  queueName: RECORD_CONTENT_JOB_NAME,
+});
 
 logger.info("worker started.", {
+  pid: process.pid,
   queueName: RECORD_CONTENT_JOB_NAME,
 });
 

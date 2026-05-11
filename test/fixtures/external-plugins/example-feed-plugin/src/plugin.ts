@@ -1,6 +1,8 @@
 import type {
   AcquiredAsset,
+  ExtractedDetailBody,
   SourceCollectorAcquireInput,
+  SourceCollectorExtractInput,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
   SourceCollectorPlugin,
@@ -17,6 +19,10 @@ export const plugin: SourceCollectorPlugin = {
     });
   },
 
+  settingSchema() {
+    return [];
+  },
+
   inspect(input: SourceCollectorInspectInput) {
     return Promise.resolve({
       description:
@@ -30,6 +36,12 @@ export const plugin: SourceCollectorPlugin = {
     return Promise.resolve({
       contents: [],
     });
+  },
+
+  extract(
+    _input: SourceCollectorExtractInput,
+  ): Promise<ExtractedDetailBody | null> {
+    return Promise.resolve(null);
   },
 
   acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {

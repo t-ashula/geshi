@@ -19,6 +19,7 @@ import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import type { ObservedAsset, ObservedContent } from "../../plugins/types.js";
+import { getWebClient } from "../../plugins/web-client.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
 
@@ -88,13 +89,19 @@ export async function handleObserveSourceJob(
   let observeResult;
 
   try {
+    const pluginLogger = logger.child({
+      operation: "observe",
+    });
     observeResult = await plugin.observe({
       abortSignal: AbortSignal.timeout(30_000),
       collectorPluginState: collectorPluginStateResult.value,
       config: payload.collector.config,
-      logger: logger.child({
-        operation: "observe",
-      }),
+      context: {
+        getWebClient(input) {
+          return getWebClient(input, pluginLogger);
+        },
+        logger: pluginLogger,
+      },
       sourceUrl: payload.source.url,
     });
   } catch (error) {

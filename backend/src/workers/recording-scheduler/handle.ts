@@ -146,6 +146,12 @@ export async function handleRecordingSchedulerJob(
       return attachQueueJobIdResult;
     }
 
+    logger.info("record-content job enqueued.", {
+      jobId: job.id,
+      queueJobId,
+      scheduledStartAt: scheduledStartAt?.toISOString() ?? null,
+    });
+
     await dependencies.startRecordContentWorker();
 
     enqueuedCount += 1;

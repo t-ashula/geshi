@@ -5,6 +5,18 @@ import { describe, expect, it, vi } from "vitest";
 import { createNoopLogger } from "../../../../src/logger/index.js";
 import { podcastRssPlugin } from "../../../../src/plugins/collector/podcast-rss/plugin.js";
 
+function createPluginContext() {
+  const logger = createNoopLogger();
+
+  return {
+    logger,
+    getWebClient: (_input: { kind: "browser" | "fetch" }) =>
+      Promise.resolve({
+        fetch: (request: Request) => fetch(request),
+      }),
+  };
+}
+
 async function observeFixture(name: string) {
   const fixture = await readFile(
     new URL(`./fixtures/${name}`, import.meta.url),
@@ -19,7 +31,7 @@ async function observeFixture(name: string) {
   const result = await podcastRssPlugin.observe({
     abortSignal: new AbortController().signal,
     config: {},
-    logger: createNoopLogger(),
+    context: createPluginContext(),
     sourceUrl: "https://example.com/feed.xml",
   });
 
@@ -129,7 +141,7 @@ describe("podcastRssPlugin.observe", () => {
     const result = await podcastRssPlugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
-      logger: createNoopLogger(),
+      context: createPluginContext(),
       sourceUrl: "https://example.com/feed.xml",
     });
     const contents = result.contents;
@@ -199,7 +211,7 @@ describe("podcastRssPlugin.observe", () => {
     const result = await podcastRssPlugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
-      logger: createNoopLogger(),
+      context: createPluginContext(),
       sourceUrl: "https://example.com/feed.xml",
     });
     const contents = result.contents;
@@ -259,7 +271,7 @@ describe("podcastRssPlugin.observe", () => {
     const result = await podcastRssPlugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
-      logger: createNoopLogger(),
+      context: createPluginContext(),
       sourceUrl: "https://example.com/feed.xml",
     });
     const contents = result.contents;
@@ -280,7 +292,7 @@ describe("podcastRssPlugin.observe", () => {
       podcastRssPlugin.observe({
         abortSignal: new AbortController().signal,
         config: {},
-        logger: createNoopLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://example.com/feed.xml",
       }),
     ).rejects.toThrow("Failed to fetch RSS feed: 502");
@@ -310,7 +322,7 @@ describe("podcastRssPlugin.inspect", () => {
     const result = await podcastRssPlugin.inspect({
       abortSignal: new AbortController().signal,
       config: {},
-      logger: createNoopLogger(),
+      context: createPluginContext(),
       sourceUrl: "https://example.com/feed.xml",
     });
 
@@ -333,12 +345,33 @@ describe("podcastRssPlugin.inspect", () => {
       podcastRssPlugin.inspect({
         abortSignal: new AbortController().signal,
         config: {},
-        logger: createNoopLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://example.com/feed.xml",
       }),
     ).rejects.toMatchObject({
       code: "source_inspect_unrecognized",
       message: "The given URL is not a supported RSS feed.",
+    });
+  });
+});
+
+describe("podcastRssPlugin.extract", () => {
+  it("extracts a sanitized html detail body", async () => {
+    await expect(
+      podcastRssPlugin.extract({
+        asset: {
+          body: new TextEncoder().encode(
+            `<html><body><article><h1>Episode 1</h1><p>Hello <strong>world</strong>.</p><script>alert("x")</script><p><a href="https://example.com/show-notes">Show notes</a></p></article></body></html>`,
+          ),
+          kind: "html",
+          mimeType: "text/html",
+          sourceUrl: "https://example.com/episodes/1",
+        },
+        context: createPluginContext(),
+      }),
+    ).resolves.toEqual({
+      body: '<article><h1>Episode 1</h1><p>Hello <strong>world</strong>.</p><p><a href="https://example.com/show-notes">Show notes</a></p></article>',
+      format: "html",
     });
   });
 });
@@ -381,7 +414,7 @@ describe("podcastRssPlugin.acquire", () => {
         summary: null,
         title: "Episode 1",
       },
-      logger: createNoopLogger(),
+      context: createPluginContext(),
     });
 
     expect(asset).toMatchObject({
@@ -420,7 +453,7 @@ describe("podcastRssPlugin.acquire", () => {
           summary: null,
           title: "Episode 1",
         },
-        logger: createNoopLogger(),
+        context: createPluginContext(),
       }),
     ).rejects.toThrow("Podcast RSS asset sourceUrl is required.");
   });
@@ -454,7 +487,7 @@ describe("podcastRssPlugin.acquire", () => {
           summary: null,
           title: "Episode 1",
         },
-        logger: createNoopLogger(),
+        context: createPluginContext(),
       }),
     ).rejects.toThrow("Failed to fetch asset: 404");
   });

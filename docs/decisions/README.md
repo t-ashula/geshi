@@ -57,3 +57,6 @@
 - [ADR-0054: job の実行入力は `jobs.payload` に保持する](./0054-job-payload-owned-by-job-row.md)
 - [ADR-0055: fingerprint 移行期間は legacy prefix を versioned fingerprint より古く扱う](./0055-legacy-fingerprint-compatibility.md)
 - [ADR-0056: job lifecycle を `planned` を含む状態語彙へ再定義する](./0056-job-lifecycle-state-interpretation.md)
+- [ADR-0057: `html asset` の acquire 方式は source collector plugin が責務を持つ](./0057-html-asset-acquire-strategy.md)
+- [ADR-0058: `content detail` では `html asset` 由来の派生生成物を優先し無ければ `summary` を使う](./0058-html-asset-detail-presentation.md)
+- [ADR-0059: 派生物は種類ごとに専用モデルを持ち `transcript` もその一種として扱う](./0059-content-derivative-models.md)

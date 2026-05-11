@@ -8,6 +8,7 @@ import {
 import {
   createCreateSourceEndpoint,
   createEnqueueObserveSourceEndpoint,
+  createGetSourceCollectorSettingsEndpoint,
   createInspectSourceEndpoint,
   createListSourceCollectorPluginsEndpoint,
   createListSourcesEndpoint,
@@ -164,6 +165,7 @@ describe("source endpoints", () => {
             ),
           ),
           findObserveSourceTarget: vi.fn(),
+          getSourceCollectorSettings: vi.fn(),
           listSourceCollectorPlugins: () => ok([]),
           listPeriodicCrawlTargets: vi.fn(),
           listSources: vi.fn(),
@@ -217,6 +219,54 @@ describe("source endpoints", () => {
       err({
         code: "duplicate_source",
         message: "A source for this source URL already exists.",
+      }),
+    );
+  });
+
+  it("returns source collector settings", async () => {
+    const endpoint = createGetSourceCollectorSettingsEndpoint(
+      createTestAppDependencies({
+        sourceService: {
+          getSourceCollectorSettings: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                baseVersion: 3,
+                items: [
+                  {
+                    key: "userAgent",
+                    type: {
+                      type: "text",
+                    },
+                    value: "geshi-test",
+                  },
+                ],
+                periodicCrawl: {
+                  enabled: true,
+                  intervalMinutes: 60,
+                },
+              }),
+            ),
+          ),
+        } as unknown as SourceService,
+      }),
+    );
+
+    await expect(endpoint("source-1")).resolves.toEqual(
+      ok({
+        baseVersion: 3,
+        items: [
+          {
+            key: "userAgent",
+            type: {
+              type: "text",
+            },
+            value: "geshi-test",
+          },
+        ],
+        periodicCrawl: {
+          enabled: true,
+          intervalMinutes: 60,
+        },
       }),
     );
   });
@@ -423,6 +473,7 @@ describe("source endpoints", () => {
         baseVersion: 1,
         enabled: true,
         intervalMinutes: 60,
+        items: [],
       }),
     ).resolves.toEqual(
       err({
@@ -452,6 +503,7 @@ describe("source endpoints", () => {
       baseVersion: 1,
       enabled: true,
       intervalMinutes: 60,
+      items: [],
     });
 
     assertErr(result);
@@ -483,6 +535,7 @@ describe("source endpoints", () => {
       baseVersion: 1,
       enabled: true,
       intervalMinutes: 60,
+      items: [],
     });
 
     assertErr(result);
@@ -501,6 +554,7 @@ describe("source endpoints", () => {
       baseVersion: 1,
       enabled: true,
       intervalMinutes: 60,
+      items: [],
     });
 
     assertOk(result);

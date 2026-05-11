@@ -9,6 +9,7 @@ import {
 import { err, ok } from "../../src/lib/result.js";
 import type { AssetService } from "../../src/service/asset-service.js";
 import type { ContentService } from "../../src/service/content-service.js";
+import type { DetailBodyService } from "../../src/service/detail-body-service.js";
 import type { TranscriptService } from "../../src/service/transcript-service.js";
 import { createTestAppDependencies } from "../support/app-dependencies.js";
 
@@ -52,6 +53,7 @@ describe("content endpoints", () => {
           findContentDetail: vi.fn(() =>
             ok({
               collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+              detailBody: null,
               id: "content-1",
               kind: "podcast-episode",
               publishedAt: new Date("2026-04-30T00:00:00.000Z"),
@@ -67,6 +69,20 @@ describe("content endpoints", () => {
           ),
           listContents: vi.fn(),
         } as unknown as ContentService,
+        detailBodyService: {
+          findOrCreateDetailBodyByContentId: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                body: "Detailed body",
+                contentId: "content-1",
+                createdAt: new Date("2026-05-01T00:00:00.000Z"),
+                format: "plain",
+                id: "detail-body-1",
+                sourceAssetSnapshotId: "asset-snapshot-1",
+              }),
+            ),
+          ),
+        } as unknown as DetailBodyService,
       }),
     );
 
@@ -78,6 +94,10 @@ describe("content endpoints", () => {
             url: "/media/assets/asset-1.mp3",
           },
         ],
+        detailBody: {
+          body: "Detailed body",
+          format: "plain",
+        },
         id: "content-1",
         title: "Episode 1",
         transcripts: [],
@@ -167,6 +187,9 @@ describe("content endpoints", () => {
           ),
           listContents: vi.fn(),
         } as unknown as ContentService,
+        detailBodyService: {
+          findOrCreateDetailBodyByContentId: vi.fn(),
+        } as unknown as DetailBodyService,
       }),
     );
 
@@ -174,6 +197,126 @@ describe("content endpoints", () => {
       err({
         code: "content_not_found",
         message: "Content was not found.",
+      }),
+    );
+  });
+
+  it("falls back to summary when detail body generation fails", async () => {
+    const endpoint = createGetContentDetailEndpoint(
+      createTestAppDependencies({
+        assetService: {
+          listAssetsByContentId: vi.fn(() => Promise.resolve([])),
+        } as unknown as AssetService,
+        contentService: {
+          findContentDetail: vi.fn(() =>
+            ok({
+              collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+              detailBody: null,
+              id: "content-1",
+              kind: "podcast-episode",
+              publishedAt: new Date("2026-04-30T00:00:00.000Z"),
+              source: {
+                id: "source-1",
+                slug: "example-feed",
+                title: "Example Feed",
+              },
+              status: "stored",
+              summary: "Episode summary",
+              title: "Episode 1",
+            }),
+          ),
+          listContents: vi.fn(),
+        } as unknown as ContentService,
+        detailBodyService: {
+          findOrCreateDetailBodyByContentId: vi.fn(() =>
+            Promise.resolve(err(new Error("detail body failed"))),
+          ),
+        } as unknown as DetailBodyService,
+        transcriptService: {
+          listTranscriptsByContentId: vi.fn(() => Promise.resolve(ok([]))),
+        } as unknown as TranscriptService,
+      }),
+    );
+
+    await expect(endpoint("content-1")).resolves.toEqual(
+      ok({
+        assets: [],
+        collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+        detailBody: null,
+        id: "content-1",
+        kind: "podcast-episode",
+        publishedAt: new Date("2026-04-30T00:00:00.000Z"),
+        source: {
+          id: "source-1",
+          slug: "example-feed",
+          title: "Example Feed",
+        },
+        status: "stored",
+        summary: "Episode summary",
+        title: "Episode 1",
+        transcripts: [],
+      }),
+    );
+  });
+
+  it("returns summary-only detail when assets and transcripts fail", async () => {
+    const endpoint = createGetContentDetailEndpoint(
+      createTestAppDependencies({
+        assetService: {
+          listAssetsByContentId: vi.fn(() =>
+            Promise.reject(new Error("assets failed")),
+          ),
+        } as unknown as AssetService,
+        contentService: {
+          findContentDetail: vi.fn(() =>
+            ok({
+              collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+              detailBody: null,
+              id: "content-1",
+              kind: "podcast-episode",
+              publishedAt: new Date("2026-04-30T00:00:00.000Z"),
+              source: {
+                id: "source-1",
+                slug: "example-feed",
+                title: "Example Feed",
+              },
+              status: "stored",
+              summary: "Episode summary",
+              title: "Episode 1",
+            }),
+          ),
+          listContents: vi.fn(),
+        } as unknown as ContentService,
+        detailBodyService: {
+          findOrCreateDetailBodyByContentId: vi.fn(() =>
+            Promise.resolve(err(new Error("detail body failed"))),
+          ),
+        } as unknown as DetailBodyService,
+        transcriptService: {
+          listTranscriptsByContentId: vi.fn(() =>
+            Promise.resolve(err(new Error("transcripts failed"))),
+          ),
+        } as unknown as TranscriptService,
+      }),
+    );
+
+    await expect(endpoint("content-1")).resolves.toEqual(
+      ok({
+        assets: [],
+        collectedAt: new Date("2026-05-01T00:00:00.000Z"),
+        detailBody: null,
+        id: "content-1",
+        kind: "podcast-episode",
+        publishedAt: new Date("2026-04-30T00:00:00.000Z"),
+        source: {
+          id: "source-1",
+          slug: "example-feed",
+          title: "Example Feed",
+        },
+        status: "stored",
+        summary: "Episode summary",
+        title: "Episode 1",
+        transcripts: [],
       }),
     );
   });

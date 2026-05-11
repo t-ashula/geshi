@@ -9,12 +9,15 @@ import type {
   CreateSourceRequest,
   PeriodicCrawlSettings,
   SourceCollectorPluginListItem,
+  SourceCollectorSettingItem,
+  SourceCollectorSettingsDetail,
   SourceListItem,
 } from "./source-api.js";
 import {
   createSource,
   getContentDetail,
   getPeriodicCrawlSettings,
+  getSourceCollectorSettings,
   inspectSource,
   listSourceCollectorPlugins,
   listContents,
@@ -29,6 +32,10 @@ import {
   sanitizeContentSummary,
   summarizeContentSummary,
 } from "./content-summary.js";
+import {
+  detailOriginalPageUrl,
+  selectDetailDisplayContent,
+} from "./content-detail.js";
 import { validateCreateSourceRequest } from "./source-form.js";
 
 type RouteState =
@@ -56,6 +63,7 @@ const expandedAssetMenuId = ref<string | null>(null);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
 const isSourceSettingsExpanded = ref(false);
+const isSourceCollectorSettingsLoading = ref(false);
 const errorMessage = ref<string | null>(null);
 const detailErrorMessage = ref<string | null>(null);
 const inspectErrorMessage = ref<string | null>(null);
@@ -82,14 +90,22 @@ const sourceCrawlForm = ref<PeriodicCrawlSettings>({
   enabled: false,
   intervalMinutes: 60,
 });
+const sourceCollectorSettings = ref<SourceCollectorSettingsDetail | null>(null);
+const sourceCollectorItemsForm = ref<Record<string, unknown>>({});
 const theme = ref<"light" | "dark">("light");
 
 const selectedSourceSlug = computed(() => {
-  switch (routeState.value.kind) {
+  const route = routeState.value;
+
+  switch (route.kind) {
     case "browse-feed":
-      return routeState.value.feedSlug;
-    case "browse-entry":
-      return contentDetail.value?.source.slug ?? null;
+      return route.feedSlug;
+    case "browse-entry": {
+      const content = contents.value.find(
+        (entry) => entry.id === route.entryId,
+      );
+      return content?.sourceSlug ?? contentDetail.value?.source.slug ?? null;
+    }
     default:
       return null;
   }
@@ -135,6 +151,8 @@ watch(
     isContentActionsExpanded.value = false;
 
     if (source === null) {
+      sourceCollectorSettings.value = null;
+      sourceCollectorItemsForm.value = {};
       return;
     }
 
@@ -142,7 +160,10 @@ watch(
       enabled: source.periodicCrawlEnabled,
       intervalMinutes: source.periodicCrawlIntervalMinutes,
     };
+    sourceCollectorSettings.value = null;
+    sourceCollectorItemsForm.value = {};
     sourceCrawlErrorMessage.value = null;
+    void refreshSelectedSourceCollectorSettings(source.id);
   },
   { immediate: true },
 );
@@ -361,7 +382,12 @@ async function saveSelectedSourceCrawlSettings(): Promise<void> {
     return;
   }
 
-  if (selectedSource.value.collectorSettingsVersion === null) {
+  if (sourceCollectorSettings.value === null) {
+    sourceCrawlErrorMessage.value = "Source collector settings unavailable.";
+    return;
+  }
+
+  if (sourceCollectorSettings.value.baseVersion === null) {
     sourceCrawlErrorMessage.value =
       "Source collector settings version missing.";
     return;
@@ -374,15 +400,23 @@ async function saveSelectedSourceCrawlSettings(): Promise<void> {
     const updatedSource = await updateSourceCollectorSettings(
       selectedSource.value.id,
       {
-        baseVersion: selectedSource.value.collectorSettingsVersion,
+        baseVersion: sourceCollectorSettings.value.baseVersion,
         enabled: sourceCrawlForm.value.enabled,
         intervalMinutes: Number(sourceCrawlForm.value.intervalMinutes),
+        items: sourceCollectorSettings.value.items.map((item) => ({
+          key: item.key,
+          value: normalizeCollectorSettingFormValue(
+            item,
+            sourceCollectorItemsForm.value[item.key],
+          ),
+        })),
       },
     );
 
     sources.value = sources.value.map((source) =>
       source.id === updatedSource.id ? updatedSource : source,
     );
+    await refreshSelectedSourceCollectorSettings(updatedSource.id);
   } catch (error) {
     sourceCrawlErrorMessage.value =
       error instanceof Error
@@ -424,6 +458,40 @@ async function refreshSourceCollectorPlugins(): Promise<void> {
       error instanceof Error
         ? error.message
         : "Failed to load source collector plugins.";
+  }
+}
+
+async function refreshSelectedSourceCollectorSettings(
+  sourceId: string,
+): Promise<void> {
+  isSourceCollectorSettingsLoading.value = true;
+
+  try {
+    const settings = await getSourceCollectorSettings(sourceId);
+
+    if (selectedSource.value?.id !== sourceId) {
+      return;
+    }
+
+    sourceCollectorSettings.value = settings;
+    sourceCrawlForm.value = {
+      enabled: settings.periodicCrawl.enabled,
+      intervalMinutes: settings.periodicCrawl.intervalMinutes,
+    };
+    sourceCollectorItemsForm.value = Object.fromEntries(
+      settings.items.map((item) => [item.key, item.value]),
+    );
+  } catch (error) {
+    if (selectedSource.value?.id === sourceId) {
+      sourceCrawlErrorMessage.value =
+        error instanceof Error
+          ? error.message
+          : "Failed to load source collector settings.";
+    }
+  } finally {
+    if (selectedSource.value?.id === sourceId) {
+      isSourceCollectorSettingsLoading.value = false;
+    }
   }
 }
 
@@ -644,6 +712,12 @@ function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
   return detail.assets.filter(isPlayableAsset);
 }
 
+function detailReferenceAssets(
+  detail: ContentDetailItem,
+): ContentDetailAsset[] {
+  return detail.assets.filter((asset) => !isPlayableAsset(asset));
+}
+
 function isPlayableAsset(asset: ContentDetailAsset): boolean {
   if (asset.url === null || asset.mimeType === null) {
     return false;
@@ -652,16 +726,6 @@ function isPlayableAsset(asset: ContentDetailAsset): boolean {
   return (
     asset.mimeType.startsWith("audio/") || asset.mimeType.startsWith("video/")
   );
-}
-
-function detailOriginalPageUrl(detail: ContentDetailItem): string | null {
-  const primaryHtmlAsset =
-    detail.assets.find(
-      (asset) => asset.kind === "html" && asset.primary && asset.sourceUrl,
-    ) ??
-    detail.assets.find((asset) => asset.kind === "html" && asset.sourceUrl);
-
-  return primaryHtmlAsset?.sourceUrl ?? null;
 }
 
 function transcriptSourceLabel(transcript: ContentTranscriptItem): string {
@@ -682,12 +746,59 @@ function renderContentSummary(summary: string | null): string {
   return sanitizeContentSummary(summary);
 }
 
+function detailDisplayBody(detail: ContentDetailItem): string | null {
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "detail-body" ? display.body : null;
+}
+
+function detailDisplayFormat(
+  detail: ContentDetailItem,
+): "html" | "markdown" | "plain" | null {
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "detail-body" ? display.format : null;
+}
+
+function detailDisplaySummary(detail: ContentDetailItem): string | null {
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "summary" ? display.summary : null;
+}
+
 function renderContentSummaryPreview(summary: string | null): string {
   if (summary === null) {
     return "";
   }
 
   return summarizeContentSummary(summary);
+}
+
+function isCheckboxCollectorSetting(item: SourceCollectorSettingItem): boolean {
+  return item.type.type === "checkbox";
+}
+
+function isNumberCollectorSetting(item: SourceCollectorSettingItem): boolean {
+  return item.type.type === "number";
+}
+
+function normalizeCollectorSettingFormValue(
+  item: SourceCollectorSettingItem,
+  value: unknown,
+): SourceCollectorSettingItem["value"] {
+  if (item.type.type === "checkbox") {
+    return value === true;
+  }
+
+  if (item.type.type === "number") {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+
+  return typeof value === "string"
+    ? value
+    : value === null
+      ? null
+      : String(value ?? "");
 }
 </script>
 
@@ -1138,6 +1249,44 @@ function renderContentSummaryPreview(summary: string | null): string {
                 </button>
               </div>
             </div>
+
+            <div class="source-settings-grid plugin-settings-grid">
+              <p v-if="isSourceCollectorSettingsLoading" class="feedback">
+                Loading plugin settings...
+              </p>
+
+              <template
+                v-else-if="
+                  sourceCollectorSettings !== null &&
+                  sourceCollectorSettings.items.length > 0
+                "
+              >
+                <label
+                  v-for="item in sourceCollectorSettings.items"
+                  :key="item.key"
+                  :class="{ 'toggle-field': isCheckboxCollectorSetting(item) }"
+                >
+                  <span>{{ item.key }}</span>
+                  <input
+                    v-if="isCheckboxCollectorSetting(item)"
+                    v-model="sourceCollectorItemsForm[item.key]"
+                    type="checkbox"
+                  />
+                  <input
+                    v-else-if="isNumberCollectorSetting(item)"
+                    v-model.number="sourceCollectorItemsForm[item.key]"
+                    type="number"
+                  />
+                  <input
+                    v-else
+                    v-model="sourceCollectorItemsForm[item.key]"
+                    type="text"
+                  />
+                </label>
+              </template>
+
+              <p v-else class="feedback">No plugin settings.</p>
+            </div>
           </section>
 
           <div
@@ -1246,10 +1395,19 @@ function renderContentSummaryPreview(summary: string | null): string {
               </a>
             </div>
 
+            <div v-if="detailDisplayBody(contentDetail)" class="detail-summary">
+              <pre
+                v-if="detailDisplayFormat(contentDetail) === 'plain'"
+                class="detail-body-text"
+                >{{ detailDisplayBody(contentDetail) }}</pre
+              >
+              <div v-else v-html="detailDisplayBody(contentDetail) ?? ''"></div>
+            </div>
+
             <div
-              v-if="contentDetail.summary"
+              v-else-if="detailDisplaySummary(contentDetail)"
               class="detail-summary"
-              v-html="renderContentSummary(contentDetail.summary)"
+              v-html="renderContentSummary(detailDisplaySummary(contentDetail))"
             ></div>
 
             <section
@@ -1393,7 +1551,9 @@ function renderContentSummaryPreview(summary: string | null): string {
                             v-if="detailOriginalPageUrl(contentDetail)"
                             class="menu-item"
                             role="menuitem"
-                            :href="detailOriginalPageUrl(contentDetail) ?? undefined"
+                            :href="
+                              detailOriginalPageUrl(contentDetail) ?? undefined
+                            "
                             target="_blank"
                             rel="noreferrer"
                             @click="closeAssetMenu"
@@ -1405,7 +1565,9 @@ function renderContentSummaryPreview(summary: string | null): string {
                             type="button"
                             class="menu-item"
                             role="menuitem"
-                            :disabled="isTranscriptSubmitting === contentDetail.id"
+                            :disabled="
+                              isTranscriptSubmitting === contentDetail.id
+                            "
                             @click="requestContentTranscripts(contentDetail.id)"
                           >
                             {{
@@ -1442,6 +1604,46 @@ function renderContentSummaryPreview(summary: string | null): string {
                       · {{ asset.byteSize }} bytes
                     </template>
                   </p>
+                </li>
+              </ul>
+            </section>
+
+            <section
+              v-if="detailReferenceAssets(contentDetail).length > 0"
+              class="detail-section"
+            >
+              <div class="detail-section-header">
+                <h3>Reference assets</h3>
+                <span class="detail-count">
+                  {{ detailReferenceAssets(contentDetail).length }}
+                </span>
+              </div>
+
+              <ul class="asset-list">
+                <li
+                  v-for="asset in detailReferenceAssets(contentDetail)"
+                  :key="asset.id"
+                  class="asset-card"
+                >
+                  <div class="asset-card-header">
+                    <div class="asset-card-heading">
+                      <strong>{{ asset.kind }}</strong>
+                      <span class="asset-meta">
+                        {{ asset.mimeType ?? "unknown type" }}
+                      </span>
+                    </div>
+                    <div class="asset-card-actions">
+                      <a
+                        v-if="asset.url"
+                        class="ghost-button"
+                        :href="asset.url"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open stored asset
+                      </a>
+                    </div>
+                  </div>
                 </li>
               </ul>
             </section>

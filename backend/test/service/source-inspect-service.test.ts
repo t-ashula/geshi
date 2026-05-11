@@ -7,8 +7,10 @@ import { assertErr, assertOk } from "../support/result.js";
 const inspectMock = vi.fn();
 const createRegistryPlugin = () => ({
   acquire: vi.fn(),
+  extract: vi.fn(() => Promise.resolve(null)),
   inspect: inspectMock,
   observe: vi.fn(),
+  settingSchema: vi.fn(() => []),
   supports: vi.fn(),
 });
 

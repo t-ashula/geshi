@@ -18,8 +18,10 @@ import { assertErr, assertOk } from "../support/result.js";
 
 const sourceCollectorPlugin = {
   acquire: vi.fn(),
+  extract: vi.fn(() => Promise.resolve(null)),
   inspect: vi.fn(),
   observe: vi.fn(),
+  settingSchema: vi.fn(() => []),
   supports: vi.fn(),
 };
 
@@ -371,6 +373,7 @@ describe("source service", () => {
     const service = createSourceService(
       {
         createSource: vi.fn(),
+        findSourceCollectorSettings: vi.fn(() => Promise.resolve(ok(null))),
         findObserveSourceTarget: vi.fn(),
         listPeriodicCrawlTargets: vi.fn(),
         listSources: vi.fn(),
@@ -417,6 +420,17 @@ describe("source service", () => {
     const service = createSourceService(
       {
         createSource: vi.fn(),
+        findSourceCollectorSettings: vi.fn(() =>
+          Promise.resolve(
+            ok({
+              baseVersion: 1,
+              config: {},
+              periodicCrawlEnabled: true,
+              periodicCrawlIntervalMinutes: 60,
+              pluginSlug: "podcast-rss",
+            }),
+          ),
+        ),
         findObserveSourceTarget: vi.fn(),
         listPeriodicCrawlTargets: vi.fn(),
         listSources: vi.fn(),
@@ -445,6 +459,17 @@ describe("source service", () => {
     const service = createSourceService(
       {
         createSource: vi.fn(),
+        findSourceCollectorSettings: vi.fn(() =>
+          Promise.resolve(
+            ok({
+              baseVersion: 1,
+              config: {},
+              periodicCrawlEnabled: true,
+              periodicCrawlIntervalMinutes: 60,
+              pluginSlug: "podcast-rss",
+            }),
+          ),
+        ),
         findObserveSourceTarget: vi.fn(),
         listPeriodicCrawlTargets: vi.fn(),
         listSources: vi.fn(),

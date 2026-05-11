@@ -12,12 +12,31 @@ vi.mock("node:child_process", () => ({
   spawn: spawnMock,
 }));
 
+function createNoopPluginLogger() {
+  return {
+    debug: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  };
+}
+
+function createPluginContext() {
+  return {
+    logger: createNoopPluginLogger(),
+    getWebClient: (_input: { kind: "browser" | "fetch" }) =>
+      Promise.resolve({
+        fetch: (request: Request) => fetch(request),
+      }),
+  };
+}
+
 describe("sampleStreaming plugin", () => {
   it("supports localhost stream URLs only", async () => {
     await expect(
       plugin.supports({
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "http://localhost:3401/sources/streams/live-1",
       }),
     ).resolves.toEqual({ supported: true });
@@ -25,7 +44,7 @@ describe("sampleStreaming plugin", () => {
     await expect(
       plugin.supports({
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "http://127.0.0.1:3401/sources/streams/live-1",
       }),
     ).resolves.toEqual({ supported: false });
@@ -58,7 +77,7 @@ describe("sampleStreaming plugin", () => {
     const result = await plugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
-      logger: createNoopPluginLogger(),
+      context: createPluginContext(),
       sourceUrl: "http://localhost:3401/sources/streams/live-1",
     });
 
@@ -106,9 +125,9 @@ describe("sampleStreaming plugin", () => {
         title: "Live 1",
       },
       context: {
+        ...createPluginContext(),
         replacePluginMetadata,
       },
-      logger: createNoopPluginLogger(),
     });
 
     expect(result?.contentType).toBe("audio/mpeg");
@@ -138,15 +157,6 @@ describe("sampleStreaming plugin", () => {
     });
   });
 });
-
-function createNoopPluginLogger() {
-  return {
-    debug: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-  };
-}
 
 function createSuccessfulFfmpegProcess(output: number[]) {
   const process = new EventEmitter() as EventEmitter & {

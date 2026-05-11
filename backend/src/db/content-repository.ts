@@ -51,6 +51,10 @@ export type ContentListItem = {
 
 export type ContentDetailItem = {
   collectedAt: Date;
+  detailBody: {
+    body: string;
+    format: "html" | "markdown" | "plain";
+  } | null;
   id: string;
   kind: string;
   publishedAt: Date | null;
@@ -318,6 +322,7 @@ export class ContentRepository {
 
     return {
       collectedAt: content.collected_at,
+      detailBody: null,
       id: content.id,
       kind: content.kind,
       publishedAt: content.published_at,

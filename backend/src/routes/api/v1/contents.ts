@@ -33,7 +33,7 @@ export function createContentRoutes(dependencies: AppDependencies): Hono {
             message: result.error.message,
           },
         },
-        { status: 404 },
+        { status: result.error.code === "content_not_found" ? 404 : 500 },
       );
     }
 
