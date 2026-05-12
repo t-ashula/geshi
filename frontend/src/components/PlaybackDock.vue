@@ -48,7 +48,9 @@ function numberFromEvent(event: Event): number {
 <template>
   <section class="playback-dock">
     <div class="playback-dock-meta">
-      <strong class="playback-dock-title">{{ props.playback.contentTitle }}</strong>
+      <strong class="playback-dock-title">{{
+        props.playback.contentTitle
+      }}</strong>
       <div class="playback-dock-caption">
         <span class="playback-chip">{{ props.sourceLabel }}</span>
         <span class="playback-chip playback-chip-muted">
@@ -175,7 +177,11 @@ function numberFromEvent(event: Event): number {
         aria-label="Stop playback"
         @click="emit('stopPlayback')"
       >
-        <svg aria-hidden="true" class="playback-button-icon" viewBox="0 0 24 24">
+        <svg
+          aria-hidden="true"
+          class="playback-button-icon"
+          viewBox="0 0 24 24"
+        >
           <path d="M7 7h10v10H7z" fill="currentColor" />
         </svg>
       </button>
