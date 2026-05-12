@@ -1,5 +1,6 @@
 import { loadPluginArtifactPaths } from "../../../internal/geshi-config.js";
 import { definition as sampleStreamingPluginDefinition } from "../../../packages/geshi-plugin-sample-streaming/src/index.js";
+import { createLogger } from "../logger/index.js";
 import { definition as podcastRssPluginDefinition } from "./collector/podcast-rss/index.js";
 import { definition as rssPluginDefinition } from "./collector/rss/index.js";
 import { loadExternalSourceCollectorPlugins } from "./generated.js";
@@ -42,6 +43,9 @@ export class SourceCollectorPluginUnavailableError extends Error {
   }
 }
 
+const logger = createLogger({
+  component: "source-collector-plugin-registry",
+});
 const sourceCollectorPlugins = await loadDefaultSourceCollectorPlugins();
 
 export interface SourceCollectorRegistry {
@@ -144,7 +148,9 @@ async function loadDefaultSourceCollectorPlugins(): Promise<
     rssPluginDefinition,
     sampleStreamingPluginDefinition,
   ]);
-  const pluginArtifactPaths = await loadPluginArtifactPaths();
+  const pluginArtifactPaths = await loadPluginArtifactPaths(process.cwd(), {
+    logger,
+  });
   const externalPlugins =
     await loadExternalSourceCollectorPlugins(pluginArtifactPaths);
 
