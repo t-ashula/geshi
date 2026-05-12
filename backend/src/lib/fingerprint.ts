@@ -8,14 +8,18 @@ export function compareFingerprintVersions(
   left: string,
   right: string,
 ): number {
-  const leftVersion = readFingerprintVersion(left);
-  const rightVersion = readFingerprintVersion(right);
+  const leftVersion = parseFingerprintVersion(left);
+  const rightVersion = parseFingerprintVersion(right);
 
-  if (leftVersion === rightVersion) {
+  if (leftVersion.kind !== rightVersion.kind) {
+    return leftVersion.kind === "versioned" ? -1 : 1;
+  }
+
+  if (leftVersion.version === rightVersion.version) {
     return 0;
   }
 
-  return leftVersion < rightVersion ? 1 : -1;
+  return leftVersion.version < rightVersion.version ? 1 : -1;
 }
 
 export function readFingerprintVersion(fingerprint: string): string {
@@ -26,4 +30,16 @@ export function readFingerprintVersion(fingerprint: string): string {
   }
 
   return fingerprint.slice(0, separatorIndex);
+}
+
+function parseFingerprintVersion(fingerprint: string): {
+  kind: "legacy" | "versioned";
+  version: string;
+} {
+  const version = readFingerprintVersion(fingerprint);
+
+  return {
+    kind: /^\d{4}-\d{2}-\d{2}$/.test(version) ? "versioned" : "legacy",
+    version,
+  };
 }

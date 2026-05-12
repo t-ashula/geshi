@@ -8,6 +8,7 @@ import type {
   SourceRepository,
 } from "../../src/db/source-repository.js";
 import { err, ok } from "../../src/lib/result.js";
+import { createNoopLogger } from "../../src/logger/index.js";
 import type { SourceCollectorRegistry } from "../../src/plugins/index.js";
 import {
   createSourceService,
@@ -17,8 +18,10 @@ import { assertErr, assertOk } from "../support/result.js";
 
 const sourceCollectorPlugin = {
   acquire: vi.fn(),
+  extract: vi.fn(() => Promise.resolve(null)),
   inspect: vi.fn(),
   observe: vi.fn(),
+  settingSchema: vi.fn(() => []),
   supports: vi.fn(),
 };
 
@@ -71,7 +74,10 @@ describe("source service", () => {
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.createSource({
@@ -114,7 +120,10 @@ describe("source service", () => {
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.createSource({
@@ -135,7 +144,10 @@ describe("source service", () => {
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.findObserveSourceTarget("missing");
@@ -168,7 +180,10 @@ describe("source service", () => {
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.findObserveSourceTarget("source-1");
@@ -188,7 +203,10 @@ describe("source service", () => {
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.findObserveSourceTarget("source-1");
@@ -215,7 +233,10 @@ describe("source service", () => {
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.listPeriodicCrawlTargets();
@@ -281,7 +302,10 @@ describe("source service", () => {
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = service.listSourceCollectorPlugins();
@@ -333,7 +357,10 @@ describe("source service", () => {
         listSources: vi.fn(() => Promise.resolve(ok(sources))),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.listSources();
@@ -346,12 +373,16 @@ describe("source service", () => {
     const service = createSourceService(
       {
         createSource: vi.fn(),
+        findSourceCollectorSettings: vi.fn(() => Promise.resolve(ok(null))),
         findObserveSourceTarget: vi.fn(),
         listPeriodicCrawlTargets: vi.fn(),
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(() => Promise.resolve(ok(null))),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.updateSourceCollectorSettings(
@@ -389,12 +420,26 @@ describe("source service", () => {
     const service = createSourceService(
       {
         createSource: vi.fn(),
+        findSourceCollectorSettings: vi.fn(() =>
+          Promise.resolve(
+            ok({
+              baseVersion: 1,
+              config: {},
+              periodicCrawlEnabled: true,
+              periodicCrawlIntervalMinutes: 60,
+              pluginSlug: "podcast-rss",
+            }),
+          ),
+        ),
         findObserveSourceTarget: vi.fn(),
         listPeriodicCrawlTargets: vi.fn(),
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(() => Promise.resolve(ok(source))),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.updateSourceCollectorSettings(
@@ -414,6 +459,17 @@ describe("source service", () => {
     const service = createSourceService(
       {
         createSource: vi.fn(),
+        findSourceCollectorSettings: vi.fn(() =>
+          Promise.resolve(
+            ok({
+              baseVersion: 1,
+              config: {},
+              periodicCrawlEnabled: true,
+              periodicCrawlIntervalMinutes: 60,
+              pluginSlug: "podcast-rss",
+            }),
+          ),
+        ),
         findObserveSourceTarget: vi.fn(),
         listPeriodicCrawlTargets: vi.fn(),
         listSources: vi.fn(),
@@ -421,7 +477,10 @@ describe("source service", () => {
           Promise.resolve(err(new Error("update failed"))),
         ),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     const result = await service.updateSourceCollectorSettings(
@@ -466,7 +525,10 @@ describe("source service", () => {
         listSources: vi.fn(),
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
-      sourceCollectorRegistry,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
     );
 
     await service.createSource({

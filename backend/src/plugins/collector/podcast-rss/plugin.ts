@@ -2,9 +2,11 @@ import { XMLParser } from "fast-xml-parser";
 
 import type {
   AcquiredAsset,
+  ExtractedDetailBody,
   ObservedAsset,
   ObservedContent,
   SourceCollectorAcquireInput,
+  SourceCollectorExtractInput,
   SourceCollectorInspectErrorCode,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
@@ -25,6 +27,7 @@ import {
   CONTENT_FINGERPRINT_SPECS,
   OBSERVED_ASSET_FINGERPRINT_SPECS,
 } from "./fingerprint.js";
+import { extractHtmlDetailBody } from "./html-detail-body.js";
 import { manifest } from "./manifest.js";
 
 type RssChannel = {
@@ -74,12 +77,30 @@ export const plugin: SourceCollectorPlugin = {
     });
   },
 
-  async inspect(input: SourceCollectorInspectInput) {
-    const response = await fetch(input.sourceUrl, {
-      signal: input.abortSignal,
-    }).catch(() => null);
+  settingSchema() {
+    return [];
+  },
 
-    if (response === null || !response.ok) {
+  async inspect(input: SourceCollectorInspectInput) {
+    const webClient = await input.context.getWebClient({
+      kind: "fetch",
+    });
+    let response: Response;
+
+    try {
+      response = await webClient.fetch(
+        new Request(input.sourceUrl, {
+          signal: input.abortSignal,
+        }),
+      );
+    } catch {
+      throw new SourceCollectorInspectPluginError(
+        "source_inspect_fetch_failed",
+        "Failed to fetch source metadata.",
+      );
+    }
+
+    if (!response.ok) {
       throw new SourceCollectorInspectPluginError(
         "source_inspect_fetch_failed",
         "Failed to fetch source metadata.",
@@ -106,9 +127,14 @@ export const plugin: SourceCollectorPlugin = {
   async observe(
     input: SourceCollectorObserveInput,
   ): Promise<{ contents: ObservedContent[] }> {
-    const response = await fetch(input.sourceUrl, {
-      signal: input.abortSignal,
+    const webClient = await input.context.getWebClient({
+      kind: "fetch",
     });
+    const response = await webClient.fetch(
+      new Request(input.sourceUrl, {
+        signal: input.abortSignal,
+      }),
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch RSS feed: ${response.status}`);
@@ -128,14 +154,31 @@ export const plugin: SourceCollectorPlugin = {
     };
   },
 
+  extract(
+    input: SourceCollectorExtractInput,
+  ): Promise<ExtractedDetailBody | null> {
+    if (input.asset.kind !== "html") {
+      return Promise.resolve(null);
+    }
+
+    const html = new TextDecoder().decode(input.asset.body);
+
+    return Promise.resolve(extractHtmlDetailBody(html, input.asset.sourceUrl));
+  },
+
   async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
     if (input.asset.sourceUrl === null) {
       throw new Error("Podcast RSS asset sourceUrl is required.");
     }
 
-    const response = await fetch(input.asset.sourceUrl, {
-      signal: input.abortSignal,
+    const webClient = await input.context.getWebClient({
+      kind: "fetch",
     });
+    const response = await webClient.fetch(
+      new Request(input.asset.sourceUrl, {
+        signal: input.abortSignal,
+      }),
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch asset: ${response.status}`);
@@ -216,6 +259,9 @@ function toObservedAssets(item: RssItem): ObservedAsset[] {
   if (pageUrl !== null) {
     assets.push({
       kind: "html",
+      nextAction: {
+        actionKind: "acquire",
+      },
       observedFingerprints: createObservedAssetFingerprints({
         kind: "html",
         primary: true,
@@ -229,6 +275,9 @@ function toObservedAssets(item: RssItem): ObservedAsset[] {
   if (audioUrl !== null) {
     assets.push({
       kind: "audio",
+      nextAction: {
+        actionKind: "acquire",
+      },
       observedFingerprints: createObservedAssetFingerprints({
         kind: "audio",
         primary: false,

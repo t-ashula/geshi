@@ -145,11 +145,11 @@ export type JobTable = {
   id: string;
   kind: string;
   metadata: JsonColumn;
+  payload: JsonColumn;
   queue_job_id: string | null;
   retryable: GeneratedBooleanColumn;
-  source_id: string | null;
   started_at: NullableTimestampColumn;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "planned" | "queued" | "running" | "succeeded" | "failed";
 };
 
 export type TranscriptTable = {
@@ -163,6 +163,15 @@ export type TranscriptTable = {
   source_asset_snapshot_id: string;
   started_at: NullableTimestampColumn;
   status: "queued" | "running" | "succeeded" | "failed";
+};
+
+export type DetailBodyTable = {
+  body: string;
+  content_id: string;
+  created_at: TimestampColumn;
+  format: "html" | "markdown" | "plain";
+  id: string;
+  source_asset_snapshot_id: string;
 };
 
 export type TranscriptChunkTable = {
@@ -191,6 +200,7 @@ export type GeshiDatabase = {
   collector_settings: CollectorSettingTable;
   content_snapshots: ContentSnapshotTable;
   contents: ContentTable;
+  detail_bodies: DetailBodyTable;
   jobs: JobTable;
   transcript_chunks: TranscriptChunkTable;
   transcripts: TranscriptTable;

@@ -52,18 +52,8 @@ export function createJobService(
         return observeSourceTarget;
       }
 
-      const job = await jobRepository.createJob({
-        id: uuidv7(),
-        kind: "observe-source",
-        retryable: true,
-        sourceId,
-      });
-
-      if (!job.ok) {
-        return job;
-      }
-
-      const queueJobId = await jobQueue.enqueue(OBSERVE_SOURCE_JOB_NAME, {
+      const jobId = uuidv7();
+      const queuePayload = {
         collector: {
           config: observeSourceTarget.value.config,
           pluginSlug: observeSourceTarget.value.pluginSlug,
@@ -71,14 +61,30 @@ export function createJobService(
           settingSnapshotId:
             observeSourceTarget.value.collectorSettingSnapshotId,
         },
-        jobId: job.value.id,
+        jobId,
         source: {
           id: observeSourceTarget.value.sourceId,
           kind: observeSourceTarget.value.sourceKind,
           slug: observeSourceTarget.value.slug,
           url: observeSourceTarget.value.url,
         },
+      };
+
+      const job = await jobRepository.createJob({
+        id: jobId,
+        kind: "observe-source",
+        payload: queuePayload,
+        retryable: true,
       });
+
+      if (!job.ok) {
+        return job;
+      }
+
+      const queueJobId = await jobQueue.enqueue(
+        OBSERVE_SOURCE_JOB_NAME,
+        queuePayload,
+      );
 
       const attachQueueJobIdResult = await jobRepository.attachQueueJobId(
         job.value.id,

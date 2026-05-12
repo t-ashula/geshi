@@ -50,6 +50,7 @@
    ```
 
    補足:
+   - `geshi` のローカル生成物や runtime data は `.geshi/` 配下に置く
    - `geshi.config.js` に書かれた external plugin を `.geshi/generated/plugins/`
      配下へ解決する
    - plugin の設定や依存を変えたときは，起動前に再実行する
@@ -77,18 +78,18 @@ make dev-up
 
 ### 通常の起動
 
-依存サービスを起動した後は，別 terminal でそれぞれ次を起動する．
+依存サービスを起動した後は，PID 管理付きの script でそれぞれ起動する．
 
 backend:
 
 ```sh
-npm run backend:dev
+npm run backend:dev:start
 ```
 
 frontend:
 
 ```sh
-npm run frontend:dev
+npm run frontend:dev:start
 ```
 
 worker:
@@ -99,10 +100,23 @@ npm run worker:start
 
 補足:
 
-- `backend:dev` は API server を watch モードで起動する
-- `frontend:dev` は Vite dev server を起動する
+- PID file は `./.geshi/pid/*.pid` に保存する
+- log file は `./.geshi/logs/*.log` に保存する
+- log rotate は application 側ではなく OS 側の `logrotate` などで行う前提にする
+  - sample は [docs/examples/logrotate/geshi.conf.sample](./examples/logrotate/geshi.conf.sample) を参照する
+  - `scripts/start-process.sh` は各 process を log file へ直接 redirect しているため，sample では `copytruncate` を使っている
+- 停止は `npm run backend:dev:stop` / `npm run frontend:dev:stop` /
+  `npm run worker:stop` を使う
+- `backend:dev:start` は PID 管理付きの background 起動であり，watch はしない
+- `frontend:dev:start` は PID 管理付きの background 起動であり，port が埋まって
+  いるときは別 port へ逃がさず失敗する
+- `backend:dev` は API server を watch モードで起動する生 command であり，
+  PID 管理を使わず foreground で直接動かしたいときに使う
+- `frontend:dev` は Vite dev server を起動する生 command であり，PID 管理を
+  使わず foreground で直接動かしたいときに使う
 - `worker:start` は `observe-source` / `acquire-content` / `periodic-crawl` /
-  `transcript-split` / `transcript-chunk` worker をまとめて起動する
+  `recording-scheduler` / `transcript-split` / `transcript-chunk` worker を
+  まとめて起動する
 
 ### transcript 動作確認用 audio
 

@@ -72,7 +72,16 @@ async function readJsonObject(
 ): Promise<
   Result<Record<string, unknown>, { code: "invalid_json"; message: string }>
 > {
-  const json: unknown = await context.req.json().catch(() => null);
+  let json: unknown;
+
+  try {
+    json = await context.req.json();
+  } catch {
+    return err({
+      code: "invalid_json",
+      message: "Request body must be a JSON object.",
+    });
+  }
 
   if (json === null || typeof json !== "object") {
     return err({

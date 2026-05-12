@@ -5,6 +5,7 @@
 ## 基本方針
 
 - 運用上の出力は `console` ではなく共通 logger を使う
+- backend / worker の既定の log file は `./.geshi/logs/geshi.log` とする
 - ログは構造化し，message と metadata を分ける
 - `pino` を使う場合も，log level は `30` のような数値ではなく `info` のような文字列で出力する
 - 秘密情報や token を出力しない

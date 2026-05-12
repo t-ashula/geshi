@@ -8,7 +8,10 @@ import type {
 } from "../db/transcript-repository.js";
 import { TranscriptRepository } from "../db/transcript-repository.js";
 import type { GeshiDatabase } from "../db/types.js";
-import type { JobQueue } from "../job-queue/types.js";
+import type {
+  JobQueue,
+  TranscriptSplitJobPayload,
+} from "../job-queue/types.js";
 import { TRANSCRIPT_SPLIT_JOB_NAME } from "../job-queue/types.js";
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
@@ -100,6 +103,7 @@ export function createTranscriptService(
         }
 
         let reservation: {
+          payload: TranscriptSplitJobPayload;
           splitJob: { id: string };
           transcript: TranscriptRecord;
         } | null;
@@ -155,11 +159,17 @@ export function createTranscriptService(
                 throw transcript.error;
               }
 
+              const splitJobId = uuidv7();
+              const splitJobPayload = {
+                jobId: splitJobId,
+                mode: "initial" as const,
+                transcriptId: transcript.value.id,
+              };
               const splitJob = await transactionJobRepository.createJob({
-                id: uuidv7(),
+                id: splitJobId,
                 kind: TRANSCRIPT_SPLIT_JOB_NAME,
+                payload: splitJobPayload,
                 retryable: true,
-                sourceId: null,
               });
 
               if (!splitJob.ok) {
@@ -167,6 +177,7 @@ export function createTranscriptService(
               }
 
               return {
+                payload: splitJobPayload,
                 splitJob: splitJob.value,
                 transcript: transcript.value,
               };
@@ -180,11 +191,10 @@ export function createTranscriptService(
           continue;
         }
 
-        const queueJobId = await jobQueue.enqueue(TRANSCRIPT_SPLIT_JOB_NAME, {
-          jobId: reservation.splitJob.id,
-          mode: "initial",
-          transcriptId: reservation.transcript.id,
-        });
+        const queueJobId = await jobQueue.enqueue(
+          TRANSCRIPT_SPLIT_JOB_NAME,
+          reservation.payload,
+        );
 
         const attachQueueJobIdResult = await jobRepository.attachQueueJobId(
           reservation.splitJob.id,
@@ -233,7 +243,10 @@ export function createTranscriptService(
         });
       }
 
-      let reservedRetry: { id: string };
+      let reservedRetry: {
+        payload: TranscriptSplitJobPayload;
+        splitJob: { id: string };
+      };
 
       try {
         reservedRetry = await database
@@ -296,31 +309,39 @@ export function createTranscriptService(
               throw markRunningResult.error;
             }
 
+            const splitJobId = uuidv7();
+            const splitJobPayload = {
+              jobId: splitJobId,
+              mode: "retry-failed" as const,
+              transcriptId,
+            };
             const splitJob = await transactionJobRepository.createJob({
-              id: uuidv7(),
+              id: splitJobId,
               kind: TRANSCRIPT_SPLIT_JOB_NAME,
+              payload: splitJobPayload,
               retryable: true,
-              sourceId: null,
             });
 
             if (!splitJob.ok) {
               throw splitJob.error;
             }
 
-            return splitJob.value;
+            return {
+              payload: splitJobPayload,
+              splitJob: splitJob.value,
+            };
           });
       } catch (error) {
         return err(toTranscriptServiceError(error));
       }
 
-      const queueJobId = await jobQueue.enqueue(TRANSCRIPT_SPLIT_JOB_NAME, {
-        jobId: reservedRetry.id,
-        mode: "retry-failed",
-        transcriptId,
-      });
+      const queueJobId = await jobQueue.enqueue(
+        TRANSCRIPT_SPLIT_JOB_NAME,
+        reservedRetry.payload,
+      );
 
       const attachQueueJobIdResult = await jobRepository.attachQueueJobId(
-        reservedRetry.id,
+        reservedRetry.splitJob.id,
         queueJobId,
       );
 
@@ -329,7 +350,7 @@ export function createTranscriptService(
       }
 
       return ok({
-        jobId: reservedRetry.id,
+        jobId: reservedRetry.splitJob.id,
         transcriptId,
       });
     },

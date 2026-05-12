@@ -241,11 +241,7 @@ export class AssetRepository {
               .executeTakeFirstOrThrow();
           }
 
-          if (
-            input.contentFingerprintChanged ||
-            observedFingerprintChanged ||
-            existingAsset.acquired_fingerprint === null
-          ) {
+          if (input.contentFingerprintChanged || observedFingerprintChanged) {
             assetIdsRequiringAcquire.push(existingAsset.id);
           }
         }

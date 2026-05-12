@@ -3,6 +3,7 @@ import type {
   DuplicateSourceUrlHashError,
   ObserveSourceTarget,
   PeriodicCrawlSourceTarget,
+  SourceCollectorSettingsRecord,
   SourceListItem,
   SourceRepository,
   SourceRepositoryError,
@@ -11,8 +12,15 @@ import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
 import { createSourceSlug, normalizeOptionalSlug } from "../lib/source-slug.js";
 import { createUrlHash } from "../lib/url-hash.js";
+import type { Logger } from "../logger/index.js";
+import { createLogger } from "../logger/index.js";
 import type { SourceCollectorRegistry } from "../plugins/index.js";
 import { defaultSourceCollectorRegistry } from "../plugins/index.js";
+import type {
+  JsonValue,
+  SourceCollectorSettingSchemaField,
+  SourceCollectorSettingValue as PluginSourceCollectorSettingValue,
+} from "../plugins/types.js";
 import type { SourcePeriodicCrawlSettings } from "./periodic-crawl-settings.js";
 
 export type CreateSourceRequest = {
@@ -42,6 +50,11 @@ export type FindObserveSourceTargetError = {
   message: string;
 };
 
+export type GetSourceCollectorSettingsError = {
+  code: "source_not_found";
+  message: string;
+};
+
 export type SourceCollectorPluginListItem = {
   message: string | null;
   description: string | null;
@@ -49,6 +62,20 @@ export type SourceCollectorPluginListItem = {
   pluginSlug: string;
   sourceKind: "feed" | "podcast" | "streaming";
   status: "available" | "unavailable";
+};
+
+export type SourceCollectorSettingItem = {
+  key: string;
+  type: SourceCollectorSettingSchemaField["type"];
+  value: PluginSourceCollectorSettingValue;
+};
+
+export type SourceCollectorSettingValue = PluginSourceCollectorSettingValue;
+
+export type SourceCollectorSettingsDetail = {
+  baseVersion: number;
+  items: SourceCollectorSettingItem[];
+  periodicCrawl: SourcePeriodicCrawlSettings;
 };
 
 export interface SourceService {
@@ -63,6 +90,14 @@ export interface SourceService {
       FindObserveSourceTargetError | SourceRepositoryError
     >
   >;
+  getSourceCollectorSettings(
+    sourceId: string,
+  ): Promise<
+    Result<
+      SourceCollectorSettingsDetail,
+      GetSourceCollectorSettingsError | SourceRepositoryError
+    >
+  >;
   listSourceCollectorPlugins(): Result<SourceCollectorPluginListItem[], Error>;
   listPeriodicCrawlTargets(): Promise<
     Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
@@ -72,6 +107,7 @@ export interface SourceService {
     sourceId: string,
     settings: SourcePeriodicCrawlSettings,
     baseVersion: number,
+    items?: Array<{ key: string; value: PluginSourceCollectorSettingValue }>,
   ): Promise<
     Result<
       SourceListItem,
@@ -82,17 +118,48 @@ export interface SourceService {
   >;
 }
 
+export type CreateSourceServiceDependencies = {
+  logger?: Logger;
+  sourceCollectorRegistry?: SourceCollectorRegistry;
+};
+
 export function createSourceService(
   sourceRepository: SourceRepository,
-  sourceCollectorRegistry: SourceCollectorRegistry = defaultSourceCollectorRegistry,
+  sourceCollectorRegistryOrDependencies:
+    | SourceCollectorRegistry
+    | CreateSourceServiceDependencies = {},
 ): SourceService {
+  const dependencies = isSourceCollectorRegistry(
+    sourceCollectorRegistryOrDependencies,
+  )
+    ? {
+        sourceCollectorRegistry: sourceCollectorRegistryOrDependencies,
+      }
+    : sourceCollectorRegistryOrDependencies;
+  const logger =
+    dependencies.logger ??
+    createLogger({
+      service: "source",
+    });
+  const sourceCollectorRegistry =
+    dependencies.sourceCollectorRegistry ?? defaultSourceCollectorRegistry;
+
   return {
     async createSource(
       request: CreateSourceRequest,
     ): Promise<Result<SourceListItem, CreateSourceError>> {
+      const sourceLogger = logger.child({
+        operation: "source-create",
+        pluginSlug: request.pluginSlug ?? "podcast-rss",
+        requestUrl: request.url,
+        requestSourceSlug: request.sourceSlug,
+      });
       const normalizedUrlResult = normalizeSourceUrl(request.url);
 
       if (!normalizedUrlResult.ok) {
+        sourceLogger.warn("source create rejected invalid URL.", {
+          errorCode: normalizedUrlResult.error.code,
+        });
         return normalizedUrlResult;
       }
 
@@ -102,8 +169,12 @@ export function createSourceService(
         createSourceSlug(normalizedUrl, request.title);
       const pluginSlug = request.pluginSlug ?? "podcast-rss";
       const sourceKind = sourceCollectorRegistry.getSourceKind(pluginSlug);
-
-      return sourceRepository.createSource({
+      sourceLogger.info("source create started.", {
+        normalizedUrl,
+        sourceKind,
+        slug,
+      });
+      const result = await sourceRepository.createSource({
         collectorSettingId: crypto.randomUUID(),
         collectorSettingSnapshotId: crypto.randomUUID(),
         description: normalizeOptionalString(request.description),
@@ -116,6 +187,26 @@ export function createSourceService(
         url: normalizedUrl,
         urlHash: createUrlHash(normalizedUrl),
       });
+
+      if (!result.ok) {
+        const errorCode =
+          isErrorWithCode(result.error) && typeof result.error.code === "string"
+            ? result.error.code
+            : "source_create_failed";
+        sourceLogger.warn("source create failed.", {
+          errorCode,
+          errorMessage: result.error.message,
+        });
+
+        return result;
+      }
+
+      sourceLogger.info("source create completed.", {
+        sourceId: result.value.id,
+        slug: result.value.slug,
+      });
+
+      return result;
     },
 
     async findObserveSourceTarget(
@@ -140,6 +231,44 @@ export function createSourceService(
       }
 
       return ok(source.value);
+    },
+
+    async getSourceCollectorSettings(
+      sourceId: string,
+    ): Promise<
+      Result<
+        SourceCollectorSettingsDetail,
+        GetSourceCollectorSettingsError | SourceRepositoryError
+      >
+    > {
+      const currentSettings =
+        await sourceRepository.findSourceCollectorSettings(sourceId);
+
+      if (!currentSettings.ok) {
+        return currentSettings;
+      }
+
+      if (currentSettings.value === null) {
+        return err({
+          code: "source_not_found",
+          message: "Source not found.",
+        });
+      }
+
+      try {
+        return ok(
+          await toSourceCollectorSettingsDetail(
+            sourceCollectorRegistry,
+            currentSettings.value,
+          ),
+        );
+      } catch (error) {
+        return err(
+          error instanceof Error
+            ? error
+            : new Error("Failed to get source collector settings."),
+        );
+      }
     },
 
     listSourceCollectorPlugins(): Result<
@@ -182,6 +311,10 @@ export function createSourceService(
       sourceId: string,
       settings: SourcePeriodicCrawlSettings,
       baseVersion: number,
+      items: Array<{
+        key: string;
+        value: PluginSourceCollectorSettingValue;
+      }> = [],
     ): Promise<
       Result<
         SourceListItem,
@@ -190,10 +323,29 @@ export function createSourceService(
         | SourceRepositoryError
       >
     > {
+      const currentSettings =
+        await sourceRepository.findSourceCollectorSettings(sourceId);
+
+      if (!currentSettings.ok) {
+        return currentSettings;
+      }
+
+      if (currentSettings.value === null) {
+        return err({
+          code: "source_not_found",
+          message: "Source not found.",
+        });
+      }
+
+      const nextConfig = {
+        ...currentSettings.value.config,
+        ...Object.fromEntries(items.map((item) => [item.key, item.value])),
+      };
       const source = await sourceRepository.updateSourceCollectorSettings(
         sourceId,
         settings,
         baseVersion,
+        nextConfig,
       );
 
       if (!source.ok) {
@@ -212,12 +364,61 @@ export function createSourceService(
   };
 }
 
+async function toSourceCollectorSettingsDetail(
+  sourceCollectorRegistry: SourceCollectorRegistry,
+  settings: SourceCollectorSettingsRecord,
+): Promise<SourceCollectorSettingsDetail> {
+  const plugin = sourceCollectorRegistry.get(settings.pluginSlug);
+  const schema = await plugin.settingSchema();
+
+  return {
+    baseVersion: settings.baseVersion,
+    items: schema.map((field) => ({
+      key: field.key,
+      type: field.type,
+      value: readCollectorSettingValue(settings.config, field.key),
+    })),
+    periodicCrawl: {
+      enabled: settings.periodicCrawlEnabled,
+      intervalMinutes: settings.periodicCrawlIntervalMinutes,
+    },
+  };
+}
+
+function readCollectorSettingValue(
+  config: Record<string, JsonValue>,
+  key: string,
+): SourceCollectorSettingValue {
+  return key in config ? (config[key] ?? null) : null;
+}
+
 function normalizeOptionalString(
   value: string | undefined,
 ): string | undefined {
   const trimmedValue = value?.trim();
 
   return trimmedValue === "" ? undefined : trimmedValue;
+}
+
+function isSourceCollectorRegistry(
+  value: SourceCollectorRegistry | CreateSourceServiceDependencies,
+): value is SourceCollectorRegistry {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "get" in value &&
+    "getSourceKind" in value &&
+    "list" in value
+  );
+}
+
+function isErrorWithCode(error: unknown): error is { code: string } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof (error as Record<string, unknown>).code === "string"
+  );
 }
 
 export function normalizeSourceUrl(

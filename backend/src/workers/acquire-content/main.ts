@@ -35,6 +35,7 @@ const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
 const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
+const workStorage = new FilesystemStorage(runtimeConfig.workStorageRootDir);
 
 boss.on("error", (error) => {
   logger.error("job queue runtime failed.", { error });
@@ -57,6 +58,7 @@ await boss.work<AcquireContentJobPayload>(
       logger,
       sourceCollectorRegistry: defaultSourceCollectorRegistry,
       storage,
+      workStorage,
     });
 
     if (!result.ok) {
