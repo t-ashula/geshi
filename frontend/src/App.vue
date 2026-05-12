@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import {
+  computed,
+  onMounted,
+  onUnmounted,
+  ref,
+  useTemplateRef,
+  watch,
+} from "vue";
 
+import PlaybackDock from "./components/PlaybackDock.vue";
 import type {
   ContentDetailAsset,
   ContentDetailItem,
@@ -36,6 +44,7 @@ import {
   detailOriginalPageUrl,
   selectDetailDisplayContent,
 } from "./content-detail.js";
+import type { PlaybackState } from "./playback.js";
 import { validateCreateSourceRequest } from "./source-form.js";
 
 type RouteState =
@@ -93,6 +102,15 @@ const sourceCrawlForm = ref<PeriodicCrawlSettings>({
 const sourceCollectorSettings = ref<SourceCollectorSettingsDetail | null>(null);
 const sourceCollectorItemsForm = ref<Record<string, unknown>>({});
 const theme = ref<"light" | "dark">("light");
+const audioPlayer = useTemplateRef<HTMLAudioElement>("audioPlayer");
+const playback = ref<PlaybackState | null>(null);
+const playbackCurrentTime = ref(0);
+const playbackDuration = ref(0);
+const isPlaybackActive = ref(false);
+const isSeekingPlayback = ref(false);
+const pendingSeekTime = ref(0);
+const playbackVolume = ref(1);
+const isPlaybackMuted = ref(false);
 
 const selectedSourceSlug = computed(() => {
   const route = routeState.value;
@@ -144,6 +162,26 @@ const routeHeadline = computed(() => {
   return "All entries";
 });
 
+const playbackSeekValue = computed(() =>
+  isSeekingPlayback.value ? pendingSeekTime.value : playbackCurrentTime.value,
+);
+
+const playbackProgressMax = computed(() =>
+  playbackDuration.value > 0 ? playbackDuration.value : 0,
+);
+
+const playbackSourceLabel = computed(() => {
+  if (playback.value === null) {
+    return "";
+  }
+
+  return playback.value.sourceTitle ?? playback.value.sourceSlug;
+});
+
+const playbackVolumeValue = computed(() =>
+  isPlaybackMuted.value ? 0 : playbackVolume.value,
+);
+
 watch(
   selectedSource,
   (source) => {
@@ -173,6 +211,22 @@ watch(theme, (currentTheme) => {
   window.localStorage.setItem("geshi-theme", currentTheme);
 });
 
+watch(playbackVolume, (nextVolume) => {
+  const element = audioPlayer.value;
+
+  if (element !== null) {
+    element.volume = nextVolume;
+  }
+});
+
+watch(isPlaybackMuted, (muted) => {
+  const element = audioPlayer.value;
+
+  if (element !== null) {
+    element.muted = muted;
+  }
+});
+
 onMounted(async () => {
   if (window.location.pathname === "/") {
     replaceLocation("/browse");
@@ -194,6 +248,22 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("popstate", syncRouteFromLocation);
+});
+
+watch(audioPlayer, (element, previousElement) => {
+  previousElement?.pause();
+
+  if (element === null || playback.value === null) {
+    return;
+  }
+
+  element.src = playback.value.url;
+  element.currentTime = playbackCurrentTime.value;
+  element.volume = playbackVolume.value;
+  element.muted = isPlaybackMuted.value;
+  void element.play().catch(() => {
+    isPlaybackActive.value = false;
+  });
 });
 
 function syncRouteFromLocation(): void {
@@ -257,6 +327,181 @@ function closeContentActions(): void {
 function toggleAssetMenu(assetId: string): void {
   expandedAssetMenuId.value =
     expandedAssetMenuId.value === assetId ? null : assetId;
+}
+
+function isCurrentPlaybackAsset(assetId: string): boolean {
+  return playback.value?.assetId === assetId;
+}
+
+function startPlayback(
+  detail: ContentDetailItem,
+  asset: ContentDetailAsset,
+): void {
+  if (asset.url === null || asset.mimeType === null) {
+    return;
+  }
+
+  const isSameAsset =
+    playback.value?.assetId === asset.id && playback.value.url === asset.url;
+
+  playback.value = {
+    assetId: asset.id,
+    assetKind: asset.kind,
+    contentId: detail.id,
+    contentTitle: detail.title ?? "Untitled entry",
+    mimeType: asset.mimeType,
+    sourceSlug: detail.source.slug,
+    sourceTitle: detail.source.title,
+    url: asset.url,
+  };
+  closeAssetMenu();
+
+  if (!isSameAsset) {
+    playbackCurrentTime.value = 0;
+    playbackDuration.value = 0;
+    pendingSeekTime.value = 0;
+  }
+
+  const element = audioPlayer.value;
+
+  if (element === null) {
+    return;
+  }
+
+  if (!isSameAsset) {
+    element.src = asset.url;
+    element.load();
+  }
+
+  void element.play().catch(() => {
+    isPlaybackActive.value = false;
+  });
+}
+
+function togglePlayback(): void {
+  const element = audioPlayer.value;
+
+  if (element === null || playback.value === null) {
+    return;
+  }
+
+  if (element.paused) {
+    void element.play().catch(() => {
+      isPlaybackActive.value = false;
+    });
+    return;
+  }
+
+  element.pause();
+}
+
+function stopPlayback(): void {
+  const element = audioPlayer.value;
+
+  if (element !== null) {
+    element.pause();
+    element.removeAttribute("src");
+    element.load();
+    element.currentTime = 0;
+  }
+
+  playback.value = null;
+  playbackCurrentTime.value = 0;
+  playbackDuration.value = 0;
+  pendingSeekTime.value = 0;
+  isPlaybackActive.value = false;
+  isSeekingPlayback.value = false;
+}
+
+function syncPlaybackCurrentTime(): void {
+  const element = audioPlayer.value;
+
+  if (element === null || isSeekingPlayback.value) {
+    return;
+  }
+
+  playbackCurrentTime.value = element.currentTime;
+}
+
+function syncPlaybackDuration(): void {
+  const element = audioPlayer.value;
+
+  if (element === null) {
+    return;
+  }
+
+  playbackDuration.value = Number.isFinite(element.duration)
+    ? element.duration
+    : 0;
+}
+
+function handlePlaybackStarted(): void {
+  isPlaybackActive.value = true;
+}
+
+function handlePlaybackPaused(): void {
+  isPlaybackActive.value = false;
+}
+
+function handlePlaybackEnded(): void {
+  isPlaybackActive.value = false;
+  playbackCurrentTime.value = playbackDuration.value;
+}
+
+function beginSeek(): void {
+  isSeekingPlayback.value = true;
+  pendingSeekTime.value = playbackCurrentTime.value;
+}
+
+function handleSeekPreview(value: number): void {
+  pendingSeekTime.value = Number.isFinite(value) ? value : 0;
+}
+
+function commitSeek(value: number): void {
+  const element = audioPlayer.value;
+  const nextTime = Number.isFinite(value) ? value : 0;
+
+  playbackCurrentTime.value = nextTime;
+  pendingSeekTime.value = nextTime;
+  isSeekingPlayback.value = false;
+
+  if (element !== null) {
+    element.currentTime = nextTime;
+  }
+}
+
+function togglePlaybackMuted(): void {
+  isPlaybackMuted.value = !isPlaybackMuted.value;
+}
+
+function seekPlaybackBy(deltaSeconds: number): void {
+  const element = audioPlayer.value;
+
+  if (element === null) {
+    return;
+  }
+
+  const duration = Number.isFinite(element.duration) ? element.duration : 0;
+  const nextTime = Math.max(
+    0,
+    Math.min(
+      element.currentTime + deltaSeconds,
+      duration || element.currentTime + deltaSeconds,
+    ),
+  );
+
+  element.currentTime = nextTime;
+  playbackCurrentTime.value = nextTime;
+  pendingSeekTime.value = nextTime;
+}
+
+function updatePlaybackVolume(nextVolume: number): void {
+  if (!Number.isFinite(nextVolume)) {
+    return;
+  }
+
+  playbackVolume.value = Math.max(0, Math.min(1, nextVolume));
+  isPlaybackMuted.value = playbackVolume.value === 0;
 }
 
 function closeAssetMenu(): void {
@@ -1581,12 +1826,25 @@ function normalizeCollectorSettingFormValue(
                     </div>
                   </div>
 
-                  <audio v-if="asset.mimeType?.startsWith('audio/')" controls>
-                    <source
-                      :src="asset.url ?? undefined"
-                      :type="asset.mimeType"
-                    />
-                  </audio>
+                  <div
+                    v-if="asset.mimeType?.startsWith('audio/')"
+                    class="asset-inline-actions"
+                  >
+                    <button
+                      type="button"
+                      class="secondary-button"
+                      :class="{ active: isCurrentPlaybackAsset(asset.id) }"
+                      @click="startPlayback(contentDetail, asset)"
+                    >
+                      {{
+                        isCurrentPlaybackAsset(asset.id)
+                          ? isPlaybackActive
+                            ? "Playing"
+                            : "Resume"
+                          : "Play"
+                      }}
+                    </button>
+                  </div>
 
                   <video
                     v-else-if="asset.mimeType?.startsWith('video/')"
@@ -1650,6 +1908,40 @@ function normalizeCollectorSettingFormValue(
           </article>
         </section>
       </section>
+    </template>
+
+    <PlaybackDock
+      v-if="playback !== null"
+      :duration="playbackDuration"
+      :is-playback-active="isPlaybackActive"
+      :is-playback-muted="isPlaybackMuted"
+      :playback="playback"
+      :progress-max="playbackProgressMax"
+      :seek-value="playbackSeekValue"
+      :source-label="playbackSourceLabel"
+      :volume-value="playbackVolumeValue"
+      @seek-commit="commitSeek"
+      @seek-preview="handleSeekPreview"
+      @seek-relative="seekPlaybackBy"
+      @seek-start="beginSeek"
+      @stop-playback="stopPlayback"
+      @toggle-playback="togglePlayback"
+      @toggle-playback-muted="togglePlaybackMuted"
+      @update-playback-volume="updatePlaybackVolume"
+    />
+
+    <template v-if="playback !== null">
+      <audio
+        ref="audioPlayer"
+        class="playback-audio-element"
+        preload="metadata"
+        :src="playback.url"
+        @durationchange="syncPlaybackDuration"
+        @ended="handlePlaybackEnded"
+        @pause="handlePlaybackPaused"
+        @play="handlePlaybackStarted"
+        @timeupdate="syncPlaybackCurrentTime"
+      ></audio>
     </template>
   </main>
 </template>
