@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   getContentDetail,
+  getSourceCollectorSettings,
   inspectSource,
   listSourceCollectorPlugins,
 } from "../src/source-api.js";
@@ -210,6 +211,65 @@ describe("getContentDetail", () => {
         slug: "example-feed",
       },
       title: "Episode 1",
+    });
+  });
+});
+
+describe("getSourceCollectorSettings", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns collector settings data on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                baseVersion: 2,
+                items: [
+                  {
+                    key: "userAgent",
+                    type: {
+                      type: "text",
+                    },
+                    value: "geshi-test",
+                  },
+                ],
+                periodicCrawl: {
+                  enabled: true,
+                  intervalMinutes: 30,
+                },
+              },
+            }),
+            {
+              headers: {
+                "content-type": "application/json",
+              },
+              status: 200,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await expect(getSourceCollectorSettings("source-1")).resolves.toEqual({
+      baseVersion: 2,
+      items: [
+        {
+          key: "userAgent",
+          type: {
+            type: "text",
+          },
+          value: "geshi-test",
+        },
+      ],
+      periodicCrawl: {
+        enabled: true,
+        intervalMinutes: 30,
+      },
     });
   });
 });

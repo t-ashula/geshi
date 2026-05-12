@@ -94,7 +94,7 @@ async function seedPeriodicCrawlJob(
   currentJobRepository: JobRepository,
   currentJobQueue: PgBossJobQueue,
 ): Promise<void> {
-  const existingJob = await currentJobRepository.findQueuedOrRunningJobByKind(
+  const existingJob = await currentJobRepository.findIncompleteJobByKind(
     PERIODIC_CRAWL_JOB_NAME,
   );
 
@@ -102,18 +102,21 @@ async function seedPeriodicCrawlJob(
     return;
   }
 
+  const jobId = uuidv7();
+  const queuePayload = { jobId };
   const job = await currentJobRepository.createJob({
-    id: uuidv7(),
+    id: jobId,
     kind: PERIODIC_CRAWL_JOB_NAME,
+    payload: queuePayload,
     retryable: true,
-    sourceId: null,
   });
   if (!job.ok) {
     throw job.error;
   }
-  const queueJobId = await currentJobQueue.enqueue(PERIODIC_CRAWL_JOB_NAME, {
-    jobId: job.value.id,
-  });
+  const queueJobId = await currentJobQueue.enqueue(
+    PERIODIC_CRAWL_JOB_NAME,
+    queuePayload,
+  );
 
   const attachQueueJobIdResult = await currentJobRepository.attachQueueJobId(
     job.value.id,

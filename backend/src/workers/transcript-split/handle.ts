@@ -195,11 +195,19 @@ export async function handleTranscriptSplitJob(
       return err(transcriptChunkResult.error);
     }
 
+    const transcriptChunkJobId = uuidv7();
+    const transcriptChunkPayload = {
+      chunkIndex: splitChunk.chunkIndex,
+      jobId: transcriptChunkJobId,
+      storageKey,
+      transcriptChunkId: transcriptChunkResult.value.id,
+      transcriptId: payload.transcriptId,
+    };
     const transcriptChunkJob = await dependencies.jobRepository.createJob({
-      id: uuidv7(),
+      id: transcriptChunkJobId,
       kind: TRANSCRIPT_CHUNK_JOB_NAME,
+      payload: transcriptChunkPayload,
       retryable: true,
-      sourceId: null,
     });
 
     if (!transcriptChunkJob.ok) {
@@ -214,13 +222,7 @@ export async function handleTranscriptSplitJob(
 
     const queueJobId = await dependencies.jobQueue.enqueue(
       TRANSCRIPT_CHUNK_JOB_NAME,
-      {
-        chunkIndex: splitChunk.chunkIndex,
-        jobId: transcriptChunkJob.value.id,
-        storageKey,
-        transcriptChunkId: transcriptChunkResult.value.id,
-        transcriptId: payload.transcriptId,
-      },
+      transcriptChunkPayload,
     );
 
     const attachQueueJobIdResult =

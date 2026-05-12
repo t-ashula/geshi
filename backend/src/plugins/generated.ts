@@ -33,19 +33,19 @@ export type ExternalSourceCollectorPluginRecord =
     };
 
 type GeneratedSourceCollectorPluginLoader = {
-  loadDefinition(): Promise<SourceCollectorPluginDefinition>;
   packageName: string;
+  resolvedModuleUrl: string;
 };
 
 type GeneratedSourceCollectorPluginModule = {
-  generatedSourceCollectorPluginLoaders?: GeneratedSourceCollectorPluginLoader[];
+  generatedSourceCollectorPlugins?: GeneratedSourceCollectorPluginLoader[];
 };
 
 export async function loadExternalSourceCollectorPlugins(
   pluginArtifactPaths: PluginArtifactPaths,
 ): Promise<ExternalSourceCollectorPluginRecord[]> {
   const [loaders, metadataEntries] = await Promise.all([
-    loadGeneratedSourceCollectorPluginLoaders(
+    loadGeneratedSourceCollectorPlugins(
       pluginArtifactPaths.generatedPluginIndexUrl,
     ),
     loadGeneratedSourceCollectorPluginMetadata(
@@ -61,7 +61,9 @@ export async function loadExternalSourceCollectorPlugins(
     const metadata = metadataByPackageName.get(loader.packageName);
 
     try {
-      const definition = await loader.loadDefinition();
+      const definition = await loadGeneratedPluginDefinition(
+        loader.resolvedModuleUrl,
+      );
       const capability = definition.manifest.capabilities.find(
         (candidate): candidate is SourceCollectorPluginCapability =>
           candidate.kind === "source-collector",
@@ -122,7 +124,7 @@ export async function loadExternalSourceCollectorPlugins(
   return records;
 }
 
-async function loadGeneratedSourceCollectorPluginLoaders(
+async function loadGeneratedSourceCollectorPlugins(
   generatedPluginIndexUrl: string,
 ): Promise<GeneratedSourceCollectorPluginLoader[]> {
   try {
@@ -130,10 +132,24 @@ async function loadGeneratedSourceCollectorPluginLoaders(
       generatedPluginIndexUrl
     )) as GeneratedSourceCollectorPluginModule;
 
-    return module.generatedSourceCollectorPluginLoaders ?? [];
+    return module.generatedSourceCollectorPlugins ?? [];
   } catch {
     return [];
   }
+}
+
+async function loadGeneratedPluginDefinition(
+  resolvedModuleUrl: string,
+): Promise<SourceCollectorPluginDefinition> {
+  const pluginModule = (await import(resolvedModuleUrl)) as {
+    definition?: SourceCollectorPluginDefinition;
+  };
+
+  if (pluginModule.definition === undefined) {
+    throw new Error("Plugin module does not export definition.");
+  }
+
+  return pluginModule.definition;
 }
 
 async function loadGeneratedSourceCollectorPluginMetadata(

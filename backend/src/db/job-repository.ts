@@ -1,4 +1,5 @@
 import type { Kysely, Selectable } from "kysely";
+import { sql } from "kysely";
 
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
@@ -8,9 +9,16 @@ export type CreateJobInput = {
   id: string;
   kind: string;
   metadata?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
   retryable: boolean;
-  sourceId: string | null;
 };
+
+export type JobStatus =
+  | "planned"
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed";
 
 export type JobListItem = {
   attemptCount: number;
@@ -20,11 +28,11 @@ export type JobListItem = {
   id: string;
   kind: string;
   metadata: Record<string, unknown>;
+  payload: Record<string, unknown>;
   queueJobId: string | null;
   retryable: boolean;
-  sourceId: string | null;
   startedAt: Date | null;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: JobStatus;
 };
 
 export type LatestObserveJob = {
@@ -47,9 +55,9 @@ export class JobRepository {
           id: input.id,
           kind: input.kind,
           metadata: input.metadata ?? {},
+          payload: input.payload ?? {},
           retryable: input.retryable,
-          source_id: input.sourceId,
-          status: "queued",
+          status: "planned",
         })
         .returningAll()
         .executeTakeFirstOrThrow();
@@ -69,6 +77,7 @@ export class JobRepository {
         .updateTable("jobs")
         .set({
           queue_job_id: queueJobId,
+          status: queueJobId === null ? "planned" : "queued",
         })
         .where("id", "=", id)
         .executeTakeFirstOrThrow();
@@ -189,16 +198,17 @@ export class JobRepository {
     }
   }
 
-  public async listQueuedOrRunningObserveSourceIds(): Promise<
+  public async listIncompleteObserveSourceIds(): Promise<
     Result<Set<string>, JobRepositoryError>
   > {
     try {
       const jobs = await this.database
         .selectFrom("jobs")
-        .select(["source_id"])
+        .select(
+          sql<string | null>`jobs.payload -> 'source' ->> 'id'`.as("source_id"),
+        )
         .where("kind", "=", "observe-source")
-        .where("status", "in", ["queued", "running"])
-        .where("source_id", "is not", null)
+        .where("status", "in", ["planned", "queued", "running"])
         .execute();
 
       return ok(
@@ -212,7 +222,7 @@ export class JobRepository {
       return err(
         toRepositoryError(
           error,
-          "Failed to list queued or running observe source ids.",
+          "Failed to list incomplete observe source ids.",
         ),
       );
     }
@@ -228,10 +238,16 @@ export class JobRepository {
     try {
       const jobs = await this.database
         .selectFrom("jobs")
-        .select(["created_at", "source_id"])
+        .select([
+          "created_at",
+          sql<string | null>`jobs.payload -> 'source' ->> 'id'`.as("source_id"),
+        ])
         .where("kind", "=", "observe-source")
-        .where("source_id", "in", sourceIds)
-        .orderBy("source_id", "asc")
+        .where(
+          sql<string | null>`jobs.payload -> 'source' ->> 'id'`,
+          "in",
+          sourceIds,
+        )
         .orderBy("created_at", "desc")
         .execute();
       const latestJobsBySourceId = new Map<string, LatestObserveJob>();
@@ -255,21 +271,21 @@ export class JobRepository {
     }
   }
 
-  public async findQueuedOrRunningJobByKind(
+  public async findIncompleteJobByKind(
     kind: string,
   ): Promise<JobListItem | null> {
     const job = await this.database
       .selectFrom("jobs")
       .selectAll()
       .where("kind", "=", kind)
-      .where("status", "in", ["queued", "running"])
+      .where("status", "in", ["planned", "queued", "running"])
       .orderBy("created_at", "desc")
       .executeTakeFirst();
 
     return job === undefined ? null : toJobListItem(job);
   }
 
-  public async listQueuedJobsWithoutQueueIdByKind(
+  public async listPlannedJobsByKind(
     kind: string,
   ): Promise<Result<JobListItem[], JobRepositoryError>> {
     try {
@@ -277,17 +293,65 @@ export class JobRepository {
         .selectFrom("jobs")
         .selectAll()
         .where("kind", "=", kind)
-        .where("status", "=", "queued")
-        .where("queue_job_id", "is", null)
+        .where((expressionBuilder) =>
+          expressionBuilder.or([
+            expressionBuilder("status", "=", "planned"),
+            expressionBuilder.and([
+              expressionBuilder("status", "=", "queued"),
+              expressionBuilder("queue_job_id", "is", null),
+            ]),
+          ]),
+        )
         .orderBy("created_at", "asc")
         .execute();
 
       return ok(jobs.map(toJobListItem));
     } catch (error) {
+      return err(toRepositoryError(error, "Failed to list planned jobs."));
+    }
+  }
+
+  public async listIncompleteRecordContentAssetIds(): Promise<
+    Result<Set<string>, JobRepositoryError>
+  > {
+    return this.listRecordContentAssetIdsByStatuses([
+      "planned",
+      "queued",
+      "running",
+    ]);
+  }
+
+  public async listRunningRecordContentAssetIds(): Promise<
+    Result<Set<string>, JobRepositoryError>
+  > {
+    return this.listRecordContentAssetIdsByStatuses(["running"]);
+  }
+
+  private async listRecordContentAssetIdsByStatuses(
+    statuses: Array<"planned" | "queued" | "running">,
+  ): Promise<Result<Set<string>, JobRepositoryError>> {
+    try {
+      const rows = await this.database
+        .selectFrom("jobs")
+        .select(
+          sql<string | null>`jobs.payload -> 'asset' ->> 'id'`.as("asset_id"),
+        )
+        .where("kind", "=", "record-content")
+        .where("status", "in", statuses)
+        .execute();
+
+      return ok(
+        new Set(
+          rows
+            .map((row) => row.asset_id)
+            .filter((assetId): assetId is string => assetId !== null),
+        ),
+      );
+    } catch (error) {
       return err(
         toRepositoryError(
           error,
-          "Failed to list queued jobs without queue job id.",
+          "Failed to list record-content asset ids by status.",
         ),
       );
     }
@@ -303,9 +367,9 @@ function toJobListItem(job: Selectable<JobTable>): JobListItem {
     id: job.id,
     kind: job.kind,
     metadata: job.metadata,
+    payload: job.payload,
     queueJobId: job.queue_job_id,
     retryable: job.retryable,
-    sourceId: job.source_id,
     startedAt: job.started_at,
     status: job.status,
   };

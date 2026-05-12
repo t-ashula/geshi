@@ -2,12 +2,31 @@ import { describe, expect, it, vi } from "vitest";
 
 import { plugin } from "../src/index.js";
 
+function createNoopPluginLogger() {
+  return {
+    debug() {},
+    error() {},
+    info() {},
+    warn() {},
+  };
+}
+
+function createPluginContext() {
+  return {
+    logger: createNoopPluginLogger(),
+    getWebClient: (_input: { kind: "browser" | "fetch" }) =>
+      Promise.resolve({
+        fetch: (request: Request) => fetch(request),
+      }),
+  };
+}
+
 describe("goJpRss plugin", () => {
   it("reports support only for gov-online ministry news urls", async () => {
     await expect(
       plugin.supports({
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://www.gov-online.go.jp/info/index.html",
       }),
     ).resolves.toEqual({
@@ -17,7 +36,7 @@ describe("goJpRss plugin", () => {
     await expect(
       plugin.supports({
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://example.com/info/index.html",
       }),
     ).resolves.toEqual({
@@ -50,7 +69,7 @@ describe("goJpRss plugin", () => {
       plugin.inspect({
         abortSignal: new AbortController().signal,
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://www.gov-online.go.jp/info/index.html",
       }),
     ).resolves.toEqual({
@@ -66,7 +85,7 @@ describe("goJpRss plugin", () => {
       plugin.inspect({
         abortSignal: new AbortController().signal,
         config: {},
-        logger: createNoopPluginLogger(),
+        context: createPluginContext(),
         sourceUrl: "https://example.com/info/index.html",
       }),
     ).rejects.toMatchObject({
@@ -148,7 +167,7 @@ describe("goJpRss plugin", () => {
         lastProcessedUrl: "https://example.go.jp/news/4",
       },
       config: {},
-      logger: createNoopPluginLogger(),
+      context: createPluginContext(),
       sourceUrl: "https://www.gov-online.go.jp/info/index.html",
     });
 
@@ -167,6 +186,16 @@ describe("goJpRss plugin", () => {
       summary: "2099年5月23日 内閣府 記事1",
       title: "記事1",
     });
+    expect(observed.contents[0]?.assets).toEqual([
+      expect.objectContaining({
+        kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
+        primary: true,
+        sourceUrl: "https://example.go.jp/news/1",
+      }),
+    ]);
   });
 
   it("stops observing when entries are older than one week", async () => {
@@ -214,7 +243,7 @@ describe("goJpRss plugin", () => {
     const observed = await plugin.observe({
       abortSignal: new AbortController().signal,
       config: {},
-      logger: createNoopPluginLogger(),
+      context: createPluginContext(),
       sourceUrl: "https://www.gov-online.go.jp/info/index.html",
     });
 
@@ -225,6 +254,16 @@ describe("goJpRss plugin", () => {
     expect(observed.contents[0]?.externalId).toBe(
       "https://example.go.jp/news/recent",
     );
+    expect(observed.contents[0]?.assets).toEqual([
+      expect.objectContaining({
+        kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
+        primary: true,
+        sourceUrl: "https://example.go.jp/news/recent",
+      }),
+    ]);
 
     vi.useRealTimers();
   });
@@ -248,6 +287,9 @@ describe("goJpRss plugin", () => {
       abortSignal: new AbortController().signal,
       asset: {
         kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
         observedFingerprints: [
           "observed-html-url:https://example.go.jp/news/1",
         ],
@@ -263,20 +305,45 @@ describe("goJpRss plugin", () => {
         summary: null,
         title: "記事1",
       },
-      logger: createNoopPluginLogger(),
+      context: createPluginContext(),
     });
 
     expect(asset.contentType).toBe("text/html");
     expect(asset.kind).toBe("html");
+    if (asset.body === undefined) {
+      throw new Error("Expected acquired asset body.");
+    }
     expect(asset.body.byteLength).toBeGreaterThan(0);
   });
+  it("extracts a sanitized html detail body", async () => {
+    await expect(
+      plugin.extract({
+        asset: {
+          body: new TextEncoder().encode(
+            `
+              <html>
+                <body>
+                  <main class="article-body">
+                    <h1>記事タイトル</h1>
+                    <p>本文 <strong>その1</strong></p>
+                    <div>
+                      <p><a href="/info/example.html">詳細ページ</a></p>
+                    </div>
+                    <style>.hidden { display: none; }</style>
+                  </main>
+                </body>
+              </html>
+            `,
+          ),
+          kind: "html",
+          mimeType: "text/html",
+          sourceUrl: "https://www.gov-online.go.jp/example.html",
+        },
+        context: createPluginContext(),
+      }),
+    ).resolves.toEqual({
+      body: '<article><h1>記事タイトル</h1><p>本文 <strong>その1</strong></p><p><a href="https://www.gov-online.go.jp/info/example.html">詳細ページ</a></p></article>',
+      format: "html",
+    });
+  });
 });
-
-function createNoopPluginLogger() {
-  return {
-    debug() {},
-    error() {},
-    info() {},
-    warn() {},
-  };
-}

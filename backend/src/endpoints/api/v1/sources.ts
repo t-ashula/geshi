@@ -9,7 +9,11 @@ import type { Result } from "../../../lib/result.js";
 import { err, ok } from "../../../lib/result.js";
 import type { InspectSourceError } from "../../../service/source-inspect-service.js";
 import type { InspectSourceResult } from "../../../service/source-inspect-service.js";
-import type { SourceCollectorPluginListItem } from "../../../service/source-service.js";
+import type {
+  SourceCollectorPluginListItem,
+  SourceCollectorSettingsDetail,
+  SourceCollectorSettingValue,
+} from "../../../service/source-service.js";
 
 export type ListSourcesEndpointError = {
   code: "source_list_failed";
@@ -20,6 +24,16 @@ export type ListSourceCollectorPluginsEndpointError = {
   code: "source_collector_plugin_list_failed";
   message: string;
 };
+
+export type GetSourceCollectorSettingsEndpointError =
+  | {
+      code: "collector_settings_get_failed";
+      message: string;
+    }
+  | {
+      code: "source_not_found";
+      message: string;
+    };
 
 export type CreateSourceEndpointError =
   | {
@@ -76,6 +90,7 @@ export type PatchSourceCollectorSettingsEndpointInput = {
   baseVersion: number;
   enabled: boolean;
   intervalMinutes: number;
+  items: Array<{ key: string; value: SourceCollectorSettingValue }>;
 };
 
 export function createListSourcesEndpoint(dependencies: AppDependencies) {
@@ -109,6 +124,35 @@ export function createListSourceCollectorPluginsEndpoint(
         code: "source_collector_plugin_list_failed",
         message: result.error.message,
       });
+    }
+
+    return result;
+  };
+}
+
+export function createGetSourceCollectorSettingsEndpoint(
+  dependencies: AppDependencies,
+) {
+  return async (
+    sourceId: string,
+  ): Promise<
+    Result<
+      SourceCollectorSettingsDetail,
+      GetSourceCollectorSettingsEndpointError
+    >
+  > => {
+    const result =
+      await dependencies.sourceService.getSourceCollectorSettings(sourceId);
+
+    if (!result.ok) {
+      if (result.error instanceof Error) {
+        return err({
+          code: "collector_settings_get_failed",
+          message: result.error.message,
+        });
+      }
+
+      return err(result.error);
     }
 
     return result;
@@ -200,6 +244,7 @@ export function createPatchSourceCollectorSettingsEndpoint(
           intervalMinutes: input.intervalMinutes,
         },
         input.baseVersion,
+        input.items,
       );
 
     if (!result.ok) {

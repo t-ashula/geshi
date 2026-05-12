@@ -20,12 +20,14 @@ describe("observe to record arguments handoff", () => {
       | {
           id: string;
           metadata: unknown;
+          payload: Parameters<typeof handleRecordContentJob>[0];
         }
       | undefined;
     let recordedArguments: SourceCollectorRecordInput["arguments"] | undefined;
     type CreatedJobInput = {
       id: string;
       metadata: unknown;
+      payload: Parameters<typeof handleRecordContentJob>[0];
     };
 
     const observePlugin = {
@@ -84,6 +86,7 @@ describe("observe to record arguments handoff", () => {
       createdRecordJob = {
         id: input.id,
         metadata: input.metadata,
+        payload: input.payload,
       };
 
       return Promise.resolve(ok({ id: input.id }));
@@ -144,6 +147,9 @@ describe("observe to record arguments handoff", () => {
         } as never,
         jobRepository: {
           createJob,
+          listIncompleteRecordContentAssetIds: vi.fn(() =>
+            Promise.resolve(ok(new Set())),
+          ),
           markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
@@ -162,13 +168,7 @@ describe("observe to record arguments handoff", () => {
         arguments?: SourceCollectorRecordInput["arguments"];
       };
     };
-    const recordPayload = (
-      createdRecordJob?.metadata as {
-        core?: {
-          payload?: Parameters<typeof handleRecordContentJob>[0];
-        };
-      }
-    ).core?.payload;
+    const recordPayload = createdRecordJob?.payload;
 
     expect(recordMetadata.plugin?.arguments).toEqual({
       durationSeconds: 15,
@@ -210,6 +210,8 @@ describe("observe to record arguments handoff", () => {
         get: vi.fn(() => observePlugin),
       } as never,
       storage: {
+        delete: vi.fn(() => Promise.resolve(ok(undefined))),
+        get: vi.fn(),
         pathJoin: (...parts: string[]) => parts.join("/"),
         put: vi.fn(() =>
           Promise.resolve(
@@ -220,6 +222,12 @@ describe("observe to record arguments handoff", () => {
           ),
         ),
       } as never,
+      workStorage: {
+        delete: vi.fn(() => Promise.resolve(ok(undefined))),
+        get: vi.fn(),
+        pathJoin: (...parts: string[]) => parts.join("/"),
+        put: vi.fn(),
+      },
     });
 
     expect(recordResult).toEqual(ok(undefined));

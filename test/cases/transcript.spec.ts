@@ -20,10 +20,13 @@ test("requests transcript and waits for chunked transcription to complete", asyn
   const urlInput = page.getByRole("textbox", { name: "Source URL" });
   await urlInput.fill(transcriptSourceFeedUrl);
   await urlInput.blur();
-  await page.getByRole("button", { name: "Register" }).click();
+  await page.getByRole("button", { name: "Register", exact: true }).click();
 
-  await expect(page.getByText(transcriptSourceFeedUrl)).toBeVisible();
-  await page.getByRole("button", { name: "Observe" }).click();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Geshi E2E Botchan Feed" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Entry actions" }).click();
+  await page.getByRole("menuitem", { name: "Crawl" }).click();
 
   let entryId: string | null = null;
 
@@ -91,7 +94,8 @@ test("requests transcript and waits for chunked transcription to complete", asyn
   await expect(
     page.getByRole("heading", { name: "Botchan Episode 1" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Request transcripts" }).click();
+  await page.getByRole("button", { name: "Asset actions" }).first().click();
+  await page.getByRole("menuitem", { name: "Request transcripts" }).click();
 
   await expect
     .poll(

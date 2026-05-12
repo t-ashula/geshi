@@ -6,6 +6,7 @@ import { AppSettingRepository } from "./db/app-setting-repository.js";
 import { AssetRepository } from "./db/asset-repository.js";
 import { ContentRepository } from "./db/content-repository.js";
 import { createDatabaseFromPool } from "./db/database.js";
+import { DetailBodyRepository } from "./db/detail-body-repository.js";
 import { JobRepository } from "./db/job-repository.js";
 import { SourceRepository } from "./db/source-repository.js";
 import { TranscriptRepository } from "./db/transcript-repository.js";
@@ -22,10 +23,12 @@ import {
   TRANSCRIPT_SPLIT_JOB_NAME,
 } from "./job-queue/types.js";
 import { createLogger } from "./logger/index.js";
+import { getWebClient } from "./plugins/web-client.js";
 import { getRuntimeConfig } from "./runtime-config.js";
 import { createAppSettingService } from "./service/app-setting-service.js";
 import { createAssetService } from "./service/asset-service.js";
 import { createContentService } from "./service/content-service.js";
+import { createDetailBodyService } from "./service/detail-body-service.js";
 import { createJobService } from "./service/job-service.js";
 import { createSourceInspectService } from "./service/source-inspect-service.js";
 import { createSourceService } from "./service/source-service.js";
@@ -51,10 +54,19 @@ const assetRepository = new AssetRepository(database);
 const assetService = createAssetService(assetRepository);
 const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
+const detailBodyRepository = new DetailBodyRepository(database);
 const jobRepository = new JobRepository(database);
 const sourceRepository = new SourceRepository(database);
-const sourceService = createSourceService(sourceRepository);
-const sourceInspectService = createSourceInspectService();
+const sourceService = createSourceService(sourceRepository, {
+  logger: logger.child({
+    service: "source",
+  }),
+});
+const sourceInspectService = createSourceInspectService({
+  logger: logger.child({
+    service: "source-inspect",
+  }),
+});
 const jobQueue = new PgBossJobQueue(boss);
 const jobService = createJobService(sourceService, jobRepository, jobQueue);
 const transcriptRepository = new TranscriptRepository(database);
@@ -66,6 +78,16 @@ const transcriptService = createTranscriptService(
   transcriptRepository,
 );
 const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
+const detailBodyService = createDetailBodyService(
+  detailBodyRepository,
+  storage,
+  {
+    getWebClient,
+    logger: logger.child({
+      service: "detail-body",
+    }),
+  },
+);
 
 boss.on("error", (error) => {
   logger.error("job queue runtime failed.", { error });
@@ -93,6 +115,7 @@ const app = createApp({
   appSettingService,
   assetService,
   contentService,
+  detailBodyService,
   jobService,
   sourceInspectService,
   sourceService,

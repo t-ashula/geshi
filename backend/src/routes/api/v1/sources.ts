@@ -10,6 +10,7 @@ import type {
 import {
   createCreateSourceEndpoint,
   createEnqueueObserveSourceEndpoint,
+  createGetSourceCollectorSettingsEndpoint,
   createInspectSourceEndpoint,
   createListSourceCollectorPluginsEndpoint,
   createListSourcesEndpoint,
@@ -17,15 +18,30 @@ import {
 } from "../../../endpoints/api/v1/sources.js";
 import type { Result } from "../../../lib/result.js";
 import { err, ok } from "../../../lib/result.js";
+import { createLogger } from "../../../logger/index.js";
+
+type JsonValue =
+  | boolean
+  | null
+  | number
+  | string
+  | { [key: string]: JsonValue }
+  | JsonValue[];
 
 export function createSourceRoutes(dependencies: AppDependencies): Hono {
   const router = new Hono();
+  const logger = createLogger({
+    process: "backend",
+    route: "api/v1/sources",
+  });
   const listSources = createListSourcesEndpoint(dependencies);
   const listSourceCollectorPlugins =
     createListSourceCollectorPluginsEndpoint(dependencies);
   const createSource = createCreateSourceEndpoint(dependencies);
   const inspectSource = createInspectSourceEndpoint(dependencies);
   const enqueueObserveSource = createEnqueueObserveSourceEndpoint(dependencies);
+  const getSourceCollectorSettings =
+    createGetSourceCollectorSettingsEndpoint(dependencies);
   const patchSourceCollectorSettings =
     createPatchSourceCollectorSettingsEndpoint(dependencies);
 
@@ -51,18 +67,35 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
     const json = await readJsonObject(context);
 
     if (!json.ok) {
+      logger.warn("source create rejected invalid JSON.", {
+        errorCode: json.error.code,
+      });
       return context.json({ error: json.error }, { status: 400 });
     }
 
     const input = toCreateSourceEndpointInput(json.value);
+    logger.info("source create request received.", {
+      pluginSlug: input.pluginSlug ?? "podcast-rss",
+      requestSourceSlug: input.sourceSlug,
+      requestUrl: input.url,
+    });
     const result = await createSource(input);
 
     if (!result.ok) {
+      logger.warn("source create request failed.", {
+        errorCode: result.error.code,
+        errorMessage: result.error.message,
+      });
       return context.json(
         { error: result.error },
         { status: createSourceErrorStatus(result.error.code) },
       );
     }
+
+    logger.info("source create request completed.", {
+      sourceId: result.value.id,
+      slug: result.value.slug,
+    });
 
     return context.json({ data: result.value }, { status: 201 });
   });
@@ -105,6 +138,20 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
     }
 
     return context.json({ data: result.value }, { status: 202 });
+  });
+  router.get("/:sourceId/collector-settings", async (context) => {
+    const result = await getSourceCollectorSettings(
+      requireRouteParam(context.req.param("sourceId"), "sourceId"),
+    );
+
+    if (!result.ok) {
+      return context.json(
+        { error: result.error },
+        { status: getSourceCollectorSettingsErrorStatus(result.error.code) },
+      );
+    }
+
+    return context.json({ data: result.value });
   });
   router.patch("/:sourceId/collector-settings", async (context) => {
     const json = await readJsonObject(context);
@@ -150,7 +197,16 @@ async function readJsonObject(
 ): Promise<
   Result<Record<string, unknown>, { code: "invalid_json"; message: string }>
 > {
-  const json: unknown = await context.req.json().catch(() => null);
+  let json: unknown;
+
+  try {
+    json = await context.req.json();
+  } catch {
+    return err({
+      code: "invalid_json",
+      message: "Request body must be a JSON object.",
+    });
+  }
 
   if (json === null || typeof json !== "object") {
     return err({
@@ -192,12 +248,13 @@ function toPatchSourceCollectorSettingsEndpointInput(
   if (
     typeof value.enabled !== "boolean" ||
     !isPositiveInteger(value.intervalMinutes) ||
-    !isPositiveInteger(value.baseVersion)
+    !isPositiveInteger(value.baseVersion) ||
+    !isCollectorSettingItems(value.items)
   ) {
     return err({
       code: "invalid_collector_settings",
       message:
-        "Collector settings require boolean enabled and positive intervalMinutes and baseVersion.",
+        "Collector settings require boolean enabled, positive intervalMinutes/baseVersion, and valid items.",
     });
   }
 
@@ -205,6 +262,7 @@ function toPatchSourceCollectorSettingsEndpointInput(
     baseVersion: value.baseVersion,
     enabled: value.enabled,
     intervalMinutes: value.intervalMinutes,
+    items: value.items ?? [],
   });
 }
 
@@ -214,6 +272,49 @@ function toOptionalString(value: unknown): string | undefined {
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isCollectorSettingItems(
+  value: unknown,
+): value is Array<{ key: string; value: JsonValue }> {
+  if (value === undefined) {
+    return true;
+  }
+
+  if (!Array.isArray(value)) {
+    return false;
+  }
+
+  return value.every((item) => {
+    if (typeof item !== "object" || item === null) {
+      return false;
+    }
+
+    const candidate = item as { key?: unknown; value?: unknown };
+
+    return typeof candidate.key === "string" && isJsonValue(candidate.value);
+  });
+}
+
+function isJsonValue(value: unknown): value is JsonValue {
+  if (
+    value === null ||
+    typeof value === "boolean" ||
+    typeof value === "number" ||
+    typeof value === "string"
+  ) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.every((item) => isJsonValue(item));
+  }
+
+  if (typeof value !== "object") {
+    return false;
+  }
+
+  return Object.values(value).every((item) => isJsonValue(item));
 }
 
 function createSourceErrorStatus(
@@ -245,6 +346,16 @@ function patchSourceCollectorSettingsErrorStatus(
   }
 
   if (code === "collector_settings_update_failed") {
+    return 500;
+  }
+
+  return 404;
+}
+
+function getSourceCollectorSettingsErrorStatus(
+  code: "collector_settings_get_failed" | "source_not_found",
+): 404 | 500 {
+  if (code === "collector_settings_get_failed") {
     return 500;
   }
 

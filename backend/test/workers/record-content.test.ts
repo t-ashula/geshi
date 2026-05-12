@@ -125,6 +125,12 @@ describe("record-content metadata updates", () => {
             ),
           ),
         } as never,
+        workStorage: {
+          delete: vi.fn(() => Promise.resolve(ok(undefined))),
+          get: vi.fn(),
+          pathJoin: (...parts: string[]) => parts.join("/"),
+          put: vi.fn(),
+        },
       },
     );
 

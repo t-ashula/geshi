@@ -96,6 +96,8 @@ async function generatePlugins(): Promise<void> {
     previousMetadata,
   );
 
+  printUnavailablePluginWarnings(nextMetadata);
+
   await writeFile(
     generatedPluginMetadataPath,
     `${JSON.stringify(nextMetadata, null, 2)}\n`,
@@ -197,6 +199,21 @@ async function buildGeneratedPluginMetadata(
   return nextMetadata;
 }
 
+function printUnavailablePluginWarnings(
+  metadataEntries: GeneratedSourceCollectorPluginMetadata[],
+): void {
+  for (const entry of metadataEntries) {
+    if (entry.status !== "unavailable" || entry.message === null) {
+      continue;
+    }
+
+    const pluginLabel = entry.pluginSlug ?? entry.packageName;
+    console.warn(
+      `[geshi plugins generate] warning: plugin unavailable: ${pluginLabel}: ${entry.message}`,
+    );
+  }
+}
+
 async function loadExistingMetadata(): Promise<
   GeneratedSourceCollectorPluginMetadata[]
 > {
@@ -262,7 +279,7 @@ function loadInstalledPackagePaths(): Set<string> {
 function renderGeneratedPluginIndex(
   installedPluginResolutions: InstalledPluginResolution[],
 ): string {
-  const loaderItems = installedPluginResolutions
+  const pluginItems = installedPluginResolutions
     .filter(
       (
         resolution,
@@ -271,22 +288,16 @@ function renderGeneratedPluginIndex(
         { status: "available" }
       > => resolution.status === "available",
     )
-    .map(
-      (resolution) => `  {
-    packageName: ${JSON.stringify(resolution.packageName)},
-    async loadDefinition() {
-      const pluginModule = await import(${JSON.stringify(
-        resolution.resolvedModuleUrl,
-      )});
-      return pluginModule.definition;
-    },
-  }`,
-    )
-    .join(",\n");
+    .map((resolution) => ({
+      packageName: resolution.packageName,
+      resolvedModuleUrl: resolution.resolvedModuleUrl,
+    }));
 
-  return `export const generatedSourceCollectorPluginLoaders = [
-${loaderItems}
-];`;
+  return `export const generatedSourceCollectorPlugins = ${JSON.stringify(
+    pluginItems,
+    null,
+    2,
+  )};`;
 }
 
 function normalizePluginPackageSpec(packageSpec: string): string {
