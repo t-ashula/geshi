@@ -129,7 +129,7 @@ create table jobs (
     metadata jsonb not null default '{}'::jsonb,
     status text not null constraint jobs_status_check check (
         status = any(
-            array ['queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text]
+            array ['planned'::text, 'queued'::text, 'running'::text, 'succeeded'::text, 'failed'::text]
         )
     ),
     attempt_count integer not null default 0,
@@ -160,6 +160,20 @@ create table transcripts (
     constraint transcripts_source_asset_snapshot_id_generation_key unique (
         source_asset_snapshot_id,
         generation
+    )
+);
+
+create table detail_bodies (
+    id uuid primary key,
+    content_id uuid not null references contents (id),
+    source_asset_snapshot_id uuid not null references asset_snapshots (id),
+    format text not null constraint detail_bodies_format_check check (
+        format = any(array ['html'::text, 'markdown'::text, 'plain'::text])
+    ),
+    body text not null,
+    created_at timestamptz not null default current_timestamp,
+    constraint detail_bodies_source_asset_snapshot_id_key unique (
+        source_asset_snapshot_id
     )
 );
 
@@ -236,6 +250,11 @@ create index if not exists transcripts_content_id_created_at_idx on transcripts 
 
 create index if not exists transcripts_source_asset_snapshot_id_idx on transcripts (
     source_asset_snapshot_id,
+    created_at desc
+);
+
+create index if not exists detail_bodies_content_id_created_at_idx on detail_bodies (
+    content_id,
     created_at desc
 );
 

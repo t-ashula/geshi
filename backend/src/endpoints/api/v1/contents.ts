@@ -15,6 +15,8 @@ import type {
   TranscriptServiceError,
 } from "../../../service/transcript-service.js";
 
+export type GetContentDetailEndpointError = FindContentDetailError;
+
 export type ContentDetailEndpointValue = ContentDetailItem & {
   assets: Array<
     ContentDetailAsset & {
@@ -32,7 +34,9 @@ export function createListContentsEndpoint(dependencies: AppDependencies) {
 export function createGetContentDetailEndpoint(dependencies: AppDependencies) {
   return async (
     contentId: string,
-  ): Promise<Result<ContentDetailEndpointValue, FindContentDetailError>> => {
+  ): Promise<
+    Result<ContentDetailEndpointValue, GetContentDetailEndpointError>
+  > => {
     const result =
       await dependencies.contentService.findContentDetail(contentId);
 
@@ -41,25 +45,30 @@ export function createGetContentDetailEndpoint(dependencies: AppDependencies) {
     }
 
     const content = result.value;
-    const assets = await dependencies.assetService.listAssetsByContentId(
-      content.id,
-    );
+    const detailBody =
+      await dependencies.detailBodyService.findOrCreateDetailBodyByContentId(
+        content.id,
+      );
+    const assetsResult = await listDetailAssets(dependencies, content.id);
     const transcripts =
       await dependencies.transcriptService.listTranscriptsByContentId(
         content.id,
       );
 
-    if (!transcripts.ok) {
-      throw new Error(transcripts.error.message);
-    }
-
     return ok({
       ...content,
-      assets: assets.map((asset) => ({
+      detailBody:
+        !detailBody.ok || detailBody.value === null
+          ? null
+          : {
+              body: detailBody.value.body,
+              format: detailBody.value.format,
+            },
+      assets: assetsResult.map((asset) => ({
         ...asset,
         url: buildAssetUrl(asset.id, asset.mimeType),
       })),
-      transcripts: transcripts.value,
+      transcripts: transcripts.ok ? transcripts.value : [],
     });
   };
 }
@@ -92,4 +101,15 @@ function buildAssetUrl(
   }
 
   return `/media/assets/${assetId}.${extension}`;
+}
+
+async function listDetailAssets(
+  dependencies: AppDependencies,
+  contentId: string,
+): Promise<ContentDetailAsset[]> {
+  try {
+    return await dependencies.assetService.listAssetsByContentId(contentId);
+  } catch {
+    return [];
+  }
 }

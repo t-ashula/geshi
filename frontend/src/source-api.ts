@@ -20,6 +20,16 @@ export type SourceCollectorPluginListItem = {
   status: "available" | "unavailable";
 };
 
+export type SourceCollectorSettingFieldType = {
+  type: string;
+};
+
+export type SourceCollectorSettingItem = {
+  key: string;
+  type: SourceCollectorSettingFieldType;
+  value: boolean | null | number | string | Array<unknown> | object;
+};
+
 export type InspectSourceDraft = {
   description: string | null;
   sourceSlug: string;
@@ -55,6 +65,16 @@ export type PeriodicCrawlSettings = {
 
 export type SourceCollectorSettingsUpdate = PeriodicCrawlSettings & {
   baseVersion: number;
+  items?: Array<{
+    key: string;
+    value: SourceCollectorSettingItem["value"];
+  }>;
+};
+
+export type SourceCollectorSettingsDetail = {
+  baseVersion: number;
+  items: SourceCollectorSettingItem[];
+  periodicCrawl: PeriodicCrawlSettings;
 };
 
 export type ContentListItem = {
@@ -105,6 +125,10 @@ export type ContentTranscriptItem = {
 export type ContentDetailItem = {
   assets: ContentDetailAsset[];
   collectedAt: string;
+  detailBody: {
+    body: string;
+    format: "html" | "markdown" | "plain";
+  } | null;
   id: string;
   kind: string;
   publishedAt: string | null;
@@ -130,7 +154,7 @@ export type JobListItem = {
   retryable: boolean;
   sourceId: string | null;
   startedAt: string | null;
-  status: "queued" | "running" | "succeeded" | "failed";
+  status: "planned" | "queued" | "running" | "succeeded" | "failed";
 };
 
 type CreateSourceResponse = {
@@ -177,6 +201,10 @@ type InspectSourceResponse = {
 
 type PeriodicCrawlSettingsResponse = {
   data: PeriodicCrawlSettings;
+};
+
+type SourceCollectorSettingsResponse = {
+  data: SourceCollectorSettingsDetail;
 };
 
 export async function listSources(): Promise<SourceListItem[]> {
@@ -433,4 +461,25 @@ export async function updateSourceCollectorSettings(
   }
 
   throw new Error("Failed to update source collector settings.");
+}
+
+export async function getSourceCollectorSettings(
+  sourceId: string,
+): Promise<SourceCollectorSettingsDetail> {
+  const response = await fetch(
+    `/api/v1/sources/${sourceId}/collector-settings`,
+  );
+  const payload = (await response.json()) as
+    | SourceCollectorSettingsResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to load source collector settings.");
 }

@@ -1,6 +1,7 @@
 import { loadPluginArtifactPaths } from "../../../internal/geshi-config.js";
 import { definition as sampleStreamingPluginDefinition } from "../../../packages/geshi-plugin-sample-streaming/src/index.js";
 import { definition as podcastRssPluginDefinition } from "./collector/podcast-rss/index.js";
+import { definition as rssPluginDefinition } from "./collector/rss/index.js";
 import { loadExternalSourceCollectorPlugins } from "./generated.js";
 import type {
   SourceCollectorPlugin,
@@ -140,6 +141,7 @@ async function loadDefaultSourceCollectorPlugins(): Promise<
 > {
   const registeredPlugins = registerSourceCollectorPlugins([
     podcastRssPluginDefinition,
+    rssPluginDefinition,
     sampleStreamingPluginDefinition,
   ]);
   const pluginArtifactPaths = await loadPluginArtifactPaths();

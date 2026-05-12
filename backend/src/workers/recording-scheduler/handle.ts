@@ -11,7 +11,7 @@ import {
   RECORDING_SCHEDULER_JOB_NAME,
 } from "../../job-queue/types.js";
 import type { Result } from "../../lib/result.js";
-import { ok } from "../../lib/result.js";
+import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type {
   SourceCollectorExpirationAction,
@@ -22,7 +22,10 @@ type HandleRecordingSchedulerJobDependencies = {
   jobQueue: JobQueue;
   jobRepository: JobRepository;
   logger: Logger;
-  startRecordContentWorker: () => Promise<void>;
+  startRecordContentWorker: (
+    jobId: string,
+    queueJobId: string,
+  ) => Promise<void>;
 };
 
 const RECORDING_SCHEDULER_INTERVAL_MS = 30_000;
@@ -45,17 +48,17 @@ export async function handleRecordingSchedulerJob(
 
   logger.info("recording scheduler job started.");
 
-  const queuedJobsResult =
-    await dependencies.jobRepository.listQueuedJobsWithoutQueueIdByKind(
+  const plannedJobsResult =
+    await dependencies.jobRepository.listPlannedJobsByKind(
       RECORD_CONTENT_JOB_NAME,
     );
 
-  if (!queuedJobsResult.ok) {
-    return queuedJobsResult;
+  if (!plannedJobsResult.ok) {
+    return plannedJobsResult;
   }
 
   const dedupeResult = await cleanupSupersededRecordJobs(
-    queuedJobsResult.value,
+    plannedJobsResult.value,
     dependencies,
     logger,
   );
@@ -134,11 +137,7 @@ export async function handleRecordingSchedulerJob(
       continue;
     }
 
-    const queueJobId = await dependencies.jobQueue.enqueue(
-      RECORD_CONTENT_JOB_NAME,
-      queuePayload,
-    );
-
+    const queueJobId = uuidv7();
     const attachQueueJobIdResult =
       await dependencies.jobRepository.attachQueueJobId(job.id, queueJobId);
 
@@ -146,7 +145,31 @@ export async function handleRecordingSchedulerJob(
       return attachQueueJobIdResult;
     }
 
-    await dependencies.startRecordContentWorker();
+    try {
+      await dependencies.startRecordContentWorker(job.id, queueJobId);
+    } catch (error) {
+      const detachQueueJobIdResult =
+        await dependencies.jobRepository.attachQueueJobId(job.id, null);
+
+      if (!detachQueueJobIdResult.ok) {
+        logger.error("record-content job queue state rollback failed.", {
+          error: detachQueueJobIdResult.error,
+          jobId: job.id,
+        });
+      }
+
+      return err(
+        error instanceof Error
+          ? error
+          : new Error("Failed to start record-content worker."),
+      );
+    }
+
+    logger.info("record-content job enqueued.", {
+      jobId: job.id,
+      queueJobId,
+      scheduledStartAt: scheduledStartAt?.toISOString() ?? null,
+    });
 
     enqueuedCount += 1;
   }

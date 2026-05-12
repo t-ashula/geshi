@@ -1,6 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import {
+  computed,
+  onMounted,
+  onUnmounted,
+  ref,
+  useTemplateRef,
+  watch,
+} from "vue";
 
+import PlaybackDock from "./components/PlaybackDock.vue";
 import type {
   ContentDetailAsset,
   ContentDetailItem,
@@ -9,12 +17,15 @@ import type {
   CreateSourceRequest,
   PeriodicCrawlSettings,
   SourceCollectorPluginListItem,
+  SourceCollectorSettingItem,
+  SourceCollectorSettingsDetail,
   SourceListItem,
 } from "./source-api.js";
 import {
   createSource,
   getContentDetail,
   getPeriodicCrawlSettings,
+  getSourceCollectorSettings,
   inspectSource,
   listSourceCollectorPlugins,
   listContents,
@@ -29,6 +40,11 @@ import {
   sanitizeContentSummary,
   summarizeContentSummary,
 } from "./content-summary.js";
+import {
+  detailOriginalPageUrl,
+  selectDetailDisplayContent,
+} from "./content-detail.js";
+import type { PlaybackState } from "./playback.js";
 import { validateCreateSourceRequest } from "./source-form.js";
 
 type RouteState =
@@ -52,9 +68,11 @@ const isSourcesLoading = ref(true);
 const isContentsLoading = ref(true);
 const isContentActionsExpanded = ref(false);
 const isDetailLoading = ref(false);
+const expandedAssetMenuId = ref<string | null>(null);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
 const isSourceSettingsExpanded = ref(false);
+const isSourceCollectorSettingsLoading = ref(false);
 const errorMessage = ref<string | null>(null);
 const detailErrorMessage = ref<string | null>(null);
 const inspectErrorMessage = ref<string | null>(null);
@@ -64,6 +82,7 @@ const sourceCrawlErrorMessage = ref<string | null>(null);
 const transcriptActionErrorMessage = ref<string | null>(null);
 const validationMessage = ref<string | null>(null);
 const lastInspectedUrl = ref<string | null>(null);
+const lastInspectedPluginSlug = ref<string | null>(null);
 const routeState = ref<RouteState>(normalizeRoute(window.location.pathname));
 const form = ref<CreateSourceRequest>({
   description: "",
@@ -80,14 +99,31 @@ const sourceCrawlForm = ref<PeriodicCrawlSettings>({
   enabled: false,
   intervalMinutes: 60,
 });
+const sourceCollectorSettings = ref<SourceCollectorSettingsDetail | null>(null);
+const sourceCollectorItemsForm = ref<Record<string, unknown>>({});
 const theme = ref<"light" | "dark">("light");
+const audioPlayer = useTemplateRef<HTMLAudioElement>("audioPlayer");
+const playback = ref<PlaybackState | null>(null);
+const playbackCurrentTime = ref(0);
+const playbackDuration = ref(0);
+const isPlaybackActive = ref(false);
+const isSeekingPlayback = ref(false);
+const pendingSeekTime = ref(0);
+const playbackVolume = ref(1);
+const isPlaybackMuted = ref(false);
 
 const selectedSourceSlug = computed(() => {
-  switch (routeState.value.kind) {
+  const route = routeState.value;
+
+  switch (route.kind) {
     case "browse-feed":
-      return routeState.value.feedSlug;
-    case "browse-entry":
-      return contentDetail.value?.source.slug ?? null;
+      return route.feedSlug;
+    case "browse-entry": {
+      const content = contents.value.find(
+        (entry) => entry.id === route.entryId,
+      );
+      return content?.sourceSlug ?? contentDetail.value?.source.slug ?? null;
+    }
     default:
       return null;
   }
@@ -126,6 +162,26 @@ const routeHeadline = computed(() => {
   return "All entries";
 });
 
+const playbackSeekValue = computed(() =>
+  isSeekingPlayback.value ? pendingSeekTime.value : playbackCurrentTime.value,
+);
+
+const playbackProgressMax = computed(() =>
+  playbackDuration.value > 0 ? playbackDuration.value : 0,
+);
+
+const playbackSourceLabel = computed(() => {
+  if (playback.value === null) {
+    return "";
+  }
+
+  return playback.value.sourceTitle ?? playback.value.sourceSlug;
+});
+
+const playbackVolumeValue = computed(() =>
+  isPlaybackMuted.value ? 0 : playbackVolume.value,
+);
+
 watch(
   selectedSource,
   (source) => {
@@ -133,6 +189,8 @@ watch(
     isContentActionsExpanded.value = false;
 
     if (source === null) {
+      sourceCollectorSettings.value = null;
+      sourceCollectorItemsForm.value = {};
       return;
     }
 
@@ -140,7 +198,10 @@ watch(
       enabled: source.periodicCrawlEnabled,
       intervalMinutes: source.periodicCrawlIntervalMinutes,
     };
+    sourceCollectorSettings.value = null;
+    sourceCollectorItemsForm.value = {};
     sourceCrawlErrorMessage.value = null;
+    void refreshSelectedSourceCollectorSettings(source.id);
   },
   { immediate: true },
 );
@@ -148,6 +209,22 @@ watch(
 watch(theme, (currentTheme) => {
   document.documentElement.dataset.theme = currentTheme;
   window.localStorage.setItem("geshi-theme", currentTheme);
+});
+
+watch(playbackVolume, (nextVolume) => {
+  const element = audioPlayer.value;
+
+  if (element !== null) {
+    element.volume = nextVolume;
+  }
+});
+
+watch(isPlaybackMuted, (muted) => {
+  const element = audioPlayer.value;
+
+  if (element !== null) {
+    element.muted = muted;
+  }
 });
 
 onMounted(async () => {
@@ -173,6 +250,22 @@ onUnmounted(() => {
   window.removeEventListener("popstate", syncRouteFromLocation);
 });
 
+watch(audioPlayer, (element, previousElement) => {
+  previousElement?.pause();
+
+  if (element === null || playback.value === null) {
+    return;
+  }
+
+  element.src = playback.value.url;
+  element.currentTime = playbackCurrentTime.value;
+  element.volume = playbackVolume.value;
+  element.muted = isPlaybackMuted.value;
+  void element.play().catch(() => {
+    isPlaybackActive.value = false;
+  });
+});
+
 function syncRouteFromLocation(): void {
   routeState.value = normalizeRoute(window.location.pathname);
   void syncDetailWithRoute();
@@ -183,6 +276,7 @@ function openCreateForm(): void {
   errorMessage.value = null;
   inspectErrorMessage.value = null;
   lastInspectedUrl.value = null;
+  lastInspectedPluginSlug.value = null;
   validationMessage.value = null;
 }
 
@@ -192,8 +286,13 @@ function handlePluginSlugChange(pluginSlug: string): void {
   form.value.sourceSlug = "";
   form.value.title = "";
   lastInspectedUrl.value = null;
+  lastInspectedPluginSlug.value = null;
   inspectErrorMessage.value = null;
   validationMessage.value = null;
+
+  if (form.value.url.trim() !== "") {
+    void inspectCurrentSource();
+  }
 }
 
 function handlePluginSelection(event: Event): void {
@@ -204,6 +303,7 @@ function closeCreateForm(): void {
   isCreateFormVisible.value = false;
   inspectErrorMessage.value = null;
   lastInspectedUrl.value = null;
+  lastInspectedPluginSlug.value = null;
   validationMessage.value = null;
 }
 
@@ -224,10 +324,199 @@ function closeContentActions(): void {
   isContentActionsExpanded.value = false;
 }
 
+function toggleAssetMenu(assetId: string): void {
+  expandedAssetMenuId.value =
+    expandedAssetMenuId.value === assetId ? null : assetId;
+}
+
+function isCurrentPlaybackAsset(assetId: string): boolean {
+  return playback.value?.assetId === assetId;
+}
+
+function startPlayback(
+  detail: ContentDetailItem,
+  asset: ContentDetailAsset,
+): void {
+  if (asset.url === null || asset.mimeType === null) {
+    return;
+  }
+
+  const isSameAsset =
+    playback.value?.assetId === asset.id && playback.value.url === asset.url;
+
+  playback.value = {
+    assetId: asset.id,
+    assetKind: asset.kind,
+    contentId: detail.id,
+    contentTitle: detail.title ?? "Untitled entry",
+    mimeType: asset.mimeType,
+    sourceSlug: detail.source.slug,
+    sourceTitle: detail.source.title,
+    url: asset.url,
+  };
+  closeAssetMenu();
+
+  if (!isSameAsset) {
+    playbackCurrentTime.value = 0;
+    playbackDuration.value = 0;
+    pendingSeekTime.value = 0;
+  }
+
+  const element = audioPlayer.value;
+
+  if (element === null) {
+    return;
+  }
+
+  if (!isSameAsset) {
+    element.src = asset.url;
+    element.load();
+  }
+
+  void element.play().catch(() => {
+    isPlaybackActive.value = false;
+  });
+}
+
+function togglePlayback(): void {
+  const element = audioPlayer.value;
+
+  if (element === null || playback.value === null) {
+    return;
+  }
+
+  if (element.paused) {
+    void element.play().catch(() => {
+      isPlaybackActive.value = false;
+    });
+    return;
+  }
+
+  element.pause();
+}
+
+function stopPlayback(): void {
+  const element = audioPlayer.value;
+
+  if (element !== null) {
+    element.pause();
+    element.removeAttribute("src");
+    element.load();
+    element.currentTime = 0;
+  }
+
+  playback.value = null;
+  playbackCurrentTime.value = 0;
+  playbackDuration.value = 0;
+  pendingSeekTime.value = 0;
+  isPlaybackActive.value = false;
+  isSeekingPlayback.value = false;
+}
+
+function syncPlaybackCurrentTime(): void {
+  const element = audioPlayer.value;
+
+  if (element === null || isSeekingPlayback.value) {
+    return;
+  }
+
+  playbackCurrentTime.value = element.currentTime;
+}
+
+function syncPlaybackDuration(): void {
+  const element = audioPlayer.value;
+
+  if (element === null) {
+    return;
+  }
+
+  playbackDuration.value = Number.isFinite(element.duration)
+    ? element.duration
+    : 0;
+}
+
+function handlePlaybackStarted(): void {
+  isPlaybackActive.value = true;
+}
+
+function handlePlaybackPaused(): void {
+  isPlaybackActive.value = false;
+}
+
+function handlePlaybackEnded(): void {
+  isPlaybackActive.value = false;
+  playbackCurrentTime.value = playbackDuration.value;
+}
+
+function beginSeek(): void {
+  isSeekingPlayback.value = true;
+  pendingSeekTime.value = playbackCurrentTime.value;
+}
+
+function handleSeekPreview(value: number): void {
+  pendingSeekTime.value = Number.isFinite(value) ? value : 0;
+}
+
+function commitSeek(value: number): void {
+  const element = audioPlayer.value;
+  const nextTime = Number.isFinite(value) ? value : 0;
+
+  playbackCurrentTime.value = nextTime;
+  pendingSeekTime.value = nextTime;
+  isSeekingPlayback.value = false;
+
+  if (element !== null) {
+    element.currentTime = nextTime;
+  }
+}
+
+function togglePlaybackMuted(): void {
+  isPlaybackMuted.value = !isPlaybackMuted.value;
+}
+
+function seekPlaybackBy(deltaSeconds: number): void {
+  const element = audioPlayer.value;
+
+  if (element === null) {
+    return;
+  }
+
+  const duration = Number.isFinite(element.duration) ? element.duration : 0;
+  const nextTime = Math.max(
+    0,
+    Math.min(
+      element.currentTime + deltaSeconds,
+      duration || element.currentTime + deltaSeconds,
+    ),
+  );
+
+  element.currentTime = nextTime;
+  playbackCurrentTime.value = nextTime;
+  pendingSeekTime.value = nextTime;
+}
+
+function updatePlaybackVolume(nextVolume: number): void {
+  if (!Number.isFinite(nextVolume)) {
+    return;
+  }
+
+  playbackVolume.value = Math.max(0, Math.min(1, nextVolume));
+  isPlaybackMuted.value = playbackVolume.value === 0;
+}
+
+function closeAssetMenu(): void {
+  expandedAssetMenuId.value = null;
+}
+
 async function inspectCurrentSource(): Promise<void> {
   const trimmedUrl = form.value.url.trim();
+  const trimmedPluginSlug = (form.value.pluginSlug ?? "").trim();
 
-  if (trimmedUrl === "" || lastInspectedUrl.value === trimmedUrl) {
+  if (
+    trimmedUrl === "" ||
+    (lastInspectedUrl.value === trimmedUrl &&
+      lastInspectedPluginSlug.value === trimmedPluginSlug)
+  ) {
     return;
   }
 
@@ -254,6 +543,7 @@ async function inspectCurrentSource(): Promise<void> {
       url: draft.url,
     };
     lastInspectedUrl.value = draft.url;
+    lastInspectedPluginSlug.value = trimmedPluginSlug;
   } catch (error) {
     inspectErrorMessage.value =
       error instanceof Error ? error.message : "Source inspect failed.";
@@ -337,7 +627,12 @@ async function saveSelectedSourceCrawlSettings(): Promise<void> {
     return;
   }
 
-  if (selectedSource.value.collectorSettingsVersion === null) {
+  if (sourceCollectorSettings.value === null) {
+    sourceCrawlErrorMessage.value = "Source collector settings unavailable.";
+    return;
+  }
+
+  if (sourceCollectorSettings.value.baseVersion === null) {
     sourceCrawlErrorMessage.value =
       "Source collector settings version missing.";
     return;
@@ -350,15 +645,23 @@ async function saveSelectedSourceCrawlSettings(): Promise<void> {
     const updatedSource = await updateSourceCollectorSettings(
       selectedSource.value.id,
       {
-        baseVersion: selectedSource.value.collectorSettingsVersion,
+        baseVersion: sourceCollectorSettings.value.baseVersion,
         enabled: sourceCrawlForm.value.enabled,
         intervalMinutes: Number(sourceCrawlForm.value.intervalMinutes),
+        items: sourceCollectorSettings.value.items.map((item) => ({
+          key: item.key,
+          value: normalizeCollectorSettingFormValue(
+            item,
+            sourceCollectorItemsForm.value[item.key],
+          ),
+        })),
       },
     );
 
     sources.value = sources.value.map((source) =>
       source.id === updatedSource.id ? updatedSource : source,
     );
+    await refreshSelectedSourceCollectorSettings(updatedSource.id);
   } catch (error) {
     sourceCrawlErrorMessage.value =
       error instanceof Error
@@ -403,6 +706,40 @@ async function refreshSourceCollectorPlugins(): Promise<void> {
   }
 }
 
+async function refreshSelectedSourceCollectorSettings(
+  sourceId: string,
+): Promise<void> {
+  isSourceCollectorSettingsLoading.value = true;
+
+  try {
+    const settings = await getSourceCollectorSettings(sourceId);
+
+    if (selectedSource.value?.id !== sourceId) {
+      return;
+    }
+
+    sourceCollectorSettings.value = settings;
+    sourceCrawlForm.value = {
+      enabled: settings.periodicCrawl.enabled,
+      intervalMinutes: settings.periodicCrawl.intervalMinutes,
+    };
+    sourceCollectorItemsForm.value = Object.fromEntries(
+      settings.items.map((item) => [item.key, item.value]),
+    );
+  } catch (error) {
+    if (selectedSource.value?.id === sourceId) {
+      sourceCrawlErrorMessage.value =
+        error instanceof Error
+          ? error.message
+          : "Failed to load source collector settings.";
+    }
+  } finally {
+    if (selectedSource.value?.id === sourceId) {
+      isSourceCollectorSettingsLoading.value = false;
+    }
+  }
+}
+
 async function refreshContents(): Promise<void> {
   isContentsLoading.value = true;
   closeContentActions();
@@ -433,6 +770,8 @@ async function refreshSettings(): Promise<void> {
 }
 
 async function syncDetailWithRoute(): Promise<void> {
+  closeAssetMenu();
+
   if (routeState.value.kind !== "browse-entry") {
     contentDetail.value = null;
     detailErrorMessage.value = null;
@@ -457,6 +796,7 @@ async function syncDetailWithRoute(): Promise<void> {
 async function requestContentTranscripts(contentId: string): Promise<void> {
   isTranscriptSubmitting.value = contentId;
   transcriptActionErrorMessage.value = null;
+  closeAssetMenu();
 
   try {
     await requestTranscripts(contentId);
@@ -475,6 +815,7 @@ async function retryFailedTranscript(
 ): Promise<void> {
   isTranscriptSubmitting.value = transcriptId;
   transcriptActionErrorMessage.value = null;
+  closeAssetMenu();
 
   try {
     await retryTranscript(contentId, transcriptId);
@@ -613,11 +954,23 @@ function formatDate(value: string | null): string {
 }
 
 function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
-  return detail.assets.filter((asset) => asset.url !== null);
+  return detail.assets.filter(isPlayableAsset);
 }
 
-function detailAudioAssets(detail: ContentDetailItem): ContentDetailAsset[] {
-  return detail.assets.filter((asset) => asset.kind === "audio");
+function detailReferenceAssets(
+  detail: ContentDetailItem,
+): ContentDetailAsset[] {
+  return detail.assets.filter((asset) => !isPlayableAsset(asset));
+}
+
+function isPlayableAsset(asset: ContentDetailAsset): boolean {
+  if (asset.url === null || asset.mimeType === null) {
+    return false;
+  }
+
+  return (
+    asset.mimeType.startsWith("audio/") || asset.mimeType.startsWith("video/")
+  );
 }
 
 function transcriptSourceLabel(transcript: ContentTranscriptItem): string {
@@ -638,12 +991,59 @@ function renderContentSummary(summary: string | null): string {
   return sanitizeContentSummary(summary);
 }
 
+function detailDisplayBody(detail: ContentDetailItem): string | null {
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "detail-body" ? display.body : null;
+}
+
+function detailDisplayFormat(
+  detail: ContentDetailItem,
+): "html" | "markdown" | "plain" | null {
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "detail-body" ? display.format : null;
+}
+
+function detailDisplaySummary(detail: ContentDetailItem): string | null {
+  const display = selectDetailDisplayContent(detail);
+
+  return display?.kind === "summary" ? display.summary : null;
+}
+
 function renderContentSummaryPreview(summary: string | null): string {
   if (summary === null) {
     return "";
   }
 
   return summarizeContentSummary(summary);
+}
+
+function isCheckboxCollectorSetting(item: SourceCollectorSettingItem): boolean {
+  return item.type.type === "checkbox";
+}
+
+function isNumberCollectorSetting(item: SourceCollectorSettingItem): boolean {
+  return item.type.type === "number";
+}
+
+function normalizeCollectorSettingFormValue(
+  item: SourceCollectorSettingItem,
+  value: unknown,
+): SourceCollectorSettingItem["value"] {
+  if (item.type.type === "checkbox") {
+    return value === true;
+  }
+
+  if (item.type.type === "number") {
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  }
+
+  return typeof value === "string"
+    ? value
+    : value === null
+      ? null
+      : String(value ?? "");
 }
 </script>
 
@@ -687,14 +1087,6 @@ function renderContentSummaryPreview(summary: string | null): string {
         </nav>
         <button class="ghost-button" type="button" @click="toggleTheme">
           {{ theme === "dark" ? "Light" : "Dark" }}
-        </button>
-        <button
-          v-if="routeState.kind !== 'settings'"
-          class="primary-button"
-          type="button"
-          @click="openCreateForm"
-        >
-          Add source
         </button>
       </div>
     </header>
@@ -884,6 +1276,25 @@ function renderContentSummaryPreview(summary: string | null): string {
               <p class="pane-caption">Registered feeds and collectors</p>
             </div>
             <span class="pane-count">{{ sources.length }}</span>
+            <div class="pane-actions">
+              <button
+                type="button"
+                class="ghost-button menu-toggle-button pane-add-button"
+                aria-label="Add source"
+                title="Add source"
+                @click="openCreateForm"
+              >
+                <svg aria-hidden="true" class="button-icon" viewBox="0 0 24 24">
+                  <path
+                    d="M12 5v14M5 12h14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="square"
+                    stroke-width="1.8"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div v-if="isSourcesLoading" class="empty-state">
@@ -934,7 +1345,6 @@ function renderContentSummaryPreview(summary: string | null): string {
           <div v-else class="empty-state">
             No sources registered yet. Add a feed to get started.
           </div>
-
         </aside>
 
         <section class="pane pane-contents">
@@ -952,6 +1362,25 @@ function renderContentSummaryPreview(summary: string | null): string {
             </div>
             <span class="pane-count">{{ visibleContents.length }}</span>
             <div class="pane-actions">
+              <button
+                type="button"
+                class="ghost-button menu-toggle-button pane-reload-button"
+                aria-label="Reload entries"
+                title="Reload"
+                :disabled="isContentsLoading"
+                @click="refreshContents"
+              >
+                <svg aria-hidden="true" class="button-icon" viewBox="0 0 24 24">
+                  <path
+                    d="M20 12a8 8 0 1 1-2.34-5.66M20 4v6h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-linecap="square"
+                    stroke-linejoin="miter"
+                    stroke-width="1.8"
+                  />
+                </svg>
+              </button>
               <div class="menu-shell">
                 <button
                   type="button"
@@ -983,37 +1412,15 @@ function renderContentSummaryPreview(summary: string | null): string {
                   <button
                     v-if="selectedSource"
                     type="button"
-                    class="menu-item menu-item-with-icon"
+                    class="menu-item"
                     role="menuitem"
                     @click="toggleSourceSettings"
                   >
-                    <svg
-                      aria-hidden="true"
-                      class="button-icon"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        d="M21 7.5a5.5 5.5 0 0 1-7.75 5.03L6.78 19 5 17.22l6.47-6.47A5.5 5.5 0 1 1 16.5 3l-2.25 2.25.75 2.25 2.25.75L19.5 6A5.48 5.48 0 0 1 21 7.5Z"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-linecap="square"
-                        stroke-linejoin="miter"
-                        stroke-width="1.6"
-                      />
-                    </svg>
-                    <span>{{
+                    {{
                       isSourceSettingsExpanded
                         ? "Hide source settings"
                         : "Source settings"
-                    }}</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="menu-item"
-                    role="menuitem"
-                    @click="refreshContents"
-                  >
-                    Refresh entries
+                    }}
                   </button>
                   <button
                     v-if="selectedSource"
@@ -1025,8 +1432,8 @@ function renderContentSummaryPreview(summary: string | null): string {
                   >
                     {{
                       isObserveSubmitting === selectedSource.id
-                        ? "Running observe..."
-                        : "Observe source"
+                        ? "Crawling..."
+                        : "Crawl"
                     }}
                   </button>
                 </div>
@@ -1087,6 +1494,44 @@ function renderContentSummaryPreview(summary: string | null): string {
                 </button>
               </div>
             </div>
+
+            <div class="source-settings-grid plugin-settings-grid">
+              <p v-if="isSourceCollectorSettingsLoading" class="feedback">
+                Loading plugin settings...
+              </p>
+
+              <template
+                v-else-if="
+                  sourceCollectorSettings !== null &&
+                  sourceCollectorSettings.items.length > 0
+                "
+              >
+                <label
+                  v-for="item in sourceCollectorSettings.items"
+                  :key="item.key"
+                  :class="{ 'toggle-field': isCheckboxCollectorSetting(item) }"
+                >
+                  <span>{{ item.key }}</span>
+                  <input
+                    v-if="isCheckboxCollectorSetting(item)"
+                    v-model="sourceCollectorItemsForm[item.key]"
+                    type="checkbox"
+                  />
+                  <input
+                    v-else-if="isNumberCollectorSetting(item)"
+                    v-model.number="sourceCollectorItemsForm[item.key]"
+                    type="number"
+                  />
+                  <input
+                    v-else
+                    v-model="sourceCollectorItemsForm[item.key]"
+                    type="text"
+                  />
+                </label>
+              </template>
+
+              <p v-else class="feedback">No plugin settings.</p>
+            </div>
           </section>
 
           <div
@@ -1122,17 +1567,16 @@ function renderContentSummaryPreview(summary: string | null): string {
                     <span class="content-row-title">
                       {{ content.title ?? "Untitled entry" }}
                     </span>
-                    <span
-                      class="content-row-status"
-                      :class="content.status"
-                    >
+                    <span class="content-row-status" :class="content.status">
                       {{ content.status }}
                     </span>
                   </span>
                   <span class="content-row-meta">
                     <span>{{ formatDate(content.publishedAt) }}</span>
                     <span>{{
-                      selectedSource === null ? content.sourceSlug : content.kind
+                      selectedSource === null
+                        ? content.sourceSlug
+                        : content.kind
                     }}</span>
                   </span>
                   <span v-if="content.summary" class="content-row-summary">
@@ -1185,15 +1629,36 @@ function renderContentSummaryPreview(summary: string | null): string {
               <span>{{ contentDetail.kind }}</span>
               <span>{{ contentDetail.status }}</span>
               <span>{{ formatDate(contentDetail.publishedAt) }}</span>
+              <a
+                v-if="detailOriginalPageUrl(contentDetail)"
+                class="detail-meta-link"
+                :href="detailOriginalPageUrl(contentDetail) ?? undefined"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Original page
+              </a>
+            </div>
+
+            <div v-if="detailDisplayBody(contentDetail)" class="detail-summary">
+              <pre
+                v-if="detailDisplayFormat(contentDetail) === 'plain'"
+                class="detail-body-text"
+                >{{ detailDisplayBody(contentDetail) }}</pre
+              >
+              <div v-else v-html="detailDisplayBody(contentDetail) ?? ''"></div>
             </div>
 
             <div
-              v-if="contentDetail.summary"
+              v-else-if="detailDisplaySummary(contentDetail)"
               class="detail-summary"
-              v-html="renderContentSummary(contentDetail.summary)"
+              v-html="renderContentSummary(detailDisplaySummary(contentDetail))"
             ></div>
 
-            <section class="detail-section">
+            <section
+              v-if="contentDetail.transcripts.length > 0"
+              class="detail-section"
+            >
               <div class="detail-section-header">
                 <div>
                   <h3>Transcripts</h3>
@@ -1201,35 +1666,13 @@ function renderContentSummaryPreview(summary: string | null): string {
                     {{ contentDetail.transcripts.length }}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  class="secondary-button"
-                  :disabled="
-                    detailAudioAssets(contentDetail).length === 0 ||
-                    isTranscriptSubmitting === contentDetail.id
-                  "
-                  @click="requestContentTranscripts(contentDetail.id)"
-                >
-                  {{
-                    isTranscriptSubmitting === contentDetail.id
-                      ? "Requesting..."
-                      : "Request transcripts"
-                  }}
-                </button>
               </div>
 
               <p v-if="transcriptActionErrorMessage" class="feedback error">
                 {{ transcriptActionErrorMessage }}
               </p>
 
-              <div
-                v-if="contentDetail.transcripts.length === 0"
-                class="empty-inline"
-              >
-                No transcripts yet.
-              </div>
-
-              <ul v-else class="asset-list">
+              <ul class="asset-list">
                 <li
                   v-for="transcript in contentDetail.transcripts"
                   :key="transcript.id"
@@ -1281,7 +1724,10 @@ function renderContentSummaryPreview(summary: string | null): string {
               </ul>
             </section>
 
-            <section class="detail-section">
+            <section
+              v-if="detailPlayableAssets(contentDetail).length > 0"
+              class="detail-section"
+            >
               <div class="detail-section-header">
                 <h3>Playable assets</h3>
                 <span class="detail-count">
@@ -1289,42 +1735,126 @@ function renderContentSummaryPreview(summary: string | null): string {
                 </span>
               </div>
 
-              <div
-                v-if="detailPlayableAssets(contentDetail).length === 0"
-                class="empty-inline"
-              >
-                No playable assets stored yet.
-              </div>
+              <p v-if="transcriptActionErrorMessage" class="feedback error">
+                {{ transcriptActionErrorMessage }}
+              </p>
 
-              <ul v-else class="asset-list">
+              <ul class="asset-list">
                 <li
                   v-for="asset in detailPlayableAssets(contentDetail)"
                   :key="asset.id"
                   class="asset-card"
                 >
                   <div class="asset-card-header">
-                    <strong>{{ asset.kind }}</strong>
-                    <span class="asset-meta">
-                      {{ asset.primary ? "Primary" : "Supplemental" }}
-                    </span>
+                    <div class="asset-card-heading">
+                      <strong>{{ asset.kind }}</strong>
+                      <span class="asset-meta">
+                        {{ asset.primary ? "Primary" : "Supplemental" }}
+                      </span>
+                    </div>
+                    <div class="asset-card-actions">
+                      <div class="menu-shell">
+                        <button
+                          type="button"
+                          class="ghost-button menu-toggle-button"
+                          :aria-expanded="expandedAssetMenuId === asset.id"
+                          aria-label="Asset actions"
+                          @click="toggleAssetMenu(asset.id)"
+                        >
+                          <svg
+                            aria-hidden="true"
+                            class="button-icon"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              d="M6 12h.01M12 12h.01M18 12h.01"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-linecap="round"
+                              stroke-width="2.2"
+                            />
+                          </svg>
+                        </button>
+
+                        <div
+                          v-if="expandedAssetMenuId === asset.id"
+                          class="menu-panel"
+                          role="menu"
+                        >
+                          <a
+                            v-if="asset.url"
+                            class="menu-item"
+                            role="menuitem"
+                            :href="asset.url"
+                            target="_blank"
+                            rel="noreferrer"
+                            @click="closeAssetMenu"
+                          >
+                            Open asset
+                          </a>
+                          <a
+                            v-if="detailOriginalPageUrl(contentDetail)"
+                            class="menu-item"
+                            role="menuitem"
+                            :href="
+                              detailOriginalPageUrl(contentDetail) ?? undefined
+                            "
+                            target="_blank"
+                            rel="noreferrer"
+                            @click="closeAssetMenu"
+                          >
+                            Original page
+                          </a>
+                          <button
+                            v-if="asset.kind === 'audio'"
+                            type="button"
+                            class="menu-item"
+                            role="menuitem"
+                            :disabled="
+                              isTranscriptSubmitting === contentDetail.id
+                            "
+                            @click="requestContentTranscripts(contentDetail.id)"
+                          >
+                            {{
+                              isTranscriptSubmitting === contentDetail.id
+                                ? "Requesting..."
+                                : "Request transcripts"
+                            }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <audio v-if="asset.mimeType?.startsWith('audio/')" controls>
+                  <div
+                    v-if="asset.mimeType?.startsWith('audio/')"
+                    class="asset-inline-actions"
+                  >
+                    <button
+                      type="button"
+                      class="secondary-button"
+                      :class="{ active: isCurrentPlaybackAsset(asset.id) }"
+                      @click="startPlayback(contentDetail, asset)"
+                    >
+                      {{
+                        isCurrentPlaybackAsset(asset.id)
+                          ? isPlaybackActive
+                            ? "Playing"
+                            : "Resume"
+                          : "Play"
+                      }}
+                    </button>
+                  </div>
+
+                  <video
+                    v-else-if="asset.mimeType?.startsWith('video/')"
+                    controls
+                  >
                     <source
                       :src="asset.url ?? undefined"
                       :type="asset.mimeType"
                     />
-                  </audio>
-
-                  <a
-                    v-else-if="asset.url"
-                    class="asset-link"
-                    :href="asset.url"
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Open asset
-                  </a>
+                  </video>
 
                   <p class="asset-meta">
                     {{ asset.mimeType ?? "Unknown mime" }}
@@ -1335,9 +1865,83 @@ function renderContentSummaryPreview(summary: string | null): string {
                 </li>
               </ul>
             </section>
+
+            <section
+              v-if="detailReferenceAssets(contentDetail).length > 0"
+              class="detail-section"
+            >
+              <div class="detail-section-header">
+                <h3>Reference assets</h3>
+                <span class="detail-count">
+                  {{ detailReferenceAssets(contentDetail).length }}
+                </span>
+              </div>
+
+              <ul class="asset-list">
+                <li
+                  v-for="asset in detailReferenceAssets(contentDetail)"
+                  :key="asset.id"
+                  class="asset-card"
+                >
+                  <div class="asset-card-header">
+                    <div class="asset-card-heading">
+                      <strong>{{ asset.kind }}</strong>
+                      <span class="asset-meta">
+                        {{ asset.mimeType ?? "unknown type" }}
+                      </span>
+                    </div>
+                    <div class="asset-card-actions">
+                      <a
+                        v-if="asset.url"
+                        class="ghost-button"
+                        :href="asset.url"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open stored asset
+                      </a>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </section>
           </article>
         </section>
       </section>
+    </template>
+
+    <PlaybackDock
+      v-if="playback !== null"
+      :duration="playbackDuration"
+      :is-playback-active="isPlaybackActive"
+      :is-playback-muted="isPlaybackMuted"
+      :playback="playback"
+      :progress-max="playbackProgressMax"
+      :seek-value="playbackSeekValue"
+      :source-label="playbackSourceLabel"
+      :volume-value="playbackVolumeValue"
+      @seek-commit="commitSeek"
+      @seek-preview="handleSeekPreview"
+      @seek-relative="seekPlaybackBy"
+      @seek-start="beginSeek"
+      @stop-playback="stopPlayback"
+      @toggle-playback="togglePlayback"
+      @toggle-playback-muted="togglePlaybackMuted"
+      @update-playback-volume="updatePlaybackVolume"
+    />
+
+    <template v-if="playback !== null">
+      <audio
+        ref="audioPlayer"
+        class="playback-audio-element"
+        preload="metadata"
+        :src="playback.url"
+        @durationchange="syncPlaybackDuration"
+        @ended="handlePlaybackEnded"
+        @pause="handlePlaybackPaused"
+        @play="handlePlaybackStarted"
+        @timeupdate="syncPlaybackCurrentTime"
+      ></audio>
     </template>
   </main>
 </template>

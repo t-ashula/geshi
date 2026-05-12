@@ -80,7 +80,7 @@ async function seedRecordingSchedulerJob(
   currentJobRepository: JobRepository,
   currentJobQueue: PgBossJobQueue,
 ): Promise<void> {
-  const existingJob = await currentJobRepository.findQueuedOrRunningJobByKind(
+  const existingJob = await currentJobRepository.findIncompleteJobByKind(
     RECORDING_SCHEDULER_JOB_NAME,
   );
 
@@ -116,11 +116,20 @@ async function seedRecordingSchedulerJob(
   }
 }
 
-async function spawnRecordContentWorker(): Promise<void> {
+async function spawnRecordContentWorker(
+  jobId: string,
+  queueJobId: string,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const child = spawn(
       process.execPath,
-      ["--import", "tsx", "backend/src/workers/record-content/main.ts"],
+      [
+        "--import",
+        "tsx",
+        "backend/src/workers/record-content/main.ts",
+        `--job-id=${jobId}`,
+        `--queue-job-id=${queueJobId}`,
+      ],
       {
         cwd: process.cwd(),
         detached: true,
@@ -130,6 +139,11 @@ async function spawnRecordContentWorker(): Promise<void> {
 
     child.once("error", reject);
     child.once("spawn", () => {
+      logger.info("record-content worker process spawned.", {
+        jobId,
+        pid: child.pid,
+        queueJobId,
+      });
       child.unref();
       resolve();
     });

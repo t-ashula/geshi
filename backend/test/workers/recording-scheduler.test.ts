@@ -91,10 +91,7 @@ describe("recording scheduler", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-05T00:00:10.000Z"));
 
-    const enqueue = vi
-      .fn()
-      .mockResolvedValueOnce("queue-record-1")
-      .mockResolvedValueOnce("queue-scheduler-2");
+    const enqueue = vi.fn().mockResolvedValue("queue-record-1");
     const attachQueueJobId = vi.fn(() => Promise.resolve(ok(undefined)));
     const createJob = vi.fn(() =>
       Promise.resolve(
@@ -117,7 +114,7 @@ describe("recording scheduler", () => {
         jobRepository: {
           attachQueueJobId,
           createJob,
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(
@@ -141,35 +138,11 @@ describe("recording scheduler", () => {
     );
 
     expect(result).toEqual(ok(undefined));
-    expect(enqueue).toHaveBeenCalledWith(RECORD_CONTENT_JOB_NAME, {
-      asset: {
-        id: "asset-1",
-        kind: "audio",
-        observedFingerprint: "stream-observed:1",
-        primary: true,
-        sourceUrl: "http://localhost:3401/streams/live-1",
-      },
-      collector: {
-        config: {},
-        pluginSlug: "streaming-plugin-example",
-        settingId: "collector-setting-1",
-        settingSnapshotId: "collector-setting-snapshot-1",
-      },
-      content: {
-        externalId: "live-1",
-        id: "content-1",
-        kind: "stream-recording",
-        publishedAt: null,
-        status: "discovered",
-        summary: "fixture stream",
-        title: "Live 1",
-      },
-      jobId: "record-job-1",
-      source: {
-        id: "source-1",
-        slug: "stream-1",
-      },
-    });
+    expect(attachQueueJobId).toHaveBeenNthCalledWith(
+      1,
+      "record-job-1",
+      expect.any(String),
+    );
     expect(createJob).toHaveBeenCalledWith({
       id: "next-scheduler-job-1",
       kind: RECORDING_SCHEDULER_JOB_NAME,
@@ -180,6 +153,10 @@ describe("recording scheduler", () => {
     });
     expect(attachQueueJobId).toHaveBeenCalledTimes(2);
     expect(startRecordContentWorker).toHaveBeenCalledTimes(1);
+    expect(startRecordContentWorker).toHaveBeenCalledWith(
+      "record-job-1",
+      expect.any(String),
+    );
 
     vi.useRealTimers();
   });
@@ -188,10 +165,7 @@ describe("recording scheduler", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-05T00:00:10.000Z"));
 
-    const enqueue = vi
-      .fn()
-      .mockResolvedValueOnce("queue-record-1")
-      .mockResolvedValueOnce("queue-scheduler-2");
+    const enqueue = vi.fn().mockResolvedValue("queue-record-1");
     const attachQueueJobId = vi.fn(() => Promise.resolve(ok(undefined)));
 
     const result = await handleRecordingSchedulerJob(
@@ -212,7 +186,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(
@@ -236,35 +210,11 @@ describe("recording scheduler", () => {
     );
 
     expect(result).toEqual(ok(undefined));
-    expect(enqueue).toHaveBeenCalledWith(RECORD_CONTENT_JOB_NAME, {
-      asset: {
-        id: "asset-1",
-        kind: "audio",
-        observedFingerprint: "stream-observed:1",
-        primary: true,
-        sourceUrl: "http://localhost:3401/streams/live-1",
-      },
-      collector: {
-        config: {},
-        pluginSlug: "streaming-plugin-example",
-        settingId: "collector-setting-1",
-        settingSnapshotId: "collector-setting-snapshot-1",
-      },
-      content: {
-        externalId: "live-1",
-        id: "content-1",
-        kind: "stream-recording",
-        publishedAt: null,
-        status: "discovered",
-        summary: "fixture stream",
-        title: "Live 1",
-      },
-      jobId: "record-job-1",
-      source: {
-        id: "source-1",
-        slug: "stream-1",
-      },
-    });
+    expect(attachQueueJobId).toHaveBeenNthCalledWith(
+      1,
+      "record-job-1",
+      expect.any(String),
+    );
     expect(attachQueueJobId).toHaveBeenCalledTimes(2);
 
     vi.useRealTimers();
@@ -296,7 +246,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(
@@ -357,7 +307,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(
@@ -487,7 +437,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(ok([olderJob, newerJob])),
           ),
           listRunningRecordContentAssetIds: vi.fn(() =>
@@ -509,11 +459,9 @@ describe("recording scheduler", () => {
       "Record job superseded by queued job record-job-2 for asset asset-1.",
       false,
     );
-    expect(enqueue).toHaveBeenCalledWith(
-      RECORD_CONTENT_JOB_NAME,
-      expect.objectContaining({
-        jobId: "record-job-2",
-      }),
+    expect(startRecordContentWorker).toHaveBeenCalledWith(
+      "record-job-2",
+      expect.any(String),
     );
     expect(startRecordContentWorker).toHaveBeenCalledTimes(1);
 
@@ -569,7 +517,7 @@ describe("recording scheduler", () => {
               }),
             ),
           ),
-          listQueuedJobsWithoutQueueIdByKind: vi.fn(() =>
+          listPlannedJobsByKind: vi.fn(() =>
             Promise.resolve(
               ok([
                 createQueuedRecordJob(

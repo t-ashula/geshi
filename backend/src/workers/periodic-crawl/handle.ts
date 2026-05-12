@@ -112,7 +112,7 @@ async function enqueueObserveJobs(
   }
 
   const activeSourceIds =
-    await dependencies.jobRepository.listQueuedOrRunningObserveSourceIds();
+    await dependencies.jobRepository.listIncompleteObserveSourceIds();
 
   if (!activeSourceIds.ok) {
     return activeSourceIds;

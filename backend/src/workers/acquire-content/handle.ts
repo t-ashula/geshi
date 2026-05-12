@@ -8,6 +8,7 @@ import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import type { AcquiredAsset } from "../../plugins/types.js";
+import { getWebClient } from "../../plugins/web-client.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
 import type { Storage } from "../../storage/types.js";
@@ -28,10 +29,13 @@ export async function handleAcquireContentJob(
 ): Promise<Result<void, Error>> {
   const logger = dependencies.logger.child({
     assetId: payload.asset.id,
+    assetKind: payload.asset.kind,
+    assetSourceUrl: payload.asset.sourceUrl,
     contentId: payload.content.id,
     jobId: payload.jobId,
     pluginSlug: payload.collector.pluginSlug,
     sourceId: payload.source.id,
+    sourceSlug: payload.source.slug,
   });
 
   const markRunningResult = await dependencies.jobRepository.markRunning(
@@ -49,10 +53,16 @@ export async function handleAcquireContentJob(
   let acquiredAsset;
 
   try {
+    const pluginLogger = logger.child({
+      operation: "acquire",
+    });
     acquiredAsset = await plugin.acquire({
       abortSignal: AbortSignal.timeout(30_000),
       asset: {
         kind: payload.asset.kind,
+        nextAction: {
+          actionKind: "acquire",
+        },
         observedFingerprints: [payload.asset.observedFingerprint],
         primary: payload.asset.primary,
         sourceUrl: payload.asset.sourceUrl,
@@ -60,6 +70,10 @@ export async function handleAcquireContentJob(
       config: payload.collector.config,
       content: payload.content,
       context: {
+        getWebClient(input) {
+          return getWebClient(input, pluginLogger);
+        },
+        logger: pluginLogger,
         putWorkObject: async (input) => {
           const storedWorkObject = await dependencies.workStorage.put({
             body: input.body,
@@ -75,9 +89,6 @@ export async function handleAcquireContentJob(
           return storedWorkObject.value;
         },
       },
-      logger: logger.child({
-        operation: "acquire",
-      }),
     });
   } catch (error) {
     await failAcquireContentJob(payload, dependencies, logger, error);

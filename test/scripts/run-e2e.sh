@@ -81,7 +81,7 @@ run_basic() {
   E2E_FRONTEND_URL="http://127.0.0.1:$frontend_port" \
   E2E_SOURCE_FEED_URL="http://127.0.0.1:$source_server_port/feeds/podcast.xml" \
   E2E_NON_RSS_SOURCE_URL="http://127.0.0.1:$source_server_port/feeds/not-rss.xml" \
-    npx playwright test --config test/playwright.config.ts
+    npx playwright test --config test/playwright.config.ts test/cases/source-observe.spec.ts
 }
 
 run_transcript() {
