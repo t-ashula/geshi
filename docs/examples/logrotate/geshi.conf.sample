@@ -1,4 +1,4 @@
-/home/office/src/github.com/t-ashula/geshi/.geshi/logs/*.log {
+/path/to/geshi/.geshi/logs/*.log {
   daily
   rotate 14
   compress
