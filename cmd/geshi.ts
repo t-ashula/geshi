@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { createLogger } from "../backend/src/logger/index.js";
 import {
   type GeneratedSourceCollectorPluginMetadata,
   loadGeshiConfig,
@@ -24,7 +25,12 @@ type InstalledPluginResolution =
     };
 
 const projectRootDir = process.cwd();
-const geshiConfig = await loadGeshiConfig(projectRootDir);
+const logger = createLogger({
+  component: "geshi-cli",
+});
+const geshiConfig = await loadGeshiConfig(projectRootDir, {
+  logger,
+});
 const pluginConfig = resolvePluginConfig(geshiConfig, projectRootDir);
 const pluginOutputRootDir = pluginConfig.outputRootDir;
 const pluginPackageJsonPath = path.join(pluginOutputRootDir, "package.json");

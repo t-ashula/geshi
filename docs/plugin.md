@@ -237,6 +237,7 @@ export const definition: SourceCollectorPluginDefinition = {
 ### 運用時設定との関係
 
 - 外部 plugin package 自体の導入は，運用時設定 `geshi.config.js` の `plugin.packages` によって行う
+- external plugin を使わない環境では `geshi.config.js` は省略できる
 - `geshi` はその設定をもとに install / generate し，生成済み plugin registry module から外部 plugin を読む
 - plugin author は，本体の static import 一覧へ自分の plugin を追加することを前提にしない
 
