@@ -1,0 +1,10 @@
+/path/to/geshi/.geshi/logs/*.log {
+  daily
+  rotate 14
+  compress
+  delaycompress
+  missingok
+  notifempty
+  copytruncate
+  su office office
+}

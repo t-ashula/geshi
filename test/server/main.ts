@@ -1,0 +1,192 @@
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
+import { resolve } from "node:path";
+
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
+
+const sourceServerPort = Number(process.env.E2E_SOURCE_SERVER_PORT ?? "3401");
+const botchanAudioPath = process.env.E2E_BOTCHAN_AUDIO_PATH
+  ? resolve(process.env.E2E_BOTCHAN_AUDIO_PATH)
+  : null;
+const botchanPlaylistDir = process.env.E2E_BOTCHAN_PLAYLIST_DIR
+  ? resolve(process.env.E2E_BOTCHAN_PLAYLIST_DIR)
+  : null;
+const app = new Hono();
+
+app.get("/feeds/podcast.xml", (context) => {
+  const origin = new URL(context.req.url).origin;
+  const episodePageUrl = `${origin}/episodes/1.html`;
+  const audioUrl = `${origin}/assets/dummy.mp3`;
+
+  const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Geshi E2E Feed</title>
+    <description>Fixture feed for E2E tests.</description>
+    <link>${origin}</link>
+    <item>
+      <guid>e2e-episode-1</guid>
+      <title>Episode 1</title>
+      <description>Hello from E2E fixture.</description>
+      <link>${episodePageUrl}</link>
+      <enclosure url="${audioUrl}" type="audio/mpeg" />
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+
+  return new Response(feed, {
+    headers: {
+      "content-type": "application/rss+xml; charset=utf-8",
+    },
+  });
+});
+
+app.get("/feeds/not-rss.xml", () => {
+  return new Response("<html><body>not rss</body></html>", {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+    },
+  });
+});
+
+app.get("/feeds/botchan.xml", (context) => {
+  if (botchanAudioPath === null) {
+    return new Response("botchan fixture is not configured", {
+      status: 500,
+    });
+  }
+
+  const origin = new URL(context.req.url).origin;
+  const episodePageUrl = `${origin}/episodes/1.html`;
+  const audioUrl = `${origin}/assets/botchan.mp3`;
+
+  const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Geshi E2E Botchan Feed</title>
+    <description>Transcript fixture feed for E2E tests.</description>
+    <link>${origin}</link>
+    <item>
+      <guid>e2e-botchan-episode-1</guid>
+      <title>Botchan Episode 1</title>
+      <description>Transcript fixture episode.</description>
+      <link>${episodePageUrl}</link>
+      <enclosure url="${audioUrl}" type="audio/mpeg" />
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+
+  return new Response(feed, {
+    headers: {
+      "content-type": "application/rss+xml; charset=utf-8",
+    },
+  });
+});
+
+app.get("/episodes/1.html", async (_context) => {
+  const body = await readFixtureText("episodes/1.html");
+
+  return new Response(body, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+    },
+  });
+});
+
+app.get("/sources/streams/:id", (context) => {
+  if (botchanPlaylistDir === null) {
+    return new Response("botchan playlist fixture is not configured", {
+      status: 500,
+    });
+  }
+
+  const { id } = context.req.param();
+  const origin = new URL(context.req.url).origin;
+
+  return context.json({
+    description: `Sample streaming fixture for ${id}.`,
+    id,
+    playlistUrl: `${origin}/streams/${id}.m3u8`,
+    scheduledStartAt: "2026-05-05T00:00:00.000Z",
+    title: `Sample Stream ${id}`,
+  });
+});
+
+app.get("/streams/:fileName", async (context) => {
+  if (botchanPlaylistDir === null) {
+    return new Response("botchan playlist fixture is not configured", {
+      status: 500,
+    });
+  }
+
+  const { fileName } = context.req.param();
+
+  if (!/^[A-Za-z0-9._-]+\.(m3u8|ts)$/.test(fileName)) {
+    return new Response("not found", { status: 404 });
+  }
+
+  const filePath = resolve(botchanPlaylistDir, basename(fileName));
+
+  try {
+    const body = await readFile(filePath);
+
+    return new Response(toArrayBuffer(body), {
+      headers: {
+        "content-type": fileName.endsWith(".m3u8")
+          ? "application/vnd.apple.mpegurl"
+          : "video/mp2t",
+      },
+    });
+  } catch {
+    return new Response("not found", { status: 404 });
+  }
+});
+
+app.get("/assets/dummy.mp3", async (_context) => {
+  const body = await readFixtureFile("assets/dummy.mp3");
+
+  return new Response(toArrayBuffer(body), {
+    headers: {
+      "content-type": "audio/mpeg",
+    },
+  });
+});
+
+app.get("/assets/botchan.mp3", async (_context) => {
+  if (botchanAudioPath === null) {
+    return new Response("botchan fixture is not configured", {
+      status: 500,
+    });
+  }
+
+  const body = await readFile(botchanAudioPath);
+
+  return new Response(toArrayBuffer(body), {
+    headers: {
+      "content-type": "audio/mpeg",
+    },
+  });
+});
+
+serve({
+  fetch: app.fetch,
+  port: sourceServerPort,
+});
+
+async function readFixtureFile(relativePath: string): Promise<Buffer> {
+  return readFile(new URL(`./static/${relativePath}`, import.meta.url));
+}
+
+async function readFixtureText(relativePath: string): Promise<string> {
+  return readFile(new URL(`./static/${relativePath}`, import.meta.url), "utf8");
+}
+
+function toArrayBuffer(buffer: Buffer): ArrayBuffer {
+  return buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength,
+  ) as ArrayBuffer;
+}

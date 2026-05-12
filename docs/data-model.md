@@ -1,0 +1,363 @@
+# Data Model
+
+この文書は `geshi` のデータモデルを記す．
+
+## 目的
+
+- 収集系，保存系，閲覧系で共有する主要エンティティを明確にする
+- podcast / streaming / feed を横断して扱える基本単位を定める
+- metadata とファイル本体の責務を分ける
+- 履歴が必要な属性をどこで保持するかを定める
+
+## 構成
+
+データモデルは次の 2 層で構成する．
+
+- 主体テーブル
+  - 現在の識別対象と安定した状態を表す
+- 履歴テーブル
+  - 可変属性の各時点の状態を表す
+
+## 主体テーブル
+
+### source
+
+継続的に収集する対象を表す．
+
+例:
+
+- podcast 番組
+- streaming channel
+- RSS / Atom feed
+
+主な属性:
+
+- `id`
+- `slug`
+- `kind`
+- `url`
+- `urlHash`
+- `createdAt`
+
+### content
+
+source から収集される個別の内容単位を表す．
+
+例:
+
+- podcast episode
+- 1 回分の stream
+- feed article
+
+主な属性:
+
+- `id`
+- `sourceId`
+- `kind`
+- `publishedAt`
+- `collectedAt`
+- `status`
+  - `discovered`
+  - `stored`
+  - `failed`
+- `createdAt`
+
+### collectorSetting
+
+source をどう収集するかを表す．
+
+例:
+
+- podcast RSS をどう巡回するか
+
+主な属性:
+
+- `id`
+- `sourceId`
+- `pluginSlug`
+- `createdAt`
+
+### collectorPluginState
+
+source collector plugin の継続実行に必要な内部状態を表す．
+
+例:
+
+- 前回観測位置を表す cursor
+- 解釈補助 metadata
+- 次回 observe 実行に渡す plugin 固有 state
+
+主な属性:
+
+- `id`
+- `collectorSettingId`
+- `pluginSlug`
+- `createdAt`
+
+### asset
+
+content にひもづく実ファイルや派生ファイルを表す．
+
+例:
+
+- audio file
+- video file
+- thumbnail
+- html snapshot
+- subtitle file
+
+主な属性:
+
+- `id`
+- `contentId`
+- `primary`
+- `kind`
+  - `audio`
+  - `video`
+  - `image`
+  - `html`
+  - `subtitle`
+  - `pdf`
+  - `other`
+- `sourceUrl`
+- `storageKey`
+- `mimeType`
+- `byteSize`
+- `checksum`
+- `observedFingerprint`
+- `acquiredFingerprint`
+- `createdAt`
+- `acquiredAt`
+
+### transcript
+
+文字起こしや抽出テキストを表す．
+
+主な属性:
+
+- `id`
+- `contentId`
+- `sourceAssetSnapshotId`
+- `generation`
+  - 同じ音源に対する何度目の文字起こしか
+  - failure chunk の retry では増えず，明示的な再文字起こしで増える
+- `kind`
+  - `transcript`
+  - `ocr`
+  - `extracted-text`
+- `language`
+- `status`
+  - `queued`
+  - `running`
+  - `succeeded`
+  - `failed`
+- `body`
+- `startedAt`
+- `finishedAt`
+- `createdAt`
+
+補足:
+
+- `transcript` は `content` 文脈で読む最終成果物とする
+- 生成元 audio は `sourceAssetSnapshotId` で追う
+- `body` には chunk を連結した最終本文を保持する
+
+### transcriptChunk
+
+chunk 分割された文字起こしの部分結果を表す．
+
+主な属性:
+
+- `id`
+- `transcriptId`
+- `chunkIndex`
+- `status`
+  - `queued`
+  - `running`
+  - `succeeded`
+  - `failed`
+  - `timedOut`
+- `body`
+- `sourceStartMs`
+- `sourceEndMs`
+- `failureMessage`
+- `startedAt`
+- `finishedAt`
+- `createdAt`
+
+補足:
+
+- `transcriptChunk` は `transcript` の中間成果物とする
+- `chunkIndex` は `transcriptId` ごとに一意で，最終連結順序に使う
+- `body` は chunk 単位の本文を保持する
+- `sourceStartMs` / `sourceEndMs` は元音声内での時間範囲を表す
+
+## 履歴テーブル
+
+### sourceSnapshot
+
+source の可変属性のある時点の状態を表す．
+
+主な属性:
+
+- `id`
+- `sourceId`
+- `version`
+- `title`
+- `description`
+- `recordedAt`
+
+補足:
+
+- `version` は `sourceId` ごとの版番号とする
+- どの値がいつ有効だったかを追えるようにする
+
+### collectorSettingSnapshot
+
+collectorSetting の可変属性のある時点の状態を表す．
+
+主な属性:
+
+- `id`
+- `collectorSettingId`
+- `version`
+- `enabled`
+- `config`
+- `recordedAt`
+
+補足:
+
+- `version` は `collectorSettingId` ごとの版番号とする
+- plugin 固有 option や運用状態のようなクロール実行設定を履歴として追えるようにする
+
+### collectorPluginStateSnapshot
+
+collectorPluginState の可変属性のある時点の状態を表す．
+
+主な属性:
+
+- `id`
+- `collectorPluginStateId`
+- `version`
+- `state`
+- `recordedAt`
+
+補足:
+
+- `version` は `collectorPluginStateId` ごとの版番号とする
+- `state` は plugin が所有する JSON serialize 可能な任意の object とする
+- property 名，値の意味，versioning，互換性，秘匿方法は plugin の責務とする
+- `backend` は `state` の意味を解釈せず，opaque state として保持する
+
+### contentSnapshot
+
+content の可変属性のある時点の状態を表す．
+
+主な属性:
+
+- `id`
+- `contentId`
+- `version`
+- `title`
+- `summary`
+- `recordedAt`
+
+### assetSnapshot
+
+asset の可変属性のある時点の状態を表す．
+
+主な属性:
+
+- `id`
+- `assetId`
+- `version`
+- `sourceUrl`
+- `storageKey`
+- `mimeType`
+- `byteSize`
+- `checksum`
+- `observedFingerprint`
+- `acquiredFingerprint`
+- `recordedAt`
+
+## 関連
+
+- 1 `source` : N `content`
+- 1 `source` : N `collectorSetting`
+- 1 `collectorSetting` : 1 `collectorPluginState`
+- 1 `content` : N `asset`
+- 1 `content` : N `transcript`
+- 1 `transcript` : N `transcriptChunk`
+- 1 `source` : N `sourceSnapshot`
+- 1 `collectorSetting` : N `collectorSettingSnapshot`
+- 1 `collectorPluginState` : N `collectorPluginStateSnapshot`
+- 1 `content` : N `contentSnapshot`
+- 1 `asset` : N `assetSnapshot`
+
+## 設計上の原則
+
+### source は継続対象
+
+- source は購読・巡回・再収集の単位とする
+- source 自体は閲覧単位ではなく，content を生む上位単位とする
+- source の固定属性は主体テーブルに置く
+
+### collectorSetting は収集方法
+
+- collectorSetting は source をどう収集するかを表す
+- pluginSlug のような収集方式の識別は source ではなく collectorSetting 側へ寄せる
+- source の識別と，収集方式の識別を分ける
+- crawl するしないのような運用状態を含む収集設定の変更履歴は collectorSettingSnapshot 側に持つ
+- plugin 固有の追加設定は collectorSettingSnapshot.config に入れる
+
+### collectorPluginState は plugin の継続状態
+
+- collectorPluginState は source collector plugin 実行が更新する内部状態を表す
+- collectorSetting が人や API による入力設定を表すのに対し，collectorPluginState は plugin 実行に伴って変化する継続状態を表す
+- collectorPluginState は collectorSetting ごとに独立して持つ
+- source をまたいで state を共有しない
+- state の shape や意味は plugin が所有し，backend はそれを解釈しない
+
+### content は閲覧と検索の中心
+
+- 一覧，詳細，検索結果の主単位は content とする
+- feed article も stream archive も同じく content として扱う
+
+### asset は storage 参照を持つ
+
+- metadata 側には保存先参照だけを持つ
+- ファイル本体は storage に置く
+- `sourceUrl` は必要な場合に取得元情報として asset に持つ
+- `primary` によって，その content に対する主たる asset を表せるようにする
+- `checksum` は hash algorithm を含む文字列として持つ
+- `asset` 本体には最新の observed / acquired fingerprint を持つ
+- `createdAt` は asset metadata を登録した時点，`acquiredAt` は実ファイル取得と保存が完了した時点を表す
+
+### 可変属性は履歴テーブルに保持する
+
+- `source`，`collectorSetting`，`collectorPluginState`，`content`，`asset` の履歴が必要な属性は snapshot 側に持つ
+- 現在値だけを主体テーブルへ上書きしない
+- `updatedAt` で履歴要件を代替しない
+- source の canonical な取得先 URL は source に持つ
+- plugin 入力に使う `rssUrl` のような値は，worker が source と collectorSettingSnapshot から組み立てる
+
+### transcript は後付け可能にする
+
+- 収集時点で transcript がなくても content を保存できる
+- transcript は非同期に追加できる
+
+## 画面・API への見え方
+
+### 一覧
+
+- source 配下の content を時系列や検索条件で一覧する
+- 一覧表示には必要に応じて最新 snapshot を結合する
+
+### 詳細
+
+- 1 つの content に対して最新 snapshot，asset，asset 配下の transcript をまとめて表示する
+
+### 検索
+
+- transcript や本文の一致から content を引く
+- 検索結果には source 情報も添える

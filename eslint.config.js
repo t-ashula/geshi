@@ -1,71 +1,117 @@
-import js from "@eslint/js";
-import importPlugin from "eslint-plugin-import";
-import perfectionist from "eslint-plugin-perfectionist";
+import eslintConfigPrettier from "eslint-config-prettier";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
-import unicorn from "eslint-plugin-unicorn";
-import pluginVue from "eslint-plugin-vue";
-import globals from "globals";
+import vue from "eslint-plugin-vue";
 import tseslint from "typescript-eslint";
+import unicorn from "eslint-plugin-unicorn";
 import vueParser from "vue-eslint-parser";
 
-const commonTypeScriptRules = {
-  "no-cond-assign": ["error", "always"],
-  "no-console": "error",
-  curly: ["error", "all"],
-  "@typescript-eslint/no-unused-vars": [
-    "error",
-    { args: "all", argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+const typedConfigs = tseslint.configs.recommendedTypeChecked.map((config) => ({
+  ...config,
+  files: [
+    "backend/src/**/*.ts",
+    "backend/test/**/*.ts",
+    "frontend/src/**/*.ts",
+    "frontend/test/**/*.ts",
+    "frontend/vite.config.ts",
+    "packages/**/*.ts",
+    "test/**/*.ts",
+    "test/playwright.config.ts",
   ],
-  "@typescript-eslint/consistent-type-imports": [
-    "error",
-    { prefer: "type-imports", fixStyle: "separate-type-imports" },
-  ],
-  "import/consistent-type-specifier-style": ["error", "prefer-top-level"],
-  "simple-import-sort/imports": "error",
-  "simple-import-sort/exports": "error",
-  "perfectionist/sort-modules": "error",
-};
-
-const commonSettings = {
-  "import/resolver": {
-    typescript: {
-      project: [
-        "./frontend/tsconfig.json",
-        "./backend/tsconfig.json",
-        "./cli/tsconfig.json",
-      ],
-    },
-  },
-};
-
-const commonPlugins = {
-  import: importPlugin,
-  perfectionist,
-  "simple-import-sort": simpleImportSort,
-  unicorn,
-};
+}));
 
 export default tseslint.config(
   {
-    ignores: ["dist/**", "coverage/**", "node_modules/**"],
+    ignores: ["coverage/**", "dist/**", "node_modules/**", "tmp/**"],
   },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
-  ...pluginVue.configs["flat/recommended"],
   {
-    files: ["frontend/**/*.ts", "backend/**/*.ts", "cli/**/*.ts"],
+    files: [
+      "backend/src/**/*.ts",
+      "backend/test/**/*.ts",
+      "frontend/src/**/*.ts",
+      "frontend/test/**/*.ts",
+      "frontend/vite.config.ts",
+      "packages/**/*.ts",
+      "test/**/*.ts",
+      "test/playwright.config.ts",
+    ],
+    plugins: {
+      "@typescript-eslint": tseslint.plugin,
+      unicorn,
+      "simple-import-sort": simpleImportSort,
+    },
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      globals: {
-        ...globals.browser,
-        ...globals.node,
+      parserOptions: {
+        project: "./tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
       },
     },
-    plugins: commonPlugins,
-    settings: commonSettings,
     rules: {
-      ...commonTypeScriptRules,
+      curly: ["error", "all"],
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+        },
+      ],
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        {
+          fixStyle: "separate-type-imports",
+          prefer: "type-imports",
+        },
+      ],
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "ImportDeclaration[importKind='value'] > ImportSpecifier[importKind='type']",
+          message:
+            "Use a separate `import type { ... }` declaration for type-only imports.",
+        },
+      ],
+      "simple-import-sort/imports": "error",
+      "simple-import-sort/exports": "error",
+    },
+  },
+  {
+    files: ["frontend/src/**/*.vue"],
+    plugins: {
+      vue,
+    },
+    languageOptions: {
+      parser: vueParser,
+      parserOptions: {
+        extraFileExtensions: [".vue"],
+        parser: tseslint.parser,
+        project: "./frontend/tsconfig.json",
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      "vue/html-self-closing": "error",
+      "vue/multi-word-component-names": "off",
+    },
+  },
+  {
+    files: [
+      "backend/src/**/*.ts",
+      "backend/test/**/*.ts",
+      "frontend/src/**/*.ts",
+      "frontend/test/**/*.ts",
+      "frontend/vite.config.ts",
+      "packages/**/*.ts",
+      "test/**/*.ts",
+      "test/playwright.config.ts",
+    ],
+    plugins: {
+      unicorn,
+    },
+    rules: {
       "unicorn/filename-case": [
         "error",
         {
@@ -74,50 +120,6 @@ export default tseslint.config(
       ],
     },
   },
-  {
-    files: ["frontend/**/*.vue"],
-    languageOptions: {
-      parser: vueParser,
-      parserOptions: {
-        ecmaVersion: "latest",
-        sourceType: "module",
-        parser: tseslint.parser,
-        extraFileExtensions: [".vue"],
-      },
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
-    },
-    plugins: commonPlugins,
-    settings: commonSettings,
-    rules: {
-      ...commonTypeScriptRules,
-      "unicorn/filename-case": "off",
-    },
-  },
-  {
-    files: ["backend/src/**/*.ts"],
-    rules: {
-      "no-restricted-imports": [
-        "error",
-        {
-          patterns: [
-            {
-              group: ["**/bullmq/*.js", "!**/bullmq/index.js"],
-              message: "bullmq imports must go through bullmq/index.js",
-            },
-            {
-              group: ["**/routes/*.js", "!**/routes/index.js"],
-              message: "route imports must go through routes/index.js",
-            },
-            {
-              group: ["**/job/*.js", "!**/job/index.js"],
-              message: "job imports must go through job/index.js",
-            },
-          ],
-        },
-      ],
-    },
-  },
+  ...typedConfigs,
+  eslintConfigPrettier,
 );

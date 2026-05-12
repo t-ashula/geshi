@@ -1,13 +1,17 @@
 ## What
+
 <!-- Describe what changes this PR introduces -->
 
 ## Why
+
 <!-- Explain why these changes are necessary or beneficial -->
 
 ## Related
+
 <!-- Reference any related issues or PRs using #issue_number or user/repo#issue_number format -->
 
 ## Additional Notes
+
 <!-- Add any other context about the PR here -->
 
 ## Checklist

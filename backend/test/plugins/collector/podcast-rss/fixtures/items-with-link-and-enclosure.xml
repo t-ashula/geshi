@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss
+  version="2.0"
+  xmlns:atom="http://www.w3.org/2005/Atom"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:googleplay="http://www.google.com/schemas/play-podcasts/1.0"
+  xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+  xmlns:media="http://search.yahoo.com/mrss/"
+  xmlns:podcast="https://podcastindex.org/namespace/1.0"
+>
+  <channel>
+    <atom:link
+      href="https://feeds.simplecast.com/54nAGcIl"
+      rel="self"
+      title="MP3 Audio"
+      type="application/atom+xml"
+    />
+    <generator>https://simplecast.com</generator>
+    <title>The Daily</title>
+    <description>This is what the news should sound like.</description>
+    <link>https://www.nytimes.com/the-daily</link>
+    <itunes:type>episodic</itunes:type>
+    <item>
+      <guid isPermaLink="false">f3d85f46-60cc-40cb-a0fb-7ccd59bc8dae</guid>
+      <title>Why Even Some Democrats Hate California’s Billionaire Tax Proposal</title>
+      <description><![CDATA[<p>A landmark proposal for a one-time tax on billionaires in California recently reached a milestone.</p>]]></description>
+      <pubDate>Wed, 29 Apr 2026 09:45:00 +0000</pubDate>
+      <author>thedaily@nytimes.com (The New York Times)</author>
+      <link>https://www.nytimes.com/the-daily</link>
+      <media:thumbnail
+        height="720"
+        url="https://image.simplecastcdn.com/images/example.jpg"
+        width="1280"
+      />
+      <content:encoded><![CDATA[<p>A landmark proposal for a one-time tax on billionaires in California recently reached a milestone.</p>]]></content:encoded>
+      <enclosure
+        length="26306516"
+        type="audio/mpeg"
+        url="https://dts.podtrac.com/redirect.mp3/example-1.mp3"
+      />
+      <itunes:title>Why Even Some Democrats Hate California’s Billionaire Tax Proposal</itunes:title>
+      <itunes:author>The New York Times</itunes:author>
+      <itunes:duration>00:27:24</itunes:duration>
+      <itunes:summary>The measure calls for placing a one-time 5 percent tax on the assets of California residents with at least $1.1 billion.</itunes:summary>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+    <item>
+      <guid isPermaLink="false">183053b7-e8f3-4c47-95b2-657d7ec3f955</guid>
+      <title>Assassination Attempt Suspect Charged</title>
+      <description><![CDATA[<p>What we know about the man in custody after the shooting at the White House correspondents’ dinner.</p>]]></description>
+      <pubDate>Tue, 28 Apr 2026 09:45:00 +0000</pubDate>
+      <author>thedaily@nytimes.com (The New York Times)</author>
+      <link>https://www.nytimes.com/the-daily</link>
+      <media:thumbnail
+        height="720"
+        url="https://image.simplecastcdn.com/images/example-2.jpg"
+        width="1280"
+      />
+      <content:encoded><![CDATA[<p>What we know about the man in custody after the shooting at the White House correspondents’ dinner.</p>]]></content:encoded>
+      <enclosure
+        length="23932088"
+        type="audio/mpeg"
+        url="https://dts.podtrac.com/redirect.mp3/example-2.mp3"
+      />
+      <itunes:title>Assassination Attempt Suspect Charged</itunes:title>
+      <itunes:author>The New York Times</itunes:author>
+      <itunes:duration>00:24:55</itunes:duration>
+      <itunes:summary>What we know about the man in custody after the shooting at the White House correspondents’ dinner.</itunes:summary>
+      <itunes:explicit>false</itunes:explicit>
+      <itunes:episodeType>full</itunes:episodeType>
+    </item>
+  </channel>
+</rss>

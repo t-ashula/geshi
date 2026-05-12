@@ -1,26 +1,21 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
 import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vite";
 
-const frontendRoot = fileURLToPath(new URL(".", import.meta.url));
+const backendOrigin =
+  process.env.GESHI_BACKEND_ORIGIN ??
+  `http://127.0.0.1:${process.env.E2E_BACKEND_PORT ?? "3000"}`;
 
 export default defineConfig({
   plugins: [vue()],
-  root: path.resolve(frontendRoot),
+  root: import.meta.dirname,
   server: {
-    host: "0.0.0.0",
-    port: 5173,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:3000",
-        rewrite: (path) => path.replace(/^\/api/, ""),
+        target: backendOrigin,
+      },
+      "/media": {
+        target: backendOrigin,
       },
     },
-  },
-  build: {
-    outDir: "../dist/frontend",
-    emptyOutDir: true,
   },
 });

@@ -1,0 +1,249 @@
+# Development
+
+## environment
+
+### 前提
+
+- `git`
+- asdf 互換のバージョン管理ツール
+- `docker`
+- `docker compose`
+
+### 採用する基盤
+
+- `nodejs 24`
+  - `TypeScript`
+  - `ESLint`
+  - `Prettier`
+  - `Vitest`
+
+### 初期設定
+
+1. リポジトリを取得する
+
+   ```sh
+   git clone <repo>
+   cd geshi
+   ```
+
+2. コミットテンプレートを設定する
+
+   ```sh
+   git config commit.template .commit-template.txt
+   ```
+
+3. 必要なツールバージョンを揃える
+   - 使用する言語ランタイムや主要 CLI ツールは `.tool-versions` に従う
+   - asdf または互換ツールで必要バージョンをインストールする
+
+4. npm 依存を入れる
+
+   ```sh
+   npm install
+   ```
+
+5. plugin を install / generate する
+
+   ```sh
+   ./bin/geshi plugins install
+   ./bin/geshi plugins generate
+   ```
+
+   補足:
+   - `geshi` のローカル生成物や runtime data は `.geshi/` 配下に置く
+   - `geshi.config.js` に書かれた external plugin を `.geshi/generated/plugins/`
+     配下へ解決する
+   - plugin の設定や依存を変えたときは，起動前に再実行する
+
+6. ローカル設定ファイルを用意する
+   - `.env.example` を元に `.env.local` を作る
+   - `.env.local` にはローカル専用設定と秘密情報を置く
+   - `.env.local` はコミットしない
+   - 現状は `.env.local` の自動読込はしていない
+   - 必要なら shell から export するか，`set -a; . ./.env.local; set +a` のように読み込む
+
+7. ローカル依存サービスを起動する
+   - DB，検索エンジン，オブジェクトストレージなどの依存サービスは `docker compose` で起動する
+   - 起動対象や手順はリポジトリルートの共通入口から辿れるようにする
+
+```sh
+make dev-up
+```
+
+補足:
+
+- `make dev-up` は `postgres` を起動する
+- `make dev-down` で停止する
+  - volume まで消したいときだけ `make dev-reset` を使う
+
+### 通常の起動
+
+依存サービスを起動した後は，PID 管理付きの script でそれぞれ起動する．
+
+backend:
+
+```sh
+npm run backend:dev:start
+```
+
+frontend:
+
+```sh
+npm run frontend:dev:start
+```
+
+worker:
+
+```sh
+npm run worker:start
+```
+
+補足:
+
+- PID file は `./.geshi/pid/*.pid` に保存する
+- log file は `./.geshi/logs/*.log` に保存する
+- log rotate は application 側ではなく OS 側の `logrotate` などで行う前提にする
+  - sample は [docs/examples/logrotate/geshi.conf.sample](./examples/logrotate/geshi.conf.sample) を参照する
+  - `scripts/start-process.sh` は各 process を log file へ直接 redirect しているため，sample では `copytruncate` を使っている
+- 停止は `npm run backend:dev:stop` / `npm run frontend:dev:stop` /
+  `npm run worker:stop` を使う
+- `backend:dev:start` は PID 管理付きの background 起動であり，watch はしない
+- `frontend:dev:start` は PID 管理付きの background 起動であり，port が埋まって
+  いるときは別 port へ逃がさず失敗する
+- `backend:dev` は API server を watch モードで起動する生 command であり，
+  PID 管理を使わず foreground で直接動かしたいときに使う
+- `frontend:dev` は Vite dev server を起動する生 command であり，PID 管理を
+  使わず foreground で直接動かしたいときに使う
+- `worker:start` は `observe-source` / `acquire-content` / `periodic-crawl` /
+  `recording-scheduler` / `transcript-split` / `transcript-chunk` worker を
+  まとめて起動する
+
+### transcript 動作確認用 audio
+
+- transcript の E2E 用に `tmp/botchan/botchan_01_natsume_64kb.mp3` というファイルを配置する前提になっている
+- 入手元は LibriVox の [Botchan by Soseki Natsume](https://librivox.org/botchan-by-soseki-natsume-2/)
+- E2E runner はこの mp3 から先頭 8 分を切り出して source server から配信する
+
+例:
+
+```sh
+mkdir -p tmp/botchan
+# 取得した chapter 1 mp3 を以下へ置く
+# cd tmp;
+# unzip -d botchan botchan_1310_librivox.zip
+# ls botchan/botchan_01_natsume_64kb.mp3
+```
+
+```sh
+npm run test:e2e:transcript
+```
+
+補足:
+
+- 別 path を使う場合は `E2E_BOTCHAN_SOURCE_MP3=/path/to/file.mp3` を指定する
+- `scribe` の接続先を変える場合は `E2E_SCRIBE_BASE_URL=http://127.0.0.1:NNNNN` を指定する
+- `npm run test:e2e:transcript` は本物の `scribe` ではなく fake server を使う
+  - 制御可能な `pending -> working -> done` を返し，job orchestration を安定して確認するため
+- 外部起動済みの本物 `scribe` に向けたい場合は `E2E_USE_REAL_SCRIBE=1` を付ける
+
+```sh
+E2E_USE_REAL_SCRIBE=1 \
+E2E_SCRIBE_BASE_URL=http://127.0.0.1:58000 \
+npm run test:e2e:transcript
+```
+
+### 運用方針
+
+- 開発に必要なバージョンは `.tool-versions` に集約する
+- ローカル依存サービスはできるだけホスト環境に直接インストールしない
+- 再現性が必要なものは `docker compose` 側に寄せる
+- 共有すべき設定項目だけを `.env.example` に残す
+- 開発者固有の値は `.env.local` に閉じる
+- セットアップ，起動，Lint，テストの入口はリポジトリルートから辿れるようにする
+- 個別ディレクトリに散らばった独自コマンドだけに依存しない
+- schema migration と data migration の手順は [Migration](./migration.md) に従う
+
+### module / import
+
+- `index.ts` は，原則として再エクスポートや公開境界の集約だけに使う
+- `index.ts` に業務ロジックや初期化処理や状態管理を持ち込まない
+- 実装本体は `foo.ts` や `bar.ts` のような個別 module に置き，必要なら `index.ts` から公開する
+- `index.ts` を使うかどうかは module 境界を見て決めるが，「外向けの入口」であることを優先する
+- import 規約を lint で強制するかどうかは，module 境界が十分に固まってから判断する
+
+## commit
+
+- メッセージは .commit-template.txt と関連する ADR に基づいて一貫性を保つ
+- 粒度は大きくなりすぎないタイミングで行う
+- コミット前に，npm run precommit での最低限のテストやコーディングスタイルのチェックを行い，チェックが通らないときはコミットしない
+
+## フロー
+
+開発は基本的にブランチを切って行う．
+そのブランチをマージするときにどんな条件が満たされていれば良いかを明確にしたうえで行う．
+
+依存ライブラリのアップデートや，typo やコーディングスタイル上の調整などの数コミット程度で終わる，細かな保守作業や軽微な変更では，このフローを踏襲しなくてよい．
+
+1. 作業用にブランチを作成しスイッチ
+2. このブランチでの終了条件（マージ受け入れ条件）を調整し，最終的な達成目標を決める
+3. 受け入れ条件達成に必要な ADR を起票の後，詳細を議論し，決定にするか却下する
+4. 決定にしたADR にもとづいて，テストを書き，開発作業をする
+   - 適切な粒度でコミットをテンプレートに基づいて詰む
+5. 受け入れ条件を満たすまでテストや動作検証と開発作業を行う
+   - 必要に応じて追加の ADR を起票したり，細分化した受け入れ条件としてブランチを分岐したりして，作業を続ける
+6. 条件が満たされたらベースブランチにマージする
+
+### 0. 開発項目を決める
+
+- まず着手対象の開発項目を定める
+- 開発項目は，必要に応じて ADR や Design log を伴いうる単位として扱う
+
+### 1. ブランチを切る
+
+- 開発項目ごとに作業ブランチを切る
+- 複数の開発項目を 1 ブランチに混在させない
+- ブランチ A での機能 A の開発を細分化した複数ブランチ A1, A2, A3... で行うのは良いが，さらに機能 B の開発を同じブランチ A には入れない
+
+### 2. 終了条件を文書に残す
+
+- その開発項目の受け入れ条件（検収要件）を文書として残す
+- 受け入れ条件が曖昧なまま実装を始めない
+- 受け入れ条件の文書は `docs/acceptance/` に置く
+  - ファイル名は `NNNN-kebab-case-title.md` 形式とする
+    - `NNNN` は 4 桁ゼロ埋め連番
+    - タイトルは英小文字の kebab-case
+    - 例: `docs/acceptance/0007-example.md`
+  - 特にフォーマットは決めない
+  - 実装詳細に関しての内容は ADR や design log に譲り，こういう機能が実現されていること（あるいは削除されていること）とそれを確認する検証方法を書き連ねる
+
+### 3. 必要な変更を ADR / Design log に起票する
+
+- 重要な設計判断を伴う変更は ADR として起票する
+- 必要に応じて 1 つの開発項目の中で複数の ADR に分ける
+- 詳細な検討過程や比較，補足案は Design log に残す
+- ADR にするほどではないが，判断の補足や検討過程を残したい場合も Design log を使ってよい
+  - ADR とひもづかない Design log には番号として xxxx を固定する．
+
+### 4. 文書だけでコミットする
+
+- ADR，Design log，終了条件文書を作成した場合は，実装前に文書だけでコミットする
+- まず「何を作るか」と「何をもって終わりとするか」を履歴に固定する
+- これは文書とコードのコミットを極力混ぜないことで，実装をなかったことにしてやり直しやすくするためでもある
+
+### 5. 実装を開始する
+
+- コードや機能変更を伴う開発項目では，終了条件に基づいて実装を進める
+- 実装の中で TDD 的なサイクルとして回す
+- 必要に応じてレビューや議論を行い，その内容は受け入れ条件にも反映してもよい
+- その後にコードを実装する
+- 適切な粒度で `lint`，`format`，`test` などのチェックを通してコミットを重ねる
+
+### 6. 検収要件を満たしたら PR を作る
+
+- 検収要件を満たすことを確認する
+- PR を作成し，CI による検証を通す
+- 問題がなければマージする
+
+### 7. 次のタスクへ進む
+
+- マージ後に次の開発項目を決め，同じフローを繰り返す

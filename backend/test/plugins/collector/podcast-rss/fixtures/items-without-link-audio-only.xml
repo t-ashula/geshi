@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss
+  version="2.0"
+  xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+  xmlns:atom="http://www.w3.org/2005/Atom"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:art19="https://art19.com/xmlns/rss-extensions/1.0"
+  xmlns:googleplay="http://www.google.com/schemas/play-podcasts/1.0/"
+  xmlns:podcast="https://podcastindex.org/namespace/1.0"
+>
+  <channel>
+    <title>PODSHIP EARTH</title>
+    <description><![CDATA[<p>In the next decade, the scale and scope of environmental change will test our ingenuity and strength.</p>]]></description>
+    <managingEditor>jared@podshipearth.com (Jared Blumenfeld)</managingEditor>
+    <generator>ART19</generator>
+    <atom:link href="https://rss.art19.com/podship-earth" rel="self" type="application/rss+xml" />
+    <link>https://www.podshipearth.com/</link>
+    <itunes:type>episodic</itunes:type>
+    <item>
+      <title>Looking Up</title>
+      <description><![CDATA[<p>Prepping for 2022: We’ve been through a year of climate emergencies.</p>]]></description>
+      <itunes:title>Looking Up</itunes:title>
+      <itunes:episodeType>full</itunes:episodeType>
+      <itunes:episode>124</itunes:episode>
+      <itunes:summary>Prepping for 2022: We’ve been through a year of climate emergencies.</itunes:summary>
+      <content:encoded><![CDATA[<p>Prepping for 2022: We’ve been through a year of climate emergencies.</p>]]></content:encoded>
+      <guid isPermaLink="false">gid://art19-episode-locator/V0/L9jEJWYYxmqXxaSRWvZ0-lpXAql3zaloEU7A8Qw8n5c</guid>
+      <pubDate>Sun, 26 Dec 2021 08:00:00 -0000</pubDate>
+      <itunes:explicit>yes</itunes:explicit>
+      <itunes:duration>00:32:35</itunes:duration>
+      <enclosure
+        url="https://rss.art19.com/episodes/e2e424f9-09ee-44e8-951f-2d6dff4fc3fd.mp3"
+        type="audio/mpeg"
+        length="31294693"
+      />
+    </item>
+    <item>
+      <title>Alex</title>
+      <description><![CDATA[<p>Art is fundamental to understanding who we are in context to the world.</p>]]></description>
+      <itunes:title>Alex</itunes:title>
+      <itunes:episodeType>full</itunes:episodeType>
+      <itunes:episode>123</itunes:episode>
+      <itunes:summary>Art is fundamental to understanding who we are in context to the world.</itunes:summary>
+      <content:encoded><![CDATA[<p>Art is fundamental to understanding who we are in context to the world.</p>]]></content:encoded>
+      <guid isPermaLink="false">gid://art19-episode-locator/V0/HWBflwh9b-TF_zx9l2fj0AoZ5NtLcUGJCrnJLDKufgg</guid>
+      <pubDate>Sun, 12 Dec 2021 08:00:00 -0000</pubDate>
+      <itunes:explicit>yes</itunes:explicit>
+      <itunes:duration>00:35:06</itunes:duration>
+      <enclosure
+        url="https://rss.art19.com/episodes/e85e44a7-6c31-48dc-8255-547bce6eff28.mp3"
+        type="audio/mpeg"
+        length="33709662"
+      />
+    </item>
+  </channel>
+</rss>

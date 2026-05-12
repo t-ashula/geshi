@@ -1,0 +1,11 @@
+{
+  "name": "@geshi-test/example-feed-plugin",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@geshi/sdk": "file:../../../../packages/geshi-sdk"
+  }
+}
