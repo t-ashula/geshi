@@ -1,4 +1,5 @@
 import path from "node:path";
+import { access } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
 export type GeshiConfig = {
@@ -32,6 +33,13 @@ export async function loadGeshiConfig(
   currentWorkingDirectory: string = process.cwd(),
 ): Promise<GeshiConfig> {
   const configFilePath = path.join(currentWorkingDirectory, "geshi.config.js");
+
+  try {
+    await access(configFilePath);
+  } catch {
+    return {};
+  }
+
   const configModule = await import(pathToFileURL(configFilePath).href);
 
   return (configModule.default ?? {}) as GeshiConfig;
