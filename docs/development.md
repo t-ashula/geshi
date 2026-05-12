@@ -51,6 +51,7 @@
 
    補足:
    - `geshi` のローカル生成物や runtime data は `.geshi/` 配下に置く
+   - external plugin を使わないなら `geshi.config.js` は無くてもよい
    - `geshi.config.js` に書かれた external plugin を `.geshi/generated/plugins/`
      配下へ解決する
    - plugin の設定や依存を変えたときは，起動前に再実行する

@@ -1,5 +1,8 @@
 import path from "node:path";
+import * as fs from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+
+import { createLogger, type Logger } from "../backend/src/logger/index.js";
 
 export type GeshiConfig = {
   plugin?: {
@@ -28,13 +31,51 @@ export type GeneratedSourceCollectorPluginMetadata = {
   status: "available" | "unavailable";
 };
 
+type GeshiConfigLoaderDependencies = {
+  logger: Logger;
+};
+
 export async function loadGeshiConfig(
   currentWorkingDirectory: string = process.cwd(),
+  dependencies: GeshiConfigLoaderDependencies,
 ): Promise<GeshiConfig> {
   const configFilePath = path.join(currentWorkingDirectory, "geshi.config.js");
+
+  try {
+    await fs.access(configFilePath);
+  } catch (error) {
+    if (isNodeErrorWithCode(error, "ENOENT")) {
+      return {};
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    dependencies.logger.warn(
+      "geshi config access failed; falling back to empty config.",
+      {
+        configFilePath,
+        errorCode:
+          error instanceof Error && "code" in error ? error.code : undefined,
+        errorMessage: message,
+      },
+    );
+    return {};
+  }
+
   const configModule = await import(pathToFileURL(configFilePath).href);
 
   return (configModule.default ?? {}) as GeshiConfig;
+}
+
+function isNodeErrorWithCode(
+  error: unknown,
+  code: string,
+): error is NodeJS.ErrnoException {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    error.code === code
+  );
 }
 
 export function resolvePluginConfig(
@@ -68,8 +109,9 @@ export function resolvePluginConfig(
 
 export async function loadPluginArtifactPaths(
   currentWorkingDirectory: string = process.cwd(),
+  dependencies: GeshiConfigLoaderDependencies,
 ): Promise<PluginArtifactPaths> {
-  const config = await loadGeshiConfig(currentWorkingDirectory);
+  const config = await loadGeshiConfig(currentWorkingDirectory, dependencies);
   const pluginConfig = resolvePluginConfig(config, currentWorkingDirectory);
 
   return {
