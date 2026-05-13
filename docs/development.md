@@ -177,6 +177,7 @@ npm run test:e2e:transcript
 - メッセージは .commit-template.txt と関連する ADR に基づいて一貫性を保つ
 - 粒度は大きくなりすぎないタイミングで行う
 - コミット前に，npm run precommit での最低限のテストやコーディングスタイルのチェックを行い，チェックが通らないときはコミットしない
+- `npx vitest` などを使わず， つねに npm script 経由でのチェックを行い，一貫性とツール依存性を排除する
 
 ## フロー
 

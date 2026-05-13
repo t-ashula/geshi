@@ -60,3 +60,6 @@
 - [ADR-0057: `html asset` の acquire 方式は source collector plugin が責務を持つ](./0057-html-asset-acquire-strategy.md)
 - [ADR-0058: `content detail` では `html asset` 由来の派生生成物を優先し無ければ `summary` を使う](./0058-html-asset-detail-presentation.md)
 - [ADR-0059: 派生物は種類ごとに専用モデルを持ち `transcript` もその一種として扱う](./0059-content-derivative-models.md)
+- [ADR-0060: plugin 実行 capability は collector 固有 context ではなく host object として公開する](./0060-plugin-host-object.md)
+- [ADR-0061: web client は plugin context ではなく SDK 提供 API として扱う](./0061-web-client-sdk-api.md)
+- [ADR-0062: plugin 実行時の logger 追加コンテキストは呼び出された側が付与する](./0062-plugin-logger-context-ownership.md)

@@ -140,6 +140,13 @@ logger.info("observe job completed.", { jobId, sourceId, pluginSlug });
 - job 単位
 - plugin 呼び出し単位
 
+### plugin 呼び出し時の責務
+
+- host 側は，`jobId`, `sourceId`, `pluginSlug` など，呼び出し側が知っている共通実行文脈までを child logger に束ねて plugin へ渡す
+- plugin 側は，対象 URL，内部 step，分岐結果，解析対象 ID など，呼び出された側しか知らない局所文脈を child logger または metadata で追加する
+- host 側が plugin 内部事情を先回りして logger に埋め込まない
+- plugin 側も host 由来の共通文脈を message に重複して埋め込まない
+
 ```ts
 const jobLogger = logger.child({
   jobId,
