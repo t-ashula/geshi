@@ -202,19 +202,14 @@ export const plugin: SourceCollectorPlugin = {
     }
 
     const body = new Uint8Array(await response.arrayBuffer());
-    const html = decodeHtmlDocument(body, response.headers.get("content-type"));
-    const normalizedBody = new TextEncoder().encode(html);
     const contentType = normalizeContentType(
       response.headers.get("content-type"),
       DEFAULT_CONTENT_TYPE,
     );
 
     return {
-      acquiredFingerprints: createAcquiredAssetFingerprints(
-        input.asset.sourceUrl,
-        normalizedBody,
-      ),
-      body: normalizedBody,
+      acquiredFingerprints: createAcquiredAssetFingerprints(input.asset.sourceUrl, body),
+      body,
       contentType,
       kind: input.asset.kind,
       metadata: {},

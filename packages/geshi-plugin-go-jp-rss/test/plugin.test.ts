@@ -368,7 +368,7 @@ describe("goJpRss plugin", () => {
     ]);
   });
 
-  it("acquires shift_jis HTML assets as utf-8 using response charset", async () => {
+  it("acquires shift_jis HTML assets without rewriting bytes", async () => {
     const body = joinBytes([
       asciiBytes("<html><body><p>"),
       KONNICHIWA_SHIFT_JIS,
@@ -418,11 +418,11 @@ describe("goJpRss plugin", () => {
       throw new Error("Expected acquired asset body.");
     }
 
-    expect(new TextDecoder().decode(asset.body)).toContain("こんにちは");
+    expect(asset.body).toEqual(body);
     expect(asset.contentType).toBe("text/html");
     expect(asset.acquiredFingerprints).toEqual([
       expect.stringMatching(VERSIONED_FINGERPRINT_PATTERN),
-      "acquired-html:https://example.go.jp/news/shift-jis:48",
+      "acquired-html:https://example.go.jp/news/shift-jis:43",
     ]);
   });
   it("extracts a sanitized html detail body", async () => {
@@ -453,6 +453,40 @@ describe("goJpRss plugin", () => {
       }),
     ).resolves.toEqual({
       body: '<article><h1>記事タイトル</h1><p>本文 <strong>その1</strong></p><p><a href="https://www.gov-online.go.jp/info/example.html">詳細ページ</a></p></article>',
+      format: "html",
+    });
+  });
+
+  it("extracts shift_jis html using meta charset", async () => {
+    const body = joinBytes([
+      asciiBytes(`
+              <html>
+                <head>
+                  <meta charset="Shift_JIS" />
+                </head>
+                <body>
+                  <main class="article-body">
+                    <p>`),
+      KONNICHIWA_SHIFT_JIS,
+      asciiBytes(`</p>
+                  </main>
+                </body>
+              </html>
+            `),
+    ]);
+
+    await expect(
+      plugin.extract({
+        asset: {
+          body,
+          kind: "html",
+          mimeType: "text/html",
+          sourceUrl: "https://www.gov-online.go.jp/example.html",
+        },
+        context: createPluginContext(),
+      }),
+    ).resolves.toEqual({
+      body: "<article><p>こんにちは</p></article>",
       format: "html",
     });
   });
