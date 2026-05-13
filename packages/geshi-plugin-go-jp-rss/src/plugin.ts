@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type {
   AcquiredAsset,
   ExtractedDetailBody,
@@ -14,6 +16,8 @@ import type {
   SourceCollectorSupportsInput,
   SourceMetadata,
 } from "@geshi/sdk";
+import type { DefaultTreeAdapterTypes } from "parse5";
+import { parse } from "parse5";
 
 import { extractHtmlDetailBody } from "./html-detail-body.js";
 import { manifest } from "./manifest.js";
@@ -25,6 +29,9 @@ const GOV_ONLINE_HOST = "www.gov-online.go.jp";
 const GOV_ONLINE_INFO_PATHS = new Set(["/info/", "/info/index.html"]);
 const MAX_ITEMS = 40;
 const ONE_WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
+const TEXT_DECODER_FALLBACK_ENCODING = "utf-8";
+const META_CHARSET_SCAN_LENGTH = 2048;
+const FINGERPRINT_VERSION = "2026-05-13";
 
 class SourceCollectorInspectPluginError extends Error {
   public readonly code: SourceCollectorInspectErrorCode;
@@ -168,7 +175,7 @@ export const plugin: SourceCollectorPlugin = {
       return Promise.resolve(null);
     }
 
-    const html = new TextDecoder().decode(input.asset.body);
+    const html = decodeHtmlDocument(input.asset.body, input.asset.mimeType);
 
     return Promise.resolve(extractHtmlDetailBody(html, input.asset.sourceUrl));
   },
@@ -195,19 +202,19 @@ export const plugin: SourceCollectorPlugin = {
     }
 
     const body = new Uint8Array(await response.arrayBuffer());
+    const html = decodeHtmlDocument(body, response.headers.get("content-type"));
+    const normalizedBody = new TextEncoder().encode(html);
     const contentType = normalizeContentType(
       response.headers.get("content-type"),
       DEFAULT_CONTENT_TYPE,
     );
 
     return {
-      acquiredFingerprints: [
-        createFingerprint(
-          "acquired-html",
-          `${input.asset.sourceUrl}:${body.byteLength}`,
-        ),
-      ],
-      body,
+      acquiredFingerprints: createAcquiredAssetFingerprints(
+        input.asset.sourceUrl,
+        normalizedBody,
+      ),
+      body: normalizedBody,
       contentType,
       kind: input.asset.kind,
       metadata: {},
@@ -276,36 +283,40 @@ async function fetchGovOnlinePage(
     );
   }
 
-  const body = await response.text();
+  const body = decodeHtmlDocument(
+    new Uint8Array(await response.arrayBuffer()),
+    response.headers.get("content-type"),
+  );
 
   return parseGovOnlinePage(body, sourceUrl);
 }
 
 function parseGovOnlinePage(body: string, sourceUrl: string): GovOnlinePage {
+  const document = parse(body);
+
   return {
-    entries: parseGovOnlineEntries(body, sourceUrl),
-    metadata: parseGovOnlineMetadata(body),
-    nextPageUrl: parseNextPageUrl(body, sourceUrl),
+    entries: parseGovOnlineEntries(document, sourceUrl),
+    metadata: parseGovOnlineMetadata(document),
+    nextPageUrl: parseNextPageUrl(document, sourceUrl),
   };
 }
 
 function parseGovOnlineMetadata(
-  body: string,
+  document: DefaultTreeAdapterTypes.Document,
 ): Pick<SourceMetadata, "description" | "title"> {
-  const pageTitle = normalizeWhitespace(
-    decodeHtmlEntities(firstMatch(body, /<title[^>]*>(.*?)<\/title>/isu)),
+  const titleNode = findFirstElementByTagName(document, "title");
+  const pageTitle = normalizeWhitespace(extractTextContent(titleNode));
+  const descriptionNode = findElementsByTagName(document, "meta").find(
+    (node) => {
+      const attributes = readNodeAttributes(node);
+
+      return attributes.name?.toLowerCase() === "description";
+    },
   );
   const description = normalizeWhitespace(
-    decodeHtmlEntities(
-      firstMatch(
-        body,
-        /<meta[^>]+name=["']description["'][^>]+content=["'](.*?)["'][^>]*>/isu,
-      ) ??
-        firstMatch(
-          body,
-          /<meta[^>]+content=["'](.*?)["'][^>]+name=["']description["'][^>]*>/isu,
-        ),
-    ),
+    descriptionNode === undefined
+      ? null
+      : (readNodeAttributes(descriptionNode).content ?? null),
   );
 
   return {
@@ -315,21 +326,25 @@ function parseGovOnlineMetadata(
 }
 
 function parseGovOnlineEntries(
-  body: string,
+  document: DefaultTreeAdapterTypes.Document,
   sourceUrl: string,
 ): GovOnlineEntry[] {
-  const itemPattern = /<li class=["']p-newsList__item["'][^>]*>(.*?)<\/li>/gis;
   const entries: GovOnlineEntry[] = [];
 
-  for (const match of body.matchAll(itemPattern)) {
-    const itemHtml = match[1] ?? "";
+  for (const itemNode of findElementsByClassName(
+    document,
+    "p-newsList__item",
+  )) {
+    if (itemNode.tagName !== "li") {
+      continue;
+    }
+
+    const linkNode = findFirstDescendant(
+      itemNode,
+      (node) => node.tagName === "a" && hasClassName(node, "p-newsList__link"),
+    );
     const href = normalizeWhitespace(
-      decodeHtmlEntities(
-        firstMatch(
-          itemHtml,
-          /<a class=["']p-newsList__link["'][^>]+href=["'](.*?)["']/isu,
-        ),
-      ),
+      linkNode === null ? null : (readNodeAttributes(linkNode).href ?? null),
     );
 
     if (href === null) {
@@ -343,40 +358,36 @@ function parseGovOnlineEntries(
     }
 
     const title = normalizeWhitespace(
-      decodeHtmlEntities(
-        stripTags(
-          firstMatch(
-            itemHtml,
-            /<span class=["']p-newsList__title["'][^>]*>(.*?)<\/span>/isu,
-          ) ?? "",
+      extractTextContent(
+        findFirstDescendant(
+          itemNode,
+          (node) =>
+            node.tagName === "span" && hasClassName(node, "p-newsList__title"),
         ),
       ),
     );
     const category = normalizeWhitespace(
-      decodeHtmlEntities(
-        stripTags(
-          firstMatch(
-            itemHtml,
-            /<span class=["']p-newsList__categoryLabel["'][^>]*>(.*?)<\/span>/isu,
-          ) ?? "",
+      extractTextContent(
+        findFirstDescendant(
+          itemNode,
+          (node) =>
+            node.tagName === "span" &&
+            hasClassName(node, "p-newsList__categoryLabel"),
         ),
       ),
+    );
+    const publishedAtNode = findFirstDescendant(
+      itemNode,
+      (node) =>
+        node.tagName === "time" && hasClassName(node, "p-newsList__date"),
     );
     const publishedAtValue = normalizeWhitespace(
-      firstMatch(
-        itemHtml,
-        /<time class=["']p-newsList__date["'][^>]+datetime=["'](.*?)["']/isu,
-      ),
+      publishedAtNode === null
+        ? null
+        : (readNodeAttributes(publishedAtNode).datetime ?? null),
     );
     const publishedAtText = normalizeWhitespace(
-      decodeHtmlEntities(
-        stripTags(
-          firstMatch(
-            itemHtml,
-            /<time class=["']p-newsList__date["'][^>]*>(.*?)<\/time>/isu,
-          ) ?? "",
-        ),
-      ),
+      extractTextContent(publishedAtNode),
     );
 
     entries.push({
@@ -391,14 +402,23 @@ function parseGovOnlineEntries(
   return entries;
 }
 
-function parseNextPageUrl(body: string, sourceUrl: string): string | null {
+function parseNextPageUrl(
+  document: DefaultTreeAdapterTypes.Document,
+  sourceUrl: string,
+): string | null {
+  const paginationNode = findFirstDescendant(
+    document,
+    (node) =>
+      node.tagName === "div" && hasClassName(node, "p-pagination__next"),
+  );
+  const nextPageLinkNode =
+    paginationNode === null
+      ? null
+      : findFirstDescendant(paginationNode, (node) => node.tagName === "a");
   const nextPageHref = normalizeWhitespace(
-    decodeHtmlEntities(
-      firstMatch(
-        body,
-        /<div class=["']p-pagination__next["'][^>]*>\s*<a href=["'](.*?)["']/isu,
-      ),
-    ),
+    nextPageLinkNode === null
+      ? null
+      : (readNodeAttributes(nextPageLinkNode).href ?? null),
   );
 
   if (nextPageHref === null) {
@@ -416,14 +436,12 @@ function toObservedContent(entry: GovOnlineEntry): ObservedContent {
         nextAction: {
           actionKind: "acquire",
         },
-        observedFingerprints: [
-          createFingerprint("observed-html-url", entry.url),
-        ],
+        observedFingerprints: createObservedAssetFingerprints(entry.url),
         primary: true,
         sourceUrl: entry.url,
       },
     ],
-    contentFingerprints: [createFingerprint("content-url", entry.url)],
+    contentFingerprints: createContentFingerprints(entry),
     externalId: entry.url,
     kind: "article",
     publishedAt: entry.publishedAt,
@@ -484,10 +502,6 @@ function safeResolveUrl(url: string, sourceUrl: string): string | null {
   }
 }
 
-function createFingerprint(prefix: string, value: string): string {
-  return `${prefix}:${value}`;
-}
-
 function joinNonEmptyParts(parts: Array<string | null>): string | null {
   const normalizedParts = parts.filter(
     (part): part is string => part !== null && part.length > 0,
@@ -497,36 +511,9 @@ function joinNonEmptyParts(parts: Array<string | null>): string | null {
 }
 
 function normalizeWhitespace(value: string | null | undefined): string | null {
-  const normalized = value
-    ?.replaceAll(/<br\s*\/?>/gi, " ")
-    .replaceAll(/\s+/g, " ")
-    .trim();
+  const normalized = (value ?? "").replaceAll(/\s+/g, " ").trim();
 
   return normalized ? normalized : null;
-}
-
-function firstMatch(body: string, pattern: RegExp): string | null {
-  const match = body.match(pattern);
-
-  return match?.[1] ?? null;
-}
-
-function stripTags(value: string): string {
-  return value.replaceAll(/<[^>]+>/g, "");
-}
-
-function decodeHtmlEntities(value: string | null): string | null {
-  if (value === null) {
-    return null;
-  }
-
-  return value
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&#39;", "'")
-    .replaceAll("&nbsp;", " ");
 }
 
 function normalizeContentType(
@@ -536,4 +523,252 @@ function normalizeContentType(
   const normalized = value?.split(";")[0]?.trim();
 
   return normalized && normalized.length > 0 ? normalized : defaultValue;
+}
+
+function decodeHtmlDocument(
+  body: Uint8Array,
+  contentType: string | null,
+): string {
+  const encoding = detectHtmlEncoding(body, contentType);
+
+  try {
+    return new TextDecoder(encoding).decode(body);
+  } catch {
+    return new TextDecoder(TEXT_DECODER_FALLBACK_ENCODING).decode(body);
+  }
+}
+
+function detectHtmlEncoding(
+  body: Uint8Array,
+  contentType: string | null,
+): string {
+  const headerCharset = extractCharsetFromContentType(contentType);
+
+  if (headerCharset !== null) {
+    return headerCharset;
+  }
+
+  const metaCharset = extractCharsetFromHtmlMeta(body);
+
+  if (metaCharset !== null) {
+    return metaCharset;
+  }
+
+  return TEXT_DECODER_FALLBACK_ENCODING;
+}
+
+function extractCharsetFromContentType(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const match = value.match(/charset\s*=\s*["']?([^;"'\s]+)/iu);
+
+  return normalizeEncodingLabel(match?.[1] ?? null);
+}
+
+function extractCharsetFromHtmlMeta(body: Uint8Array): string | null {
+  const scanBody = new TextDecoder("latin1").decode(
+    body.subarray(0, META_CHARSET_SCAN_LENGTH),
+  );
+  const document = parse(scanBody);
+
+  for (const metaNode of findElementsByTagName(document, "meta")) {
+    const attributes = readNodeAttributes(metaNode);
+    const charset = normalizeEncodingLabel(attributes.charset ?? null);
+
+    if (charset !== null) {
+      return charset;
+    }
+
+    if (attributes["http-equiv"]?.toLowerCase() !== "content-type") {
+      continue;
+    }
+
+    const contentCharset = extractCharsetFromContentType(
+      attributes.content ?? null,
+    );
+
+    if (contentCharset !== null) {
+      return contentCharset;
+    }
+  }
+
+  return null;
+}
+
+function normalizeEncodingLabel(value: string | null): string | null {
+  const normalized = value?.trim().toLowerCase();
+
+  return normalized && normalized.length > 0 ? normalized : null;
+}
+
+function createContentFingerprints(entry: GovOnlineEntry): string[] {
+  const legacyValue = createLegacyFingerprint("content-url", entry.url);
+
+  return [createVersionedFingerprint(legacyValue), legacyValue];
+}
+
+function createObservedAssetFingerprints(sourceUrl: string): string[] {
+  const legacyValue = createLegacyFingerprint("observed-html-url", sourceUrl);
+
+  return [createVersionedFingerprint(legacyValue), legacyValue];
+}
+
+function createAcquiredAssetFingerprints(
+  sourceUrl: string | null,
+  body: Uint8Array,
+): string[] {
+  const legacyValue = createLegacyFingerprint(
+    "acquired-html",
+    `${sourceUrl ?? ""}:${body.byteLength}`,
+  );
+
+  return [createVersionedFingerprint(legacyValue), legacyValue];
+}
+
+function createVersionedFingerprint(value: string): string {
+  return `${FINGERPRINT_VERSION}:${sha256Hex(value)}`;
+}
+
+function createLegacyFingerprint(prefix: string, value: string): string {
+  return `${prefix}:${value}`;
+}
+
+function sha256Hex(value: string): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function findElementsByTagName(
+  root: DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
+  tagName: string,
+): DefaultTreeAdapterTypes.Element[] {
+  const nodes: DefaultTreeAdapterTypes.Element[] = [];
+
+  visitNode(root, (node) => {
+    if (isElement(node) && node.tagName === tagName) {
+      nodes.push(node);
+    }
+  });
+
+  return nodes;
+}
+
+function findFirstElementByTagName(
+  root: DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
+  tagName: string,
+): DefaultTreeAdapterTypes.Element | null {
+  return findFirstDescendant(root, (node) => node.tagName === tagName);
+}
+
+function findElementsByClassName(
+  root: DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
+  className: string,
+): DefaultTreeAdapterTypes.Element[] {
+  const nodes: DefaultTreeAdapterTypes.Element[] = [];
+
+  visitNode(root, (node) => {
+    if (isElement(node) && hasClassName(node, className)) {
+      nodes.push(node);
+    }
+  });
+
+  return nodes;
+}
+
+function findFirstDescendant(
+  root:
+    | DefaultTreeAdapterTypes.ParentNode
+    | DefaultTreeAdapterTypes.ChildNode
+    | null,
+  predicate: (node: DefaultTreeAdapterTypes.Element) => boolean,
+): DefaultTreeAdapterTypes.Element | null {
+  if (root === null) {
+    return null;
+  }
+
+  if (isElement(root) && predicate(root)) {
+    return root;
+  }
+
+  for (const childNode of getChildNodes(root)) {
+    const match = findFirstDescendant(childNode, predicate);
+
+    if (match !== null) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function visitNode(
+  root: DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
+  visitor: (
+    node:
+      | DefaultTreeAdapterTypes.ParentNode
+      | DefaultTreeAdapterTypes.ChildNode,
+  ) => void,
+): void {
+  visitor(root);
+
+  for (const childNode of getChildNodes(root)) {
+    visitNode(childNode, visitor);
+  }
+}
+
+function readNodeAttributes(
+  node: DefaultTreeAdapterTypes.Element,
+): Record<string, string> {
+  return Object.fromEntries(
+    node.attrs.map((attribute) => [attribute.name, attribute.value]),
+  );
+}
+
+function hasClassName(
+  node: DefaultTreeAdapterTypes.Element,
+  className: string,
+): boolean {
+  const classes = readNodeAttributes(node).class;
+
+  return classes?.split(/\s+/).includes(className) ?? false;
+}
+
+function extractTextContent(
+  root:
+    | DefaultTreeAdapterTypes.ParentNode
+    | DefaultTreeAdapterTypes.ChildNode
+    | null,
+): string {
+  if (root === null) {
+    return "";
+  }
+
+  const segments: string[] = [];
+
+  visitNode(root, (node) => {
+    if (isTextNode(node)) {
+      segments.push(node.value);
+    }
+  });
+
+  return segments.join(" ");
+}
+
+function isElement(
+  node: DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
+): node is DefaultTreeAdapterTypes.Element {
+  return "tagName" in node;
+}
+
+function isTextNode(
+  node: DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
+): node is DefaultTreeAdapterTypes.TextNode {
+  return node.nodeName === "#text";
+}
+
+function getChildNodes(
+  node: DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
+): DefaultTreeAdapterTypes.ChildNode[] {
+  return "childNodes" in node ? node.childNodes : [];
 }

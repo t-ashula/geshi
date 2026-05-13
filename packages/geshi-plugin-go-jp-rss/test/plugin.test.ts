@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { plugin } from "../src/index.js";
 
+const KONNICHIWA_SHIFT_JIS = Uint8Array.from([
+  0x82, 0xb1, 0x82, 0xf1, 0x82, 0xc9, 0x82, 0xbf, 0x82, 0xcd,
+]);
+const VERSIONED_FINGERPRINT_PATTERN = /^\d{4}-\d{2}-\d{2}:[0-9a-f]{64}$/;
+
 function createNoopPluginLogger() {
   return {
     debug() {},
@@ -76,6 +81,41 @@ describe("goJpRss plugin", () => {
       description:
         "各府省ウェブサイトに公表された重要な政策や政府からのお知らせをとりまとめ、分かりやすく紹介しています。",
       title: "各府省の新着情報",
+      url: "https://www.gov-online.go.jp/info/index.html",
+    });
+  });
+
+  it("inspects shift_jis gov-online metadata using meta charset", async () => {
+    const body = joinBytes([
+      asciiBytes('<html><head><meta charset="Shift_JIS" /><title>'),
+      KONNICHIWA_SHIFT_JIS,
+      asciiBytes("</title></head></html>"),
+    ]);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(Buffer.from(body), {
+            headers: {
+              "content-type": "text/html",
+            },
+            status: 200,
+          }),
+        ),
+      ),
+    );
+
+    await expect(
+      plugin.inspect({
+        abortSignal: new AbortController().signal,
+        config: {},
+        context: createPluginContext(),
+        sourceUrl: "https://www.gov-online.go.jp/info/index.html",
+      }),
+    ).resolves.toEqual({
+      description: null,
+      title: "こんにちは",
       url: "https://www.gov-online.go.jp/info/index.html",
     });
   });
@@ -196,6 +236,14 @@ describe("goJpRss plugin", () => {
         sourceUrl: "https://example.go.jp/news/1",
       }),
     ]);
+    expect(observed.contents[0]?.contentFingerprints).toEqual([
+      expect.stringMatching(VERSIONED_FINGERPRINT_PATTERN),
+      "content-url:https://example.go.jp/news/1",
+    ]);
+    expect(observed.contents[0]?.assets[0]?.observedFingerprints).toEqual([
+      expect.stringMatching(VERSIONED_FINGERPRINT_PATTERN),
+      "observed-html-url:https://example.go.jp/news/1",
+    ]);
   });
 
   it("stops observing when entries are older than one week", async () => {
@@ -291,7 +339,7 @@ describe("goJpRss plugin", () => {
           actionKind: "acquire",
         },
         observedFingerprints: [
-          "observed-html-url:https://example.go.jp/news/1",
+          "2026-05-13:1111111111111111111111111111111111111111111111111111111111111111",
         ],
         primary: true,
         sourceUrl: "https://example.go.jp/news/1",
@@ -314,6 +362,68 @@ describe("goJpRss plugin", () => {
       throw new Error("Expected acquired asset body.");
     }
     expect(asset.body.byteLength).toBeGreaterThan(0);
+    expect(asset.acquiredFingerprints).toEqual([
+      expect.stringMatching(VERSIONED_FINGERPRINT_PATTERN),
+      "acquired-html:https://example.go.jp/news/1:31",
+    ]);
+  });
+
+  it("acquires shift_jis HTML assets as utf-8 using response charset", async () => {
+    const body = joinBytes([
+      asciiBytes("<html><body><p>"),
+      KONNICHIWA_SHIFT_JIS,
+      asciiBytes("</p></body></html>"),
+    ]);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(Buffer.from(body), {
+            headers: {
+              "content-type": "text/html; charset=Shift_JIS",
+            },
+            status: 200,
+          }),
+        ),
+      ),
+    );
+
+    const asset = await plugin.acquire({
+      abortSignal: new AbortController().signal,
+      asset: {
+        kind: "html",
+        nextAction: {
+          actionKind: "acquire",
+        },
+        observedFingerprints: [
+          "2026-05-13:2222222222222222222222222222222222222222222222222222222222222222",
+        ],
+        primary: true,
+        sourceUrl: "https://example.go.jp/news/shift-jis",
+      },
+      config: {},
+      content: {
+        externalId: "https://example.go.jp/news/shift-jis",
+        kind: "article",
+        publishedAt: null,
+        status: "discovered",
+        summary: null,
+        title: "shift-jis",
+      },
+      context: createPluginContext(),
+    });
+
+    if (asset.body === undefined) {
+      throw new Error("Expected acquired asset body.");
+    }
+
+    expect(new TextDecoder().decode(asset.body)).toContain("こんにちは");
+    expect(asset.contentType).toBe("text/html");
+    expect(asset.acquiredFingerprints).toEqual([
+      expect.stringMatching(VERSIONED_FINGERPRINT_PATTERN),
+      "acquired-html:https://example.go.jp/news/shift-jis:48",
+    ]);
   });
   it("extracts a sanitized html detail body", async () => {
     await expect(
@@ -347,3 +457,20 @@ describe("goJpRss plugin", () => {
     });
   });
 });
+
+function asciiBytes(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+function joinBytes(chunks: Uint8Array[]): Uint8Array {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return result;
+}
