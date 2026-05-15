@@ -1,10 +1,14 @@
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
 
+const DEFAULT_SCRIBE_REQUEST_TIMEOUT_MS = 30_000;
+
 export type ScribeTranscriptionStatus =
   | { status: "pending" | "working" }
   | { error: string | null; status: "error" }
   | { status: "done"; text: string | null };
+
+export class ScribeRequestTimeoutError extends Error {}
 
 export type ScribeClient = {
   getTranscription(
@@ -16,13 +20,26 @@ export type ScribeClient = {
   }): Promise<Result<{ requestId: string }, Error>>;
 };
 
-export function createScribeClient(baseUrl: string): ScribeClient {
+export function createScribeClient(
+  baseUrl: string,
+  options?: {
+    requestTimeoutMs?: number;
+  },
+): ScribeClient {
+  const requestTimeoutMs =
+    options?.requestTimeoutMs ?? DEFAULT_SCRIBE_REQUEST_TIMEOUT_MS;
+
   return {
     async getTranscription(
       requestId: string,
     ): Promise<Result<ScribeTranscriptionStatus, Error>> {
       try {
-        const response = await fetch(`${baseUrl}/transcribe/${requestId}`);
+        const response = await fetchWithTimeout(
+          `${baseUrl}/transcribe/${requestId}`,
+          {
+            timeoutMs: requestTimeoutMs,
+          },
+        );
 
         if (!response.ok) {
           return err(
@@ -79,9 +96,10 @@ export function createScribeClient(baseUrl: string): ScribeClient {
         formData.append("language", input.language);
         formData.append("model", "base");
 
-        const response = await fetch(`${baseUrl}/transcribe`, {
+        const response = await fetchWithTimeout(`${baseUrl}/transcribe`, {
           body: formData,
           method: "POST",
+          timeoutMs: requestTimeoutMs,
         });
 
         if (!response.ok) {
@@ -106,4 +124,36 @@ export function createScribeClient(baseUrl: string): ScribeClient {
       }
     },
   };
+}
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit & {
+    timeoutMs: number;
+  },
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, init.timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === "AbortError" || error.name === "TimeoutError")
+    ) {
+      throw new ScribeRequestTimeoutError(
+        `Scribe request timed out after ${init.timeoutMs}ms.`,
+      );
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

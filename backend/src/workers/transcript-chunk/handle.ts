@@ -1,6 +1,7 @@
 import type { JobRepository } from "../../db/job-repository.js";
 import type { TranscriptRepository } from "../../db/transcript-repository.js";
 import type { ScribeClient } from "../../integrations/scribe-client.js";
+import { ScribeRequestTimeoutError } from "../../integrations/scribe-client.js";
 import type { TranscriptChunkJobPayload } from "../../job-queue/types.js";
 import type { Result } from "../../lib/result.js";
 import { err, ok } from "../../lib/result.js";
@@ -79,7 +80,14 @@ export async function handleTranscriptChunkJob(
       });
 
     if (!requestTranscriptionResult.ok) {
-      return requestTranscriptionResult;
+      await handleScribeFailure(
+        payload,
+        requestTranscriptionResult.error,
+        dependencies.jobRepository,
+        dependencies.transcriptRepository,
+        dependencies.workStorage,
+      );
+      return ok(undefined);
     }
 
     scribeRequestId = requestTranscriptionResult.value.requestId;
@@ -100,7 +108,14 @@ export async function handleTranscriptChunkJob(
       await dependencies.scribeClient.getTranscription(scribeRequestId);
 
     if (!status.ok) {
-      return status;
+      await handleScribeFailure(
+        payload,
+        status.error,
+        dependencies.jobRepository,
+        dependencies.transcriptRepository,
+        dependencies.workStorage,
+      );
+      return ok(undefined);
     }
 
     if (
@@ -231,6 +246,29 @@ async function updateTranscriptAggregate(
   await transcriptRepository.markTranscriptSucceeded(transcriptId, body);
   await cleanupTranscriptChunkFiles(
     transcriptId,
+    transcriptRepository,
+    workStorage,
+  );
+}
+
+async function handleScribeFailure(
+  payload: TranscriptChunkJobPayload,
+  error: Error,
+  jobRepository: JobRepository,
+  transcriptRepository: TranscriptRepository,
+  workStorage: Storage,
+): Promise<void> {
+  const failureStatus =
+    error instanceof ScribeRequestTimeoutError ? "timed_out" : "failed";
+
+  await transcriptRepository.markTranscriptChunkFailed(
+    payload.transcriptChunkId,
+    error.message,
+    failureStatus,
+  );
+  await jobRepository.markFailed(payload.jobId, error.message, true);
+  await updateTranscriptAggregate(
+    payload.transcriptId,
     transcriptRepository,
     workStorage,
   );
