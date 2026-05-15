@@ -63,3 +63,4 @@
 - [ADR-0060: plugin 実行 capability は collector 固有 context ではなく host object として公開する](./0060-plugin-host-object.md)
 - [ADR-0061: web client は plugin context ではなく SDK 提供 API として扱う](./0061-web-client-sdk-api.md)
 - [ADR-0062: plugin 実行時の logger 追加コンテキストは呼び出された側が付与する](./0062-plugin-logger-context-ownership.md)
+- [ADR-0063: transcript chunk の外部 ASR 通信は timeout を持ち終状態へ収束させる](./0063-transcript-chunk-timeout-and-terminal-state.md)
