@@ -2,13 +2,22 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ok } from "../../src/lib/result.js";
 import { createNoopLogger } from "../../src/logger/index.js";
-import type { SourceCollectorExtractInput } from "../../src/plugins/types.js";
 import { createDetailBodyService } from "../../src/service/detail-body-service.js";
 
 describe("detail body service", () => {
   it("extracts and stores a detail body from a stored html asset", async () => {
     const extract = vi.fn<
-      (input: SourceCollectorExtractInput) => Promise<{
+      (
+        input: {
+          asset: {
+            body: Uint8Array;
+            kind: string;
+            mimeType: string | null;
+            sourceUrl: string | null;
+          };
+        },
+        context: { getHost(): { logger: unknown } },
+      ) => Promise<{
         body: string;
         format: "plain";
       }>
@@ -74,11 +83,6 @@ describe("detail body service", () => {
       detailBodyRepository as never,
       storage,
       {
-        getWebClient: vi.fn(() =>
-          Promise.resolve({
-            fetch: vi.fn(),
-          }),
-        ),
         logger: createNoopLogger(),
         sourceCollectorRegistry: sourceCollectorRegistry as never,
       },
@@ -99,7 +103,7 @@ describe("detail body service", () => {
     expect(extract).toHaveBeenCalledTimes(1);
     const firstCall = extract.mock.calls[0][0];
     expect(firstCall.asset.sourceUrl).toBe("https://example.com/episodes/1");
-    expect(firstCall.context.logger).toBeDefined();
+    expect(extract.mock.calls[0][1]?.getHost().logger).toBeDefined();
   });
 
   it("returns null when no stored html asset target exists", async () => {
@@ -112,11 +116,6 @@ describe("detail body service", () => {
       } as never,
       {} as never,
       {
-        getWebClient: vi.fn(() =>
-          Promise.resolve({
-            fetch: vi.fn(),
-          }),
-        ),
         logger: createNoopLogger(),
       },
     );
@@ -154,11 +153,6 @@ describe("detail body service", () => {
         ),
       } as never,
       {
-        getWebClient: vi.fn(() =>
-          Promise.resolve({
-            fetch: vi.fn(),
-          }),
-        ),
         logger: createNoopLogger(),
         sourceCollectorRegistry: {
           get: vi.fn(() => ({})),
@@ -201,11 +195,6 @@ describe("detail body service", () => {
         ),
       } as never,
       {
-        getWebClient: vi.fn(() =>
-          Promise.resolve({
-            fetch: vi.fn(),
-          }),
-        ),
         logger: createNoopLogger(),
         sourceCollectorRegistry: {
           get: vi.fn(() => {
@@ -251,11 +240,6 @@ describe("detail body service", () => {
         ),
       } as never,
       {
-        getWebClient: vi.fn(() =>
-          Promise.resolve({
-            fetch: vi.fn(),
-          }),
-        ),
         logger: createNoopLogger(),
         sourceCollectorRegistry: {
           get: vi.fn(() => ({

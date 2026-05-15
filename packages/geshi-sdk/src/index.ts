@@ -38,6 +38,15 @@ export interface PluginLogger {
   error(message: string, metadata?: PluginLogMetadata): void;
 }
 
+export type SourceCollectorHost = {
+  logger: PluginLogger;
+  putWorkObject?(input: {
+    body: Uint8Array;
+    overwrite: boolean;
+  }): Promise<{ byteSize: number; key: string }>;
+  replacePluginMetadata?(metadata: JsonObject): Promise<void>;
+};
+
 export type SourceCollectorSourceKind = "feed" | "podcast" | "streaming";
 
 export type SourceCollectorPluginCapability = {
@@ -120,13 +129,11 @@ export type SourceCollectorObserveInput = {
   abortSignal: AbortSignal;
   collectorPluginState?: JsonObject;
   config: Record<string, unknown>;
-  context: SourceCollectorExecutionContext;
   sourceUrl: string;
 };
 
 export type SourceCollectorSupportsInput = {
   config: Record<string, unknown>;
-  context: SourceCollectorExecutionContext;
   sourceUrl: string;
 };
 
@@ -153,18 +160,11 @@ export type SourceCollectorInspectError = {
 export type SourceCollectorInspectInput = {
   abortSignal: AbortSignal;
   config: Record<string, unknown>;
-  context: SourceCollectorExecutionContext;
   sourceUrl: string;
 };
 
 export type SourceCollectorExecutionContext = {
-  logger: PluginLogger;
-  getWebClient(input: GetWebClientInput): Promise<PluginWebClient>;
-  putWorkObject?(input: {
-    body: Uint8Array;
-    overwrite: boolean;
-  }): Promise<{ byteSize: number; key: string }>;
-  replacePluginMetadata?(metadata: JsonObject): Promise<void>;
+  getHost(): SourceCollectorHost;
 };
 
 export type GetWebClientInput = {
@@ -182,12 +182,10 @@ export type SourceCollectorAcquireInput = {
   collectorPluginState?: JsonObject;
   config: Record<string, unknown>;
   content: Omit<ObservedContent, "assets" | "contentFingerprints">;
-  context: SourceCollectorExecutionContext;
 };
 
 export type SourceCollectorExtractInput = {
   asset: ExtractorAsset;
-  context: SourceCollectorExecutionContext;
 };
 
 export type SourceCollectorRecordInput = {
@@ -197,7 +195,6 @@ export type SourceCollectorRecordInput = {
   collectorPluginState?: JsonObject;
   config: Record<string, unknown>;
   content: Omit<ObservedContent, "assets" | "contentFingerprints">;
-  context: SourceCollectorExecutionContext;
 };
 
 type AssetBodyPayload = {
@@ -233,24 +230,190 @@ export type RecordedAsset = {
 export interface SourceCollectorPlugin {
   supports(
     input: SourceCollectorSupportsInput,
+    context: SourceCollectorExecutionContext,
   ): Promise<SourceCollectorSupportsResult>;
   settingSchema():
     | SourceCollectorSettingSchemaField[]
     | Promise<SourceCollectorSettingSchemaField[]>;
-  inspect(input: SourceCollectorInspectInput): Promise<SourceMetadata>;
+  inspect(
+    input: SourceCollectorInspectInput,
+    context: SourceCollectorExecutionContext,
+  ): Promise<SourceMetadata>;
   observe(
     input: SourceCollectorObserveInput,
+    context: SourceCollectorExecutionContext,
   ): Promise<SourceCollectorObserveResult>;
   extract(
     input: SourceCollectorExtractInput,
+    context: SourceCollectorExecutionContext,
   ): Promise<ExtractedDetailBody | null>;
-  acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset>;
-  record?(input: SourceCollectorRecordInput): Promise<RecordedAsset>;
+  acquire(
+    input: SourceCollectorAcquireInput,
+    context: SourceCollectorExecutionContext,
+  ): Promise<AcquiredAsset>;
+  record?(
+    input: SourceCollectorRecordInput,
+    context: SourceCollectorExecutionContext,
+  ): Promise<RecordedAsset>;
 }
 
 export type SourceCollectorPluginDefinition = {
   manifest: PluginManifest;
   plugin: SourceCollectorPlugin;
+};
+
+async function getChromium() {
+  const playwrightModule = (await import("playwright")) as {
+    chromium: {
+      launch(input: { headless: boolean }): Promise<unknown>;
+    };
+  };
+
+  return playwrightModule.chromium;
+}
+
+async function fetchWithBrowser(request: Request): Promise<Response> {
+  const method = request.method.toUpperCase();
+
+  if (method !== "GET") {
+    throw new Error(`Browser webClient only supports GET requests: ${method}`);
+  }
+
+  if (request.signal.aborted) {
+    throw createAbortError();
+  }
+
+  const chromium = await getChromium();
+  const browser = await chromium.launch({
+    headless: true,
+  });
+  const headerEntries = [...request.headers.entries()];
+  const extraHTTPHeaders = Object.fromEntries(
+    headerEntries.filter(([name]) => name.toLowerCase() !== "user-agent"),
+  );
+  const userAgent = request.headers.get("user-agent") ?? undefined;
+  const browserContext = await (
+    browser as {
+      newContext(input: {
+        extraHTTPHeaders: Record<string, string>;
+        userAgent?: string;
+      }): Promise<{
+        close(): Promise<void>;
+        newPage(): Promise<{
+          content(): Promise<string>;
+          goto(
+            url: string,
+            input: { waitUntil: "load" },
+          ): Promise<{
+            headers(): Record<string, string>;
+            status(): number;
+            statusText(): string;
+          } | null>;
+          off(event: "response", listener: (...args: unknown[]) => void): void;
+          on(event: "response", listener: (...args: unknown[]) => void): void;
+          route(
+            pattern: string,
+            handler: (route: {
+              abort(): Promise<void>;
+              continue(): Promise<void>;
+              request(): {
+                resourceType(): string;
+              };
+            }) => Promise<void>,
+          ): Promise<void>;
+        }>;
+      }>;
+    }
+  ).newContext({
+    extraHTTPHeaders,
+    userAgent,
+  });
+  const page = await browserContext.newPage();
+  const abortHandler = () => {
+    void (browser as { close(): Promise<void> }).close().catch(() => {});
+  };
+
+  request.signal.addEventListener("abort", abortHandler, {
+    once: true,
+  });
+
+  try {
+    await page.route("**/*", async (route) => {
+      const resourceType = route.request().resourceType();
+
+      if (
+        resourceType === "font" ||
+        resourceType === "image" ||
+        resourceType === "media"
+      ) {
+        await route.abort();
+        return;
+      }
+
+      await route.continue();
+    });
+
+    const navigationResponse = await page.goto(request.url, {
+      waitUntil: "load",
+    });
+
+    if (request.signal.aborted) {
+      throw createAbortError();
+    }
+
+    const html = await page.content();
+    const headers = new Headers(navigationResponse?.headers() ?? {});
+
+    if (!headers.has("content-type")) {
+      headers.set("content-type", "text/html; charset=utf-8");
+    }
+
+    return new Response(html, {
+      headers,
+      status: navigationResponse?.status() ?? 200,
+      statusText: navigationResponse?.statusText() ?? "OK",
+    });
+  } finally {
+    request.signal.removeEventListener("abort", abortHandler);
+    if (
+      "close" in browserContext &&
+      typeof browserContext.close === "function"
+    ) {
+      await browserContext.close();
+    }
+    await (browser as { close(): Promise<void> }).close();
+  }
+}
+
+function createAbortError(): Error {
+  const error = new Error("The operation was aborted.");
+  error.name = "AbortError";
+
+  return error;
+}
+
+export const WebClient = {
+  create(input: GetWebClientInput): PluginWebClient {
+    if (input.kind === "browser") {
+      return {
+        fetch(request: Request): Promise<Response> {
+          return fetchWithBrowser(request);
+        },
+        async getBrowser(): Promise<unknown> {
+          const chromium = await getChromium();
+          return chromium.launch({
+            headless: true,
+          });
+        },
+      };
+    }
+
+    return {
+      fetch(request: Request): Promise<Response> {
+        return fetch(request);
+      },
+    };
+  },
 };
 
 export {

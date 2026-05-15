@@ -4,14 +4,12 @@ import { createNoopLogger } from "../../../../src/logger/index.js";
 import { rssPlugin } from "../../../../src/plugins/collector/rss/plugin.js";
 
 function createPluginContext() {
-  const logger = createNoopLogger();
-
   return {
-    logger,
-    getWebClient: (_input: { kind: "browser" | "fetch" }) =>
-      Promise.resolve({
-        fetch: (request: Request) => fetch(request),
-      }),
+    getHost() {
+      return {
+        logger: createNoopLogger(),
+      };
+    },
   };
 }
 
@@ -44,12 +42,14 @@ describe("rssPlugin.observe", () => {
       ),
     );
 
-    const result = await rssPlugin.observe({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://example.com/feed.xml",
-    });
+    const result = await rssPlugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
 
     expect(result.contents).toHaveLength(1);
     expect(result.contents[0]).toMatchObject({
@@ -111,12 +111,14 @@ describe("rssPlugin.observe", () => {
       ),
     );
 
-    const result = await rssPlugin.observe({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://example.com/feed.xml",
-    });
+    const result = await rssPlugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
 
     expect(result.contents).toHaveLength(2);
     expect(result.contents[0]).toMatchObject({
@@ -164,12 +166,14 @@ describe("rssPlugin.inspect", () => {
       ),
     );
 
-    const result = await rssPlugin.inspect({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://example.com/feed.xml",
-    });
+    const result = await rssPlugin.inspect(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
 
     expect(result).toMatchObject({
       description: "Weekly notes",
@@ -182,17 +186,19 @@ describe("rssPlugin.inspect", () => {
 describe("rssPlugin.extract", () => {
   it("extracts a sanitized html detail body", async () => {
     await expect(
-      rssPlugin.extract({
-        asset: {
-          body: new TextEncoder().encode(
-            `<html><body><article><h1>Entry 1</h1><p>Hello <strong>world</strong>.</p><script>alert("x")</script></article></body></html>`,
-          ),
-          kind: "html",
-          mimeType: "text/html",
-          sourceUrl: "https://example.com/posts/1",
+      rssPlugin.extract(
+        {
+          asset: {
+            body: new TextEncoder().encode(
+              `<html><body><article><h1>Entry 1</h1><p>Hello <strong>world</strong>.</p><script>alert("x")</script></article></body></html>`,
+            ),
+            kind: "html",
+            mimeType: "text/html",
+            sourceUrl: "https://example.com/posts/1",
+          },
         },
-        context: createPluginContext(),
-      }),
+        createPluginContext(),
+      ),
     ).resolves.toEqual({
       body: "<article><h1>Entry 1</h1><p>Hello <strong>world</strong>.</p></article>",
       format: "html",
@@ -216,28 +222,30 @@ describe("rssPlugin.acquire", () => {
       ),
     );
 
-    const asset = await rssPlugin.acquire({
-      abortSignal: new AbortController().signal,
-      asset: {
-        kind: "html",
-        nextAction: {
-          actionKind: "acquire",
+    const asset = await rssPlugin.acquire(
+      {
+        abortSignal: new AbortController().signal,
+        asset: {
+          kind: "html",
+          nextAction: {
+            actionKind: "acquire",
+          },
+          observedFingerprints: ["2026-04-28:html:https://example.com/posts/1"],
+          primary: true,
+          sourceUrl: "https://example.com/posts/1",
         },
-        observedFingerprints: ["2026-04-28:html:https://example.com/posts/1"],
-        primary: true,
-        sourceUrl: "https://example.com/posts/1",
+        config: {},
+        content: {
+          externalId: "entry-1",
+          kind: "feed-entry",
+          publishedAt: null,
+          status: "discovered",
+          summary: null,
+          title: "Entry 1",
+        },
       },
-      config: {},
-      content: {
-        externalId: "entry-1",
-        kind: "feed-entry",
-        publishedAt: null,
-        status: "discovered",
-        summary: null,
-        title: "Entry 1",
-      },
-      context: createPluginContext(),
-    });
+      createPluginContext(),
+    );
 
     expect(asset).toMatchObject({
       body: new Uint8Array([1, 2, 3]),

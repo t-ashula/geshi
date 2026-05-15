@@ -7,7 +7,6 @@ import { ok } from "../lib/result.js";
 import type { Logger } from "../logger/index.js";
 import type { SourceCollectorRegistry } from "../plugins/index.js";
 import { defaultSourceCollectorRegistry } from "../plugins/index.js";
-import type { GetWebClientInput, PluginWebClient } from "../plugins/types.js";
 import type { Storage } from "../storage/types.js";
 
 export interface DetailBodyService {
@@ -17,10 +16,6 @@ export interface DetailBodyService {
 }
 
 export type CreateDetailBodyServiceDependencies = {
-  getWebClient: (
-    input: GetWebClientInput,
-    logger: Logger,
-  ) => Promise<PluginWebClient>;
   logger: Logger;
   sourceCollectorRegistry?: SourceCollectorRegistry;
 };
@@ -30,7 +25,6 @@ export function createDetailBodyService(
   storage: Storage,
   dependencies: CreateDetailBodyServiceDependencies,
 ): DetailBodyService {
-  const getWebClient = dependencies.getWebClient;
   const logger = dependencies.logger;
   const sourceCollectorRegistry =
     dependencies.sourceCollectorRegistry ?? defaultSourceCollectorRegistry;
@@ -151,18 +145,23 @@ export function createDetailBodyService(
       let extracted;
 
       try {
-        extracted = await plugin.extract({
-          asset: {
-            body: storedHtml.value,
-            kind: target.value.assetKind,
-            mimeType: target.value.mimeType,
-            sourceUrl: target.value.sourceUrl,
+        extracted = await plugin.extract(
+          {
+            asset: {
+              body: storedHtml.value,
+              kind: target.value.assetKind,
+              mimeType: target.value.mimeType,
+              sourceUrl: target.value.sourceUrl,
+            },
           },
-          context: {
-            logger: pluginLogger,
-            getWebClient: (input) => getWebClient(input, pluginLogger),
+          {
+            getHost() {
+              return {
+                logger: pluginLogger,
+              };
+            },
           },
-        });
+        );
       } catch (error) {
         logger.warn("detail body extraction failed.", {
           contentId: target.value.contentId,

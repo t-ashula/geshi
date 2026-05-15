@@ -14,6 +14,7 @@ import type {
   SourceCollectorPluginDefinition,
   SourceMetadata,
 } from "../../types.js";
+import { WebClient } from "../../types.js";
 import type {
   AcquiredAssetFingerprintInput,
   AcquiredAssetFingerprintSpec,
@@ -84,10 +85,8 @@ export const plugin: SourceCollectorPlugin = {
     return [];
   },
 
-  async inspect(input: SourceCollectorInspectInput) {
-    const webClient = await input.context.getWebClient({
-      kind: "fetch",
-    });
+  async inspect(input: SourceCollectorInspectInput, _context) {
+    const webClient = WebClient.create({ kind: "fetch" });
     let response: Response;
 
     try {
@@ -129,10 +128,9 @@ export const plugin: SourceCollectorPlugin = {
 
   async observe(
     input: SourceCollectorObserveInput,
+    _context,
   ): Promise<{ contents: ObservedContent[] }> {
-    const webClient = await input.context.getWebClient({
-      kind: "fetch",
-    });
+    const webClient = WebClient.create({ kind: "fetch" });
     const response = await webClient.fetch(
       new Request(input.sourceUrl, {
         signal: input.abortSignal,
@@ -159,6 +157,7 @@ export const plugin: SourceCollectorPlugin = {
 
   extract(
     input: SourceCollectorExtractInput,
+    _context,
   ): Promise<ExtractedDetailBody | null> {
     if (input.asset.kind !== "html") {
       return Promise.resolve(null);
@@ -169,14 +168,15 @@ export const plugin: SourceCollectorPlugin = {
     return Promise.resolve(extractHtmlDetailBody(html, input.asset.sourceUrl));
   },
 
-  async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
+  async acquire(
+    input: SourceCollectorAcquireInput,
+    _context,
+  ): Promise<AcquiredAsset> {
     if (input.asset.sourceUrl === null) {
       throw new Error("RSS asset sourceUrl is required.");
     }
 
-    const webClient = await input.context.getWebClient({
-      kind: "fetch",
-    });
+    const webClient = WebClient.create({ kind: "fetch" });
     const response = await webClient.fetch(
       new Request(input.asset.sourceUrl, {
         signal: input.abortSignal,

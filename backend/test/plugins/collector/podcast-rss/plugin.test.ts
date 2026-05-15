@@ -6,14 +6,12 @@ import { createNoopLogger } from "../../../../src/logger/index.js";
 import { podcastRssPlugin } from "../../../../src/plugins/collector/podcast-rss/plugin.js";
 
 function createPluginContext() {
-  const logger = createNoopLogger();
-
   return {
-    logger,
-    getWebClient: (_input: { kind: "browser" | "fetch" }) =>
-      Promise.resolve({
-        fetch: (request: Request) => fetch(request),
-      }),
+    getHost() {
+      return {
+        logger: createNoopLogger(),
+      };
+    },
   };
 }
 
@@ -28,12 +26,14 @@ async function observeFixture(name: string) {
     vi.fn(() => Promise.resolve(new Response(fixture, { status: 200 }))),
   );
 
-  const result = await podcastRssPlugin.observe({
-    abortSignal: new AbortController().signal,
-    config: {},
-    context: createPluginContext(),
-    sourceUrl: "https://example.com/feed.xml",
-  });
+  const result = await podcastRssPlugin.observe(
+    {
+      abortSignal: new AbortController().signal,
+      config: {},
+      sourceUrl: "https://example.com/feed.xml",
+    },
+    createPluginContext(),
+  );
 
   return result.contents;
 }
@@ -138,12 +138,14 @@ describe("podcastRssPlugin.observe", () => {
       ),
     );
 
-    const result = await podcastRssPlugin.observe({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://example.com/feed.xml",
-    });
+    const result = await podcastRssPlugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
     const contents = result.contents;
 
     expect(contents).toHaveLength(1);
@@ -208,12 +210,14 @@ describe("podcastRssPlugin.observe", () => {
       ),
     );
 
-    const result = await podcastRssPlugin.observe({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://example.com/feed.xml",
-    });
+    const result = await podcastRssPlugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
     const contents = result.contents;
 
     expect(contents).toHaveLength(2);
@@ -268,12 +272,14 @@ describe("podcastRssPlugin.observe", () => {
       ),
     );
 
-    const result = await podcastRssPlugin.observe({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://example.com/feed.xml",
-    });
+    const result = await podcastRssPlugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
     const contents = result.contents;
 
     expect(contents).toHaveLength(1);
@@ -289,12 +295,14 @@ describe("podcastRssPlugin.observe", () => {
     );
 
     await expect(
-      podcastRssPlugin.observe({
-        abortSignal: new AbortController().signal,
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "https://example.com/feed.xml",
-      }),
+      podcastRssPlugin.observe(
+        {
+          abortSignal: new AbortController().signal,
+          config: {},
+          sourceUrl: "https://example.com/feed.xml",
+        },
+        createPluginContext(),
+      ),
     ).rejects.toThrow("Failed to fetch RSS feed: 502");
   });
 });
@@ -319,12 +327,14 @@ describe("podcastRssPlugin.inspect", () => {
       ),
     );
 
-    const result = await podcastRssPlugin.inspect({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://example.com/feed.xml",
-    });
+    const result = await podcastRssPlugin.inspect(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
 
     expect(result).toMatchObject({
       description: "Weekly notes",
@@ -342,12 +352,14 @@ describe("podcastRssPlugin.inspect", () => {
     );
 
     await expect(
-      podcastRssPlugin.inspect({
-        abortSignal: new AbortController().signal,
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "https://example.com/feed.xml",
-      }),
+      podcastRssPlugin.inspect(
+        {
+          abortSignal: new AbortController().signal,
+          config: {},
+          sourceUrl: "https://example.com/feed.xml",
+        },
+        createPluginContext(),
+      ),
     ).rejects.toMatchObject({
       code: "source_inspect_unrecognized",
       message: "The given URL is not a supported RSS feed.",
@@ -358,17 +370,19 @@ describe("podcastRssPlugin.inspect", () => {
 describe("podcastRssPlugin.extract", () => {
   it("extracts a sanitized html detail body", async () => {
     await expect(
-      podcastRssPlugin.extract({
-        asset: {
-          body: new TextEncoder().encode(
-            `<html><body><article><h1>Episode 1</h1><p>Hello <strong>world</strong>.</p><script>alert("x")</script><p><a href="https://example.com/show-notes">Show notes</a></p></article></body></html>`,
-          ),
-          kind: "html",
-          mimeType: "text/html",
-          sourceUrl: "https://example.com/episodes/1",
+      podcastRssPlugin.extract(
+        {
+          asset: {
+            body: new TextEncoder().encode(
+              `<html><body><article><h1>Episode 1</h1><p>Hello <strong>world</strong>.</p><script>alert("x")</script><p><a href="https://example.com/show-notes">Show notes</a></p></article></body></html>`,
+            ),
+            kind: "html",
+            mimeType: "text/html",
+            sourceUrl: "https://example.com/episodes/1",
+          },
         },
-        context: createPluginContext(),
-      }),
+        createPluginContext(),
+      ),
     ).resolves.toEqual({
       body: '<article><h1>Episode 1</h1><p>Hello <strong>world</strong>.</p><p><a href="https://example.com/show-notes">Show notes</a></p></article>',
       format: "html",
@@ -392,80 +406,8 @@ describe("podcastRssPlugin.acquire", () => {
       ),
     );
 
-    const asset = await podcastRssPlugin.acquire({
-      abortSignal: new AbortController().signal,
-      asset: {
-        kind: "audio",
-        nextAction: {
-          actionKind: "acquire",
-        },
-        observedFingerprints: [
-          "2026-04-28:audio:https://cdn.example.com/1.mp3",
-        ],
-        primary: false,
-        sourceUrl: "https://cdn.example.com/1.mp3",
-      },
-      config: {},
-      content: {
-        externalId: "ep-1",
-        kind: "podcast-episode",
-        publishedAt: null,
-        status: "discovered",
-        summary: null,
-        title: "Episode 1",
-      },
-      context: createPluginContext(),
-    });
-
-    expect(asset).toMatchObject({
-      body: new Uint8Array([1, 2, 3]),
-      contentType: "audio/mpeg",
-      kind: "audio",
-      primary: false,
-      sourceUrl: "https://cdn.example.com/1.mp3",
-    });
-    expect(
-      asset.acquiredFingerprints.every((fingerprint) =>
-        /^2026-04-28:[0-9a-f]{64}$/.test(fingerprint),
-      ),
-    ).toBe(true);
-  });
-
-  it("fails when asset sourceUrl is missing", async () => {
-    await expect(
-      podcastRssPlugin.acquire({
-        abortSignal: new AbortController().signal,
-        asset: {
-          kind: "audio",
-          nextAction: {
-            actionKind: "acquire",
-          },
-          observedFingerprints: ["2026-04-28:audio:null"],
-          primary: false,
-          sourceUrl: null,
-        },
-        config: {},
-        content: {
-          externalId: "ep-1",
-          kind: "podcast-episode",
-          publishedAt: null,
-          status: "discovered",
-          summary: null,
-          title: "Episode 1",
-        },
-        context: createPluginContext(),
-      }),
-    ).rejects.toThrow("Podcast RSS asset sourceUrl is required.");
-  });
-
-  it("fails when asset fetch returns a non-success status", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => Promise.resolve(new Response("not found", { status: 404 }))),
-    );
-
-    await expect(
-      podcastRssPlugin.acquire({
+    const asset = await podcastRssPlugin.acquire(
+      {
         abortSignal: new AbortController().signal,
         asset: {
           kind: "audio",
@@ -487,8 +429,86 @@ describe("podcastRssPlugin.acquire", () => {
           summary: null,
           title: "Episode 1",
         },
-        context: createPluginContext(),
-      }),
+      },
+      createPluginContext(),
+    );
+
+    expect(asset).toMatchObject({
+      body: new Uint8Array([1, 2, 3]),
+      contentType: "audio/mpeg",
+      kind: "audio",
+      primary: false,
+      sourceUrl: "https://cdn.example.com/1.mp3",
+    });
+    expect(
+      asset.acquiredFingerprints.every((fingerprint) =>
+        /^2026-04-28:[0-9a-f]{64}$/.test(fingerprint),
+      ),
+    ).toBe(true);
+  });
+
+  it("fails when asset sourceUrl is missing", async () => {
+    await expect(
+      podcastRssPlugin.acquire(
+        {
+          abortSignal: new AbortController().signal,
+          asset: {
+            kind: "audio",
+            nextAction: {
+              actionKind: "acquire",
+            },
+            observedFingerprints: ["2026-04-28:audio:null"],
+            primary: false,
+            sourceUrl: null,
+          },
+          config: {},
+          content: {
+            externalId: "ep-1",
+            kind: "podcast-episode",
+            publishedAt: null,
+            status: "discovered",
+            summary: null,
+            title: "Episode 1",
+          },
+        },
+        createPluginContext(),
+      ),
+    ).rejects.toThrow("Podcast RSS asset sourceUrl is required.");
+  });
+
+  it("fails when asset fetch returns a non-success status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => Promise.resolve(new Response("not found", { status: 404 }))),
+    );
+
+    await expect(
+      podcastRssPlugin.acquire(
+        {
+          abortSignal: new AbortController().signal,
+          asset: {
+            kind: "audio",
+            nextAction: {
+              actionKind: "acquire",
+            },
+            observedFingerprints: [
+              "2026-04-28:audio:https://cdn.example.com/1.mp3",
+            ],
+            primary: false,
+            sourceUrl: "https://cdn.example.com/1.mp3",
+          },
+          config: {},
+          content: {
+            externalId: "ep-1",
+            kind: "podcast-episode",
+            publishedAt: null,
+            status: "discovered",
+            summary: null,
+            title: "Episode 1",
+          },
+        },
+        createPluginContext(),
+      ),
     ).rejects.toThrow("Failed to fetch asset: 404");
   });
 });

@@ -35,3 +35,4 @@ export type {
   SourceCollectorSourceKind,
   SourceMetadata,
 } from "@geshi/sdk";
+export { WebClient } from "@geshi/sdk";

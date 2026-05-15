@@ -23,30 +23,34 @@ function createNoopPluginLogger() {
 
 function createPluginContext() {
   return {
-    logger: createNoopPluginLogger(),
-    getWebClient: (_input: { kind: "browser" | "fetch" }) =>
-      Promise.resolve({
-        fetch: (request: Request) => fetch(request),
-      }),
+    getHost() {
+      return {
+        logger: createNoopPluginLogger(),
+      };
+    },
   };
 }
 
 describe("sampleStreaming plugin", () => {
   it("supports localhost stream URLs only", async () => {
     await expect(
-      plugin.supports({
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "http://localhost:3401/sources/streams/live-1",
-      }),
+      plugin.supports(
+        {
+          config: {},
+          sourceUrl: "http://localhost:3401/sources/streams/live-1",
+        },
+        createPluginContext(),
+      ),
     ).resolves.toEqual({ supported: true });
 
     await expect(
-      plugin.supports({
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "http://127.0.0.1:3401/sources/streams/live-1",
-      }),
+      plugin.supports(
+        {
+          config: {},
+          sourceUrl: "http://127.0.0.1:3401/sources/streams/live-1",
+        },
+        createPluginContext(),
+      ),
     ).resolves.toEqual({ supported: false });
   });
 
@@ -74,12 +78,14 @@ describe("sampleStreaming plugin", () => {
       ),
     );
 
-    const result = await plugin.observe({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "http://localhost:3401/sources/streams/live-1",
-    });
+    const result = await plugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "http://localhost:3401/sources/streams/live-1",
+      },
+      createPluginContext(),
+    );
 
     expect(result.contents).toHaveLength(1);
     expect(result.contents[0]?.assets[0]?.nextAction).toEqual({
@@ -98,37 +104,43 @@ describe("sampleStreaming plugin", () => {
     );
     const replacePluginMetadata = vi.fn(() => Promise.resolve());
 
-    const result = await plugin.record?.({
-      abortSignal: new AbortController().signal,
-      arguments: {
-        playlistUrl: "http://localhost:3401/streams/live-1.m3u8",
-      },
-      asset: {
-        kind: "audio",
-        nextAction: {
-          actionKind: "record",
-          arguments: {
-            playlistUrl: "http://localhost:3401/streams/live-1.m3u8",
-          },
+    const result = await plugin.record?.(
+      {
+        abortSignal: new AbortController().signal,
+        arguments: {
+          playlistUrl: "http://localhost:3401/streams/live-1.m3u8",
         },
-        observedFingerprints: ["sample-stream-observed:a"],
-        primary: true,
-        sourceUrl: "http://localhost:3401/streams/live-1.m3u8",
+        asset: {
+          kind: "audio",
+          nextAction: {
+            actionKind: "record",
+            arguments: {
+              playlistUrl: "http://localhost:3401/streams/live-1.m3u8",
+            },
+          },
+          observedFingerprints: ["sample-stream-observed:a"],
+          primary: true,
+          sourceUrl: "http://localhost:3401/streams/live-1.m3u8",
+        },
+        config: {},
+        content: {
+          externalId: "live-1",
+          kind: "stream-recording",
+          publishedAt: null,
+          status: "discovered",
+          summary: null,
+          title: "Live 1",
+        },
       },
-      config: {},
-      content: {
-        externalId: "live-1",
-        kind: "stream-recording",
-        publishedAt: null,
-        status: "discovered",
-        summary: null,
-        title: "Live 1",
+      {
+        getHost() {
+          return {
+            logger: createNoopPluginLogger(),
+            replacePluginMetadata,
+          };
+        },
       },
-      context: {
-        ...createPluginContext(),
-        replacePluginMetadata,
-      },
-    });
+    );
 
     expect(result?.contentType).toBe("audio/mpeg");
     expect(result?.body).toEqual(new Uint8Array([1, 2, 3]));

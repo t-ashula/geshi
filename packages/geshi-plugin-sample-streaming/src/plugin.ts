@@ -15,6 +15,7 @@ import type {
   SourceCollectorRecordInput,
   SourceCollectorSupportsInput,
 } from "@geshi/sdk";
+import { WebClient } from "@geshi/sdk";
 
 import { manifest } from "./manifest.js";
 
@@ -51,9 +52,8 @@ export const plugin: SourceCollectorPlugin = {
     return [];
   },
 
-  async inspect(input: SourceCollectorInspectInput) {
+  async inspect(input: SourceCollectorInspectInput, _context) {
     const descriptor = await fetchStreamDescriptor(
-      input.context,
       input.sourceUrl,
       input.abortSignal,
     );
@@ -67,9 +67,9 @@ export const plugin: SourceCollectorPlugin = {
 
   async observe(
     input: SourceCollectorObserveInput,
+    _context,
   ): Promise<SourceCollectorObserveResult> {
     const descriptor = await fetchStreamDescriptor(
-      input.context,
       input.sourceUrl,
       input.abortSignal,
     );
@@ -118,7 +118,10 @@ export const plugin: SourceCollectorPlugin = {
     };
   },
 
-  acquire(_input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
+  acquire(
+    _input: SourceCollectorAcquireInput,
+    _context,
+  ): Promise<AcquiredAsset> {
     return Promise.reject(
       new Error(
         "sample-streaming assets must be handled by record(), not acquire().",
@@ -128,11 +131,16 @@ export const plugin: SourceCollectorPlugin = {
 
   extract(
     _input: SourceCollectorExtractInput,
+    _context,
   ): Promise<ExtractedDetailBody | null> {
     return Promise.resolve(null);
   },
 
-  async record(input: SourceCollectorRecordInput): Promise<RecordedAsset> {
+  async record(
+    input: SourceCollectorRecordInput,
+    context,
+  ): Promise<RecordedAsset> {
+    const host = context.getHost();
     const playlistUrl =
       typeof input.arguments.playlistUrl === "string"
         ? input.arguments.playlistUrl
@@ -144,7 +152,7 @@ export const plugin: SourceCollectorPlugin = {
       );
     }
 
-    await input.context.replacePluginMetadata?.({
+    await host.replacePluginMetadata?.({
       progress: {
         phase: "recording",
         playlistUrl,
@@ -153,7 +161,7 @@ export const plugin: SourceCollectorPlugin = {
 
     const body = await transcodePlaylistToMp3(playlistUrl, input.abortSignal);
 
-    await input.context.replacePluginMetadata?.({
+    await host.replacePluginMetadata?.({
       progress: {
         byteLength: body.byteLength,
         phase: "completed",
@@ -183,7 +191,6 @@ export const definition: SourceCollectorPluginDefinition = {
 };
 
 async function fetchStreamDescriptor(
-  context: SourceCollectorInspectInput["context"],
   sourceUrl: string,
   abortSignal: AbortSignal,
 ): Promise<StreamDescriptor> {
@@ -192,9 +199,7 @@ async function fetchStreamDescriptor(
   let response: Response;
 
   try {
-    const webClient = await context.getWebClient({
-      kind: "fetch",
-    });
+    const webClient = WebClient.create({ kind: "fetch" });
     response = await webClient.fetch(
       new Request(sourceUrl, {
         signal: abortSignal,

@@ -1,4 +1,8 @@
-import type { RecordedAsset, SourceCollectorRecordInput } from "@geshi/sdk";
+import type {
+  RecordedAsset,
+  SourceCollectorExecutionContext,
+  SourceCollectorRecordInput,
+} from "@geshi/sdk";
 import { describe, expect, it, vi } from "vitest";
 
 import { ok } from "../../src/lib/result.js";
@@ -91,8 +95,9 @@ describe("record-content metadata updates", () => {
             record: vi.fn(
               async (
                 input: SourceCollectorRecordInput,
+                context: SourceCollectorExecutionContext,
               ): Promise<RecordedAsset> => {
-                await input.context.replacePluginMetadata?.({
+                await context.getHost().replacePluginMetadata?.({
                   progress: {
                     phase: "fetching",
                   },

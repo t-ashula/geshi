@@ -1,10 +1,21 @@
+import type {
+  SourceCollectorExecutionContext,
+  SourceCollectorInspectInput,
+  SourceMetadata,
+} from "@geshi/sdk";
 import { describe, expect, it, vi } from "vitest";
 
 import { createNoopLogger } from "../../src/logger/index.js";
 import { createSourceInspectService } from "../../src/service/source-inspect-service.js";
 import { assertErr, assertOk } from "../support/result.js";
 
-const inspectMock = vi.fn();
+const inspectMock =
+  vi.fn<
+    (
+      input: SourceCollectorInspectInput,
+      context: SourceCollectorExecutionContext,
+    ) => Promise<SourceMetadata>
+  >();
 const createRegistryPlugin = () => ({
   acquire: vi.fn(),
   extract: vi.fn(() => Promise.resolve(null)),
@@ -65,7 +76,9 @@ describe("source inspect service", () => {
         config: {},
         sourceUrl: "https://example.com/feed.xml",
       }),
+      expect.anything(),
     );
+    expect(inspectMock.mock.calls[0]?.[1].getHost().logger).toBeDefined();
     assertOk(result);
     expect(result.value).toMatchObject({
       description: "Weekly notes",

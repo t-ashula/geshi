@@ -9,7 +9,6 @@ import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import type { JsonObject, RecordedAsset } from "../../plugins/types.js";
-import { getWebClient } from "../../plugins/web-client.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
 import type { Storage } from "../../storage/types.js";
@@ -93,63 +92,65 @@ export async function handleRecordContentJob(
     const pluginLogger = logger.child({
       operation: "record",
     });
-    recordedAsset = await plugin.record({
-      abortSignal: new AbortController().signal,
-      arguments: argumentsObject,
-      asset: {
-        kind: payload.asset.kind,
-        nextAction: {
-          actionKind: "record",
-          arguments: argumentsObject,
+    recordedAsset = await plugin.record(
+      {
+        abortSignal: new AbortController().signal,
+        arguments: argumentsObject,
+        asset: {
+          kind: payload.asset.kind,
+          nextAction: {
+            actionKind: "record",
+            arguments: argumentsObject,
+          },
+          observedFingerprints: [payload.asset.observedFingerprint],
+          primary: payload.asset.primary,
+          sourceUrl: payload.asset.sourceUrl,
         },
-        observedFingerprints: [payload.asset.observedFingerprint],
-        primary: payload.asset.primary,
-        sourceUrl: payload.asset.sourceUrl,
+        collectorPluginState: collectorPluginStateResult.value,
+        config: payload.collector.config,
+        content: payload.content,
       },
-      collectorPluginState: collectorPluginStateResult.value,
-      config: payload.collector.config,
-      content: payload.content,
-      context: {
-        getWebClient(input) {
-          return getWebClient(input, pluginLogger);
-        },
-        logger: pluginLogger,
-        putWorkObject: async (input) => {
-          const storedWorkFile = await dependencies.workStorage.put({
-            body: input.body,
-            contentType: null,
-            key: createWorkStorageKey(dependencies.workStorage, payload),
-            overwrite: input.overwrite,
-          });
+      {
+        getHost() {
+          return {
+            logger: pluginLogger,
+            putWorkObject: async (input) => {
+              const storedWorkFile = await dependencies.workStorage.put({
+                body: input.body,
+                contentType: null,
+                key: createWorkStorageKey(dependencies.workStorage, payload),
+                overwrite: input.overwrite,
+              });
 
-          if (!storedWorkFile.ok) {
-            throw storedWorkFile.error;
-          }
+              if (!storedWorkFile.ok) {
+                throw storedWorkFile.error;
+              }
 
-          return storedWorkFile.value;
-        },
-        replacePluginMetadata: async (pluginMetadata) => {
-          const currentMetadata = await dependencies.jobRepository.getMetadata(
-            payload.jobId,
-          );
-
-          if (!currentMetadata.ok) {
-            throw currentMetadata.error;
-          }
-
-          const metadata = currentMetadata.value;
-          const currentArguments = readPluginArguments(metadata);
-          await dependencies.jobRepository.replaceMetadata(payload.jobId, {
-            ...metadata,
-            plugin: {
-              ...readPluginMetadata(metadata),
-              ...pluginMetadata,
-              arguments: currentArguments,
+              return storedWorkFile.value;
             },
-          });
+            replacePluginMetadata: async (pluginMetadata) => {
+              const currentMetadata =
+                await dependencies.jobRepository.getMetadata(payload.jobId);
+
+              if (!currentMetadata.ok) {
+                throw currentMetadata.error;
+              }
+
+              const metadata = currentMetadata.value;
+              const currentArguments = readPluginArguments(metadata);
+              await dependencies.jobRepository.replaceMetadata(payload.jobId, {
+                ...metadata,
+                plugin: {
+                  ...readPluginMetadata(metadata),
+                  ...pluginMetadata,
+                  arguments: currentArguments,
+                },
+              });
+            },
+          };
         },
       },
-    });
+    );
   } catch (error) {
     await failRecordContentJob(payload, dependencies, logger, error);
     return err(

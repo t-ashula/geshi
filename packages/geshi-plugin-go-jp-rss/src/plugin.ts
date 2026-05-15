@@ -16,6 +16,7 @@ import type {
   SourceCollectorSupportsInput,
   SourceMetadata,
 } from "@geshi/sdk";
+import { WebClient } from "@geshi/sdk";
 import type { DefaultTreeAdapterTypes } from "parse5";
 import { parse } from "parse5";
 
@@ -70,14 +71,10 @@ export const plugin: SourceCollectorPlugin = {
     return [];
   },
 
-  async inspect(input: SourceCollectorInspectInput) {
+  async inspect(input: SourceCollectorInspectInput, _context) {
     assertSupportedSourceUrl(input.sourceUrl);
 
-    const page = await fetchGovOnlinePage(
-      input.context,
-      input.sourceUrl,
-      input.abortSignal,
-    );
+    const page = await fetchGovOnlinePage(input.sourceUrl, input.abortSignal);
 
     if (page.metadata.title === null && page.metadata.description === null) {
       throw new SourceCollectorInspectPluginError(
@@ -95,6 +92,7 @@ export const plugin: SourceCollectorPlugin = {
 
   async observe(
     input: SourceCollectorObserveInput,
+    _context,
   ): Promise<SourceCollectorObserveResult> {
     assertSupportedSourceUrl(input.sourceUrl);
 
@@ -106,11 +104,7 @@ export const plugin: SourceCollectorPlugin = {
     let currentUrl = input.sourceUrl;
 
     while (observedContents.length < MAX_ITEMS) {
-      const page = await fetchGovOnlinePage(
-        input.context,
-        currentUrl,
-        input.abortSignal,
-      );
+      const page = await fetchGovOnlinePage(currentUrl, input.abortSignal);
 
       if (page.entries.length === 0) {
         break;
@@ -170,6 +164,7 @@ export const plugin: SourceCollectorPlugin = {
 
   extract(
     input: SourceCollectorExtractInput,
+    _context,
   ): Promise<ExtractedDetailBody | null> {
     if (input.asset.kind !== "html") {
       return Promise.resolve(null);
@@ -180,14 +175,15 @@ export const plugin: SourceCollectorPlugin = {
     return Promise.resolve(extractHtmlDetailBody(html, input.asset.sourceUrl));
   },
 
-  async acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
+  async acquire(
+    input: SourceCollectorAcquireInput,
+    _context,
+  ): Promise<AcquiredAsset> {
     if (input.asset.sourceUrl === null) {
       throw new Error("go-jp-rss asset sourceUrl is required.");
     }
 
-    const webClient = await input.context.getWebClient({
-      kind: "fetch",
-    });
+    const webClient = WebClient.create({ kind: "fetch" });
     const response = await webClient.fetch(
       new Request(input.asset.sourceUrl, {
         headers: {
@@ -208,7 +204,10 @@ export const plugin: SourceCollectorPlugin = {
     );
 
     return {
-      acquiredFingerprints: createAcquiredAssetFingerprints(input.asset.sourceUrl, body),
+      acquiredFingerprints: createAcquiredAssetFingerprints(
+        input.asset.sourceUrl,
+        body,
+      ),
       body,
       contentType,
       kind: input.asset.kind,
@@ -246,13 +245,10 @@ function isSupportedSourceUrl(sourceUrl: string): boolean {
 }
 
 async function fetchGovOnlinePage(
-  context: SourceCollectorInspectInput["context"],
   sourceUrl: string,
   abortSignal: AbortSignal,
 ): Promise<GovOnlinePage> {
-  const webClient = await context.getWebClient({
-    kind: "fetch",
-  });
+  const webClient = WebClient.create({ kind: "fetch" });
   let response: Response;
 
   try {

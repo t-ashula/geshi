@@ -9,7 +9,6 @@ import type {
   SourceCollectorInspectError,
   SourceMetadata,
 } from "../plugins/types.js";
-import { getWebClient } from "../plugins/web-client.js";
 import type { SourceUrlError } from "./source-service.js";
 import { normalizeSourceUrl } from "./source-service.js";
 
@@ -83,17 +82,20 @@ export function createSourceInspectService(
         const pluginLogger = inspectLogger.child({
           pluginApi: "inspect",
         });
-        const sourceMetadata = await plugin.inspect({
-          abortSignal: new AbortController().signal,
-          config: {},
-          context: {
-            getWebClient(input) {
-              return getWebClient(input, pluginLogger);
-            },
-            logger: pluginLogger,
+        const sourceMetadata = await plugin.inspect(
+          {
+            abortSignal: new AbortController().signal,
+            config: {},
+            sourceUrl: normalizedUrl,
           },
-          sourceUrl: normalizedUrl,
-        });
+          {
+            getHost() {
+              return {
+                logger: pluginLogger,
+              };
+            },
+          },
+        );
         inspectLogger.info("source inspect completed.", {
           metadataUrl: sourceMetadata.url,
           title: sourceMetadata.title,

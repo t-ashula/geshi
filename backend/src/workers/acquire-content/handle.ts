@@ -8,7 +8,6 @@ import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type { SourceCollectorRegistry } from "../../plugins/index.js";
 import type { AcquiredAsset } from "../../plugins/types.js";
-import { getWebClient } from "../../plugins/web-client.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
 import type { Storage } from "../../storage/types.js";
@@ -56,40 +55,43 @@ export async function handleAcquireContentJob(
     const pluginLogger = logger.child({
       operation: "acquire",
     });
-    acquiredAsset = await plugin.acquire({
-      abortSignal: AbortSignal.timeout(30_000),
-      asset: {
-        kind: payload.asset.kind,
-        nextAction: {
-          actionKind: "acquire",
+    acquiredAsset = await plugin.acquire(
+      {
+        abortSignal: AbortSignal.timeout(30_000),
+        asset: {
+          kind: payload.asset.kind,
+          nextAction: {
+            actionKind: "acquire",
+          },
+          observedFingerprints: [payload.asset.observedFingerprint],
+          primary: payload.asset.primary,
+          sourceUrl: payload.asset.sourceUrl,
         },
-        observedFingerprints: [payload.asset.observedFingerprint],
-        primary: payload.asset.primary,
-        sourceUrl: payload.asset.sourceUrl,
+        config: payload.collector.config,
+        content: payload.content,
       },
-      config: payload.collector.config,
-      content: payload.content,
-      context: {
-        getWebClient(input) {
-          return getWebClient(input, pluginLogger);
-        },
-        logger: pluginLogger,
-        putWorkObject: async (input) => {
-          const storedWorkObject = await dependencies.workStorage.put({
-            body: input.body,
-            contentType: null,
-            key: createWorkStorageKey(dependencies.workStorage, payload),
-            overwrite: input.overwrite,
-          });
+      {
+        getHost() {
+          return {
+            logger: pluginLogger,
+            putWorkObject: async (input) => {
+              const storedWorkObject = await dependencies.workStorage.put({
+                body: input.body,
+                contentType: null,
+                key: createWorkStorageKey(dependencies.workStorage, payload),
+                overwrite: input.overwrite,
+              });
 
-          if (!storedWorkObject.ok) {
-            throw storedWorkObject.error;
-          }
+              if (!storedWorkObject.ok) {
+                throw storedWorkObject.error;
+              }
 
-          return storedWorkObject.value;
+              return storedWorkObject.value;
+            },
+          };
         },
       },
-    });
+    );
   } catch (error) {
     await failAcquireContentJob(payload, dependencies, logger, error);
     return err(

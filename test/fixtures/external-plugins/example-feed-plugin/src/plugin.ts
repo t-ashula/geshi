@@ -13,7 +13,7 @@ import type {
 import { manifest } from "./manifest.js";
 
 export const plugin: SourceCollectorPlugin = {
-  supports(_input: SourceCollectorSupportsInput) {
+  supports(_input: SourceCollectorSupportsInput, _context) {
     return Promise.resolve({
       supported: true,
     });
@@ -23,7 +23,7 @@ export const plugin: SourceCollectorPlugin = {
     return [];
   },
 
-  inspect(input: SourceCollectorInspectInput) {
+  inspect(input: SourceCollectorInspectInput, _context) {
     return Promise.resolve({
       description:
         "Fixture external plugin for install and generate verification.",
@@ -32,7 +32,7 @@ export const plugin: SourceCollectorPlugin = {
     });
   },
 
-  observe(_input: SourceCollectorObserveInput) {
+  observe(_input: SourceCollectorObserveInput, _context) {
     return Promise.resolve({
       contents: [],
     });
@@ -40,11 +40,15 @@ export const plugin: SourceCollectorPlugin = {
 
   extract(
     _input: SourceCollectorExtractInput,
+    _context,
   ): Promise<ExtractedDetailBody | null> {
     return Promise.resolve(null);
   },
 
-  acquire(input: SourceCollectorAcquireInput): Promise<AcquiredAsset> {
+  acquire(
+    input: SourceCollectorAcquireInput,
+    _context,
+  ): Promise<AcquiredAsset> {
     return Promise.reject(
       new Error(
         `Example external feed plugin does not acquire assets: ${input.asset.kind}`,

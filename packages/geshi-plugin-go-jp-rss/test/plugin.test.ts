@@ -18,32 +18,36 @@ function createNoopPluginLogger() {
 
 function createPluginContext() {
   return {
-    logger: createNoopPluginLogger(),
-    getWebClient: (_input: { kind: "browser" | "fetch" }) =>
-      Promise.resolve({
-        fetch: (request: Request) => fetch(request),
-      }),
+    getHost() {
+      return {
+        logger: createNoopPluginLogger(),
+      };
+    },
   };
 }
 
 describe("goJpRss plugin", () => {
   it("reports support only for gov-online ministry news urls", async () => {
     await expect(
-      plugin.supports({
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "https://www.gov-online.go.jp/info/index.html",
-      }),
+      plugin.supports(
+        {
+          config: {},
+          sourceUrl: "https://www.gov-online.go.jp/info/index.html",
+        },
+        createPluginContext(),
+      ),
     ).resolves.toEqual({
       supported: true,
     });
 
     await expect(
-      plugin.supports({
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "https://example.com/info/index.html",
-      }),
+      plugin.supports(
+        {
+          config: {},
+          sourceUrl: "https://example.com/info/index.html",
+        },
+        createPluginContext(),
+      ),
     ).resolves.toEqual({
       supported: false,
     });
@@ -71,12 +75,14 @@ describe("goJpRss plugin", () => {
     );
 
     await expect(
-      plugin.inspect({
-        abortSignal: new AbortController().signal,
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "https://www.gov-online.go.jp/info/index.html",
-      }),
+      plugin.inspect(
+        {
+          abortSignal: new AbortController().signal,
+          config: {},
+          sourceUrl: "https://www.gov-online.go.jp/info/index.html",
+        },
+        createPluginContext(),
+      ),
     ).resolves.toEqual({
       description:
         "各府省ウェブサイトに公表された重要な政策や政府からのお知らせをとりまとめ、分かりやすく紹介しています。",
@@ -107,12 +113,14 @@ describe("goJpRss plugin", () => {
     );
 
     await expect(
-      plugin.inspect({
-        abortSignal: new AbortController().signal,
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "https://www.gov-online.go.jp/info/index.html",
-      }),
+      plugin.inspect(
+        {
+          abortSignal: new AbortController().signal,
+          config: {},
+          sourceUrl: "https://www.gov-online.go.jp/info/index.html",
+        },
+        createPluginContext(),
+      ),
     ).resolves.toEqual({
       description: null,
       title: "こんにちは",
@@ -122,12 +130,14 @@ describe("goJpRss plugin", () => {
 
   it("rejects unsupported source urls", async () => {
     await expect(
-      plugin.inspect({
-        abortSignal: new AbortController().signal,
-        config: {},
-        context: createPluginContext(),
-        sourceUrl: "https://example.com/info/index.html",
-      }),
+      plugin.inspect(
+        {
+          abortSignal: new AbortController().signal,
+          config: {},
+          sourceUrl: "https://example.com/info/index.html",
+        },
+        createPluginContext(),
+      ),
     ).rejects.toMatchObject({
       code: "source_inspect_unsupported",
     });
@@ -201,15 +211,17 @@ describe("goJpRss plugin", () => {
         ),
     );
 
-    const observed = await plugin.observe({
-      abortSignal: new AbortController().signal,
-      collectorPluginState: {
-        lastProcessedUrl: "https://example.go.jp/news/4",
+    const observed = await plugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        collectorPluginState: {
+          lastProcessedUrl: "https://example.go.jp/news/4",
+        },
+        config: {},
+        sourceUrl: "https://www.gov-online.go.jp/info/index.html",
       },
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://www.gov-online.go.jp/info/index.html",
-    });
+      createPluginContext(),
+    );
 
     expect(observed.collectorPluginState).toEqual({
       lastProcessedUrl: "https://example.go.jp/news/1",
@@ -288,12 +300,14 @@ describe("goJpRss plugin", () => {
       ),
     );
 
-    const observed = await plugin.observe({
-      abortSignal: new AbortController().signal,
-      config: {},
-      context: createPluginContext(),
-      sourceUrl: "https://www.gov-online.go.jp/info/index.html",
-    });
+    const observed = await plugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://www.gov-online.go.jp/info/index.html",
+      },
+      createPluginContext(),
+    );
 
     expect(observed.collectorPluginState).toEqual({
       lastProcessedUrl: "https://example.go.jp/news/recent",
@@ -331,30 +345,32 @@ describe("goJpRss plugin", () => {
       ),
     );
 
-    const asset = await plugin.acquire({
-      abortSignal: new AbortController().signal,
-      asset: {
-        kind: "html",
-        nextAction: {
-          actionKind: "acquire",
+    const asset = await plugin.acquire(
+      {
+        abortSignal: new AbortController().signal,
+        asset: {
+          kind: "html",
+          nextAction: {
+            actionKind: "acquire",
+          },
+          observedFingerprints: [
+            "2026-05-13:1111111111111111111111111111111111111111111111111111111111111111",
+          ],
+          primary: true,
+          sourceUrl: "https://example.go.jp/news/1",
         },
-        observedFingerprints: [
-          "2026-05-13:1111111111111111111111111111111111111111111111111111111111111111",
-        ],
-        primary: true,
-        sourceUrl: "https://example.go.jp/news/1",
+        config: {},
+        content: {
+          externalId: "https://example.go.jp/news/1",
+          kind: "article",
+          publishedAt: null,
+          status: "discovered",
+          summary: null,
+          title: "記事1",
+        },
       },
-      config: {},
-      content: {
-        externalId: "https://example.go.jp/news/1",
-        kind: "article",
-        publishedAt: null,
-        status: "discovered",
-        summary: null,
-        title: "記事1",
-      },
-      context: createPluginContext(),
-    });
+      createPluginContext(),
+    );
 
     expect(asset.contentType).toBe("text/html");
     expect(asset.kind).toBe("html");
@@ -389,30 +405,32 @@ describe("goJpRss plugin", () => {
       ),
     );
 
-    const asset = await plugin.acquire({
-      abortSignal: new AbortController().signal,
-      asset: {
-        kind: "html",
-        nextAction: {
-          actionKind: "acquire",
+    const asset = await plugin.acquire(
+      {
+        abortSignal: new AbortController().signal,
+        asset: {
+          kind: "html",
+          nextAction: {
+            actionKind: "acquire",
+          },
+          observedFingerprints: [
+            "2026-05-13:2222222222222222222222222222222222222222222222222222222222222222",
+          ],
+          primary: true,
+          sourceUrl: "https://example.go.jp/news/shift-jis",
         },
-        observedFingerprints: [
-          "2026-05-13:2222222222222222222222222222222222222222222222222222222222222222",
-        ],
-        primary: true,
-        sourceUrl: "https://example.go.jp/news/shift-jis",
+        config: {},
+        content: {
+          externalId: "https://example.go.jp/news/shift-jis",
+          kind: "article",
+          publishedAt: null,
+          status: "discovered",
+          summary: null,
+          title: "shift-jis",
+        },
       },
-      config: {},
-      content: {
-        externalId: "https://example.go.jp/news/shift-jis",
-        kind: "article",
-        publishedAt: null,
-        status: "discovered",
-        summary: null,
-        title: "shift-jis",
-      },
-      context: createPluginContext(),
-    });
+      createPluginContext(),
+    );
 
     if (asset.body === undefined) {
       throw new Error("Expected acquired asset body.");
@@ -427,30 +445,32 @@ describe("goJpRss plugin", () => {
   });
   it("extracts a sanitized html detail body", async () => {
     await expect(
-      plugin.extract({
-        asset: {
-          body: new TextEncoder().encode(
-            `
-              <html>
-                <body>
-                  <main class="article-body">
-                    <h1>記事タイトル</h1>
-                    <p>本文 <strong>その1</strong></p>
-                    <div>
-                      <p><a href="/info/example.html">詳細ページ</a></p>
-                    </div>
-                    <style>.hidden { display: none; }</style>
-                  </main>
-                </body>
-              </html>
-            `,
-          ),
-          kind: "html",
-          mimeType: "text/html",
-          sourceUrl: "https://www.gov-online.go.jp/example.html",
+      plugin.extract(
+        {
+          asset: {
+            body: new TextEncoder().encode(
+              `
+                <html>
+                  <body>
+                    <main class="article-body">
+                      <h1>記事タイトル</h1>
+                      <p>本文 <strong>その1</strong></p>
+                      <div>
+                        <p><a href="/info/example.html">詳細ページ</a></p>
+                      </div>
+                      <style>.hidden { display: none; }</style>
+                    </main>
+                  </body>
+                </html>
+              `,
+            ),
+            kind: "html",
+            mimeType: "text/html",
+            sourceUrl: "https://www.gov-online.go.jp/example.html",
+          },
         },
-        context: createPluginContext(),
-      }),
+        createPluginContext(),
+      ),
     ).resolves.toEqual({
       body: '<article><h1>記事タイトル</h1><p>本文 <strong>その1</strong></p><p><a href="https://www.gov-online.go.jp/info/example.html">詳細ページ</a></p></article>',
       format: "html",
@@ -476,15 +496,17 @@ describe("goJpRss plugin", () => {
     ]);
 
     await expect(
-      plugin.extract({
-        asset: {
-          body,
-          kind: "html",
-          mimeType: "text/html",
-          sourceUrl: "https://www.gov-online.go.jp/example.html",
+      plugin.extract(
+        {
+          asset: {
+            body,
+            kind: "html",
+            mimeType: "text/html",
+            sourceUrl: "https://www.gov-online.go.jp/example.html",
+          },
         },
-        context: createPluginContext(),
-      }),
+        createPluginContext(),
+      ),
     ).resolves.toEqual({
       body: "<article><p>こんにちは</p></article>",
       format: "html",
