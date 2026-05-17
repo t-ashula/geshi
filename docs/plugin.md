@@ -68,6 +68,18 @@
 - backend は observe 実行の開始前に current plugin state を plugin へ渡してよい
 - backend は observe 実行で domain model への反映が成立した後に，plugin が返した次回実行用 state を保存する
 
+### plugin global runtime state
+
+- source collector plugin は，必要に応じて source と独立した共有 mutable state を扱ってよい
+- plugin global runtime state は，同じ `pluginSlug` を使う複数 source のあいだで共有される，source 非依存の state とする
+- plugin global runtime state は，`collector setting` 単位の plugin state とは分けて扱う
+- plugin global runtime state は，source ごとの観測進捗や入力設定，app 全体設定とは混在させない
+- plugin は plugin global runtime state を直接永続化しない
+- plugin は host object を通じて，自身の `pluginSlug` に対応する plugin global runtime state だけを読み書きする
+- backend は plugin global runtime state の意味を解釈せず，version 付き read/write と基本的な競合検出を担う
+- 更新競合時の再読込，merge，再試行の方針は plugin の責務とする
+- plugin global runtime state を秘密情報保管庫の標準置き場とはせず，秘密情報相当を入れる場合の保護方式は plugin の責務とする
+
 ### `supports`
 
 - source collector plugin は，与えられた `sourceUrl` を扱えるかどうかを `supports` で判定してよい
@@ -251,9 +263,11 @@ export const definition: SourceCollectorPluginDefinition = {
 
 - [ADR-0047] ADR-0047: `observe` 結果は asset ごとの next-action policy を含める
 - [ADR-0048] ADR-0048: 録画系 acquire は専用 job orchestration と複数 worker 前提で扱う
+- [ADR-0064] ADR-0064: source をまたいで同じ pluginSlug で共有される実行時状態は source 状態と分けて host が保持する
 
 [ADR-0047]: ./decisions/0047-observed-asset-next-action-policy.md
 [ADR-0048]: ./decisions/0048-recording-job-orchestration.md
+[ADR-0064]: ./decisions/0064-plugin-global-runtime-state.md
 
 ## `podcast-rss` collector plugin
 
