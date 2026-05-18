@@ -202,3 +202,149 @@ describe("record-content metadata updates", () => {
     });
   });
 });
+
+describe("record-content content status updates", () => {
+  it("marks content stored when the stored asset is primary", async () => {
+    const markContentStatus = vi.fn(() => Promise.resolve(ok(undefined)));
+
+    const result = await handleRecordContentJob(
+      createRecordPayload({ primary: true }),
+      createRecordDependencies({
+        markContentStatus,
+        recordedAssetPrimary: true,
+      }),
+    );
+
+    expect(result).toEqual(ok(undefined));
+    expect(markContentStatus).toHaveBeenCalledWith("content-1", "stored");
+  });
+
+  it("does not mark content stored when the stored asset is not primary", async () => {
+    const markContentStatus = vi.fn(() => Promise.resolve(ok(undefined)));
+
+    const result = await handleRecordContentJob(
+      createRecordPayload({ primary: false }),
+      createRecordDependencies({
+        markContentStatus,
+        recordedAssetPrimary: false,
+      }),
+    );
+
+    expect(result).toEqual(ok(undefined));
+    expect(markContentStatus).not.toHaveBeenCalledWith("content-1", "stored");
+  });
+});
+
+function createRecordPayload(input: { primary: boolean }) {
+  return {
+    asset: {
+      id: "asset-1",
+      kind: "audio",
+      observedFingerprint: "stream-observed:1",
+      primary: input.primary,
+      sourceUrl: "http://localhost:3401/streams/live-1.m3u8",
+    },
+    collector: {
+      config: {},
+      pluginSlug: "streaming-plugin-example",
+      settingId: "collector-setting-1",
+      settingSnapshotId: "collector-setting-snapshot-1",
+    },
+    content: {
+      externalId: "live-1",
+      id: "content-1",
+      kind: "stream-recording",
+      publishedAt: null,
+      status: "discovered" as const,
+      summary: "fixture stream",
+      title: "Live 1",
+    },
+    jobId: "record-job-1",
+    source: {
+      id: "source-1",
+      slug: "stream-1",
+    },
+  };
+}
+
+function createRecordDependencies(input: {
+  markContentStatus: ReturnType<typeof vi.fn>;
+  recordedAssetPrimary: boolean;
+}) {
+  return {
+    assetService: {
+      upsertStoredAsset: vi.fn(() => Promise.resolve(ok(undefined))),
+    } as never,
+    collectorPluginStateRepository: {
+      findLatestStateByCollectorSettingId: vi.fn(() =>
+        Promise.resolve(ok(undefined)),
+      ),
+    } as never,
+    contentService: {
+      markContentStatus: input.markContentStatus,
+    } as never,
+    jobRepository: {
+      getMetadata: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            core: {
+              actionKind: "record",
+            },
+            plugin: {
+              arguments: {
+                playlistUrl: "http://localhost:3401/streams/live-1.m3u8",
+              },
+            },
+          }),
+        ),
+      ),
+      markFailed: vi.fn(() => Promise.resolve(ok(undefined))),
+      markRunning: vi.fn(() => Promise.resolve(ok(undefined))),
+      markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
+      replaceMetadata: vi.fn(() => Promise.resolve(ok(undefined))),
+    } as never,
+    logger: createNoopLogger(),
+    pluginGlobalRuntimeStateRepository: {
+      findLatestByPluginSlug: vi.fn(() =>
+        Promise.resolve(ok({ state: undefined, version: null })),
+      ),
+      saveState: vi.fn(() => Promise.resolve(ok(1))),
+    } as never,
+    sourceCollectorRegistry: {
+      get: vi.fn(() => ({
+        record: vi.fn(
+          (
+            input_: SourceCollectorRecordInput,
+            _context: SourceCollectorExecutionContext,
+          ): Promise<RecordedAsset> =>
+            Promise.resolve({
+              acquiredFingerprints: ["recorded:1"],
+              body: new Uint8Array([1, 2, 3]),
+              contentType: "audio/mpeg",
+              kind: input_.asset.kind,
+              metadata: {},
+              primary: input.recordedAssetPrimary,
+              sourceUrl: input_.asset.sourceUrl,
+            }),
+        ),
+      })),
+    } as never,
+    storage: {
+      pathJoin: (...parts: string[]) => parts.join("/"),
+      put: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            byteSize: 3,
+            key: "stream-1/content-1/audio/asset-1/title/recorded-1.mp3",
+          }),
+        ),
+      ),
+    } as never,
+    workStorage: {
+      delete: vi.fn(() => Promise.resolve(ok(undefined))),
+      get: vi.fn(),
+      pathJoin: (...parts: string[]) => parts.join("/"),
+      put: vi.fn(),
+    },
+  };
+}

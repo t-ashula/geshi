@@ -248,20 +248,22 @@ export async function handleRecordContentJob(
       return upsertStoredAssetResult;
     }
 
-    const markContentStatusResult =
-      await dependencies.contentService.markContentStatus(
-        payload.content.id,
-        "stored",
-      );
+    if (recordedAsset.primary) {
+      const markContentStatusResult =
+        await dependencies.contentService.markContentStatus(
+          payload.content.id,
+          "stored",
+        );
 
-    if (!markContentStatusResult.ok) {
-      await failRecordContentJob(
-        payload,
-        dependencies,
-        logger,
-        markContentStatusResult.error,
-      );
-      return markContentStatusResult;
+      if (!markContentStatusResult.ok) {
+        await failRecordContentJob(
+          payload,
+          dependencies,
+          logger,
+          markContentStatusResult.error,
+        );
+        return markContentStatusResult;
+      }
     }
 
     const markSucceededResult = await dependencies.jobRepository.markSucceeded(
