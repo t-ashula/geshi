@@ -81,17 +81,28 @@ export const plugin: SourceCollectorPlugin = {
     });
   },
 
+  globalSettingSchema() {
+    return [
+      {
+        key: "userAgent",
+        type: { type: "text" as const },
+      },
+    ];
+  },
+
   settingSchema() {
     return [];
   },
 
-  async inspect(input: SourceCollectorInspectInput, _context) {
+  async inspect(input: SourceCollectorInspectInput, context) {
     const webClient = WebClient.create({ kind: "fetch" });
+    const userAgent = await readConfiguredUserAgent(context);
     let response: Response;
 
     try {
       response = await webClient.fetch(
         new Request(input.sourceUrl, {
+          headers: createRequestHeaders(userAgent),
           signal: input.abortSignal,
         }),
       );
@@ -128,11 +139,13 @@ export const plugin: SourceCollectorPlugin = {
 
   async observe(
     input: SourceCollectorObserveInput,
-    _context,
+    context,
   ): Promise<{ contents: ObservedContent[] }> {
     const webClient = WebClient.create({ kind: "fetch" });
+    const userAgent = await readConfiguredUserAgent(context);
     const response = await webClient.fetch(
       new Request(input.sourceUrl, {
+        headers: createRequestHeaders(userAgent),
         signal: input.abortSignal,
       }),
     );
@@ -170,15 +183,17 @@ export const plugin: SourceCollectorPlugin = {
 
   async acquire(
     input: SourceCollectorAcquireInput,
-    _context,
+    context,
   ): Promise<AcquiredAsset> {
     if (input.asset.sourceUrl === null) {
       throw new Error("RSS asset sourceUrl is required.");
     }
 
     const webClient = WebClient.create({ kind: "fetch" });
+    const userAgent = await readConfiguredUserAgent(context);
     const response = await webClient.fetch(
       new Request(input.asset.sourceUrl, {
+        headers: createRequestHeaders(userAgent),
         signal: input.abortSignal,
       }),
     );
@@ -218,6 +233,32 @@ export const definition: SourceCollectorPluginDefinition = {
 
 export const rssPlugin = plugin;
 export const rssPluginDefinition = definition;
+
+async function readConfiguredUserAgent(context: {
+  getHost(): {
+    pluginGlobalRuntimeState?: {
+      load(): Promise<{ state: Record<string, unknown> | undefined }>;
+    };
+  };
+}): Promise<string | null> {
+  const snapshot = await context.getHost().pluginGlobalRuntimeState?.load();
+  const candidate = snapshot?.state?.userAgent;
+  return typeof candidate === "string" && candidate.trim() !== ""
+    ? candidate
+    : null;
+}
+
+function createRequestHeaders(
+  userAgent: string | null,
+): HeadersInit | undefined {
+  if (userAgent === null) {
+    return undefined;
+  }
+
+  return {
+    "user-agent": userAgent,
+  };
+}
 
 type ParsedRssFeed = {
   items: RssItem[];

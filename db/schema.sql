@@ -55,6 +55,24 @@ create table collector_plugin_state_snapshots (
     constraint collector_plugin_state_snapshots_state_id_version_key unique (collector_plugin_state_id, version)
 );
 
+create table plugin_global_runtime_states (
+    id uuid primary key,
+    plugin_slug varchar(128) not null unique,
+    created_at timestamptz not null default current_timestamp
+);
+
+create table plugin_global_runtime_state_snapshots (
+    id uuid primary key,
+    plugin_global_runtime_state_id uuid not null references plugin_global_runtime_states(id),
+    version integer not null,
+    state jsonb not null default '{}'::jsonb,
+    recorded_at timestamptz not null default current_timestamp,
+    constraint plugin_global_runtime_state_snapshots_state_id_version_key unique (
+        plugin_global_runtime_state_id,
+        version
+    )
+);
+
 create table app_settings (
     id uuid primary key,
     profile_slug varchar(128) not null unique,
@@ -217,6 +235,15 @@ create index if not exists collector_plugin_states_collector_setting_id_idx on c
 
 create index if not exists collector_plugin_state_snapshots_state_id_version_idx on collector_plugin_state_snapshots (
     collector_plugin_state_id,
+    version desc
+);
+
+create index if not exists plugin_global_runtime_states_plugin_slug_idx on plugin_global_runtime_states (
+    plugin_slug
+);
+
+create index if not exists plugin_global_runtime_state_snapshots_state_id_version_idx on plugin_global_runtime_state_snapshots (
+    plugin_global_runtime_state_id,
     version desc
 );
 

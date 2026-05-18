@@ -4,6 +4,7 @@ import { AssetRepository } from "../../db/asset-repository.js";
 import { ContentRepository } from "../../db/content-repository.js";
 import { createDatabaseFromPool } from "../../db/database.js";
 import { JobRepository } from "../../db/job-repository.js";
+import { PluginGlobalRuntimeStateRepository } from "../../db/plugin-global-runtime-state-repository.js";
 import { createPgBoss, ensureQueue } from "../../job-queue/pg-boss.js";
 import type { AcquireContentJobPayload } from "../../job-queue/types.js";
 import { ACQUIRE_CONTENT_JOB_NAME } from "../../job-queue/types.js";
@@ -34,6 +35,8 @@ const assetService = createAssetService(assetRepository);
 const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
+const pluginGlobalRuntimeStateRepository =
+  new PluginGlobalRuntimeStateRepository(database);
 const storage = new FilesystemStorage(runtimeConfig.storageRootDir);
 const workStorage = new FilesystemStorage(runtimeConfig.workStorageRootDir);
 
@@ -56,6 +59,7 @@ await boss.work<AcquireContentJobPayload>(
       contentService,
       jobRepository,
       logger,
+      pluginGlobalRuntimeStateRepository,
       sourceCollectorRegistry: defaultSourceCollectorRegistry,
       storage,
       workStorage,

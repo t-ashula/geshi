@@ -6,6 +6,16 @@ import { createDetailBodyService } from "../../src/service/detail-body-service.j
 
 describe("detail body service", () => {
   it("extracts and stores a detail body from a stored html asset", async () => {
+    const findLatestByPluginSlug = vi.fn(() =>
+      Promise.resolve(
+        ok({
+          state: {
+            sessionId: "shared-session",
+          },
+          version: 4,
+        }),
+      ),
+    );
     const extract = vi.fn<
       (
         input: {
@@ -16,17 +26,33 @@ describe("detail body service", () => {
             sourceUrl: string | null;
           };
         },
-        context: { getHost(): { logger: unknown } },
+        context: {
+          getHost(): {
+            logger: unknown;
+            pluginGlobalRuntimeState?: {
+              load(): Promise<unknown>;
+            };
+          };
+        },
       ) => Promise<{
         body: string;
         format: "plain";
       }>
-    >(() =>
-      Promise.resolve({
+    >(async (_input, context) => {
+      const snapshot = await context.getHost().pluginGlobalRuntimeState?.load();
+
+      expect(snapshot).toEqual({
+        state: {
+          sessionId: "shared-session",
+        },
+        version: 4,
+      });
+
+      return Promise.resolve({
         body: "Detailed body",
         format: "plain",
-      }),
-    );
+      });
+    });
     const detailBodyRepository = {
       createDetailBody: vi.fn(() =>
         Promise.resolve(
@@ -84,6 +110,10 @@ describe("detail body service", () => {
       storage,
       {
         logger: createNoopLogger(),
+        pluginGlobalRuntimeStateRepository: {
+          findLatestByPluginSlug,
+          saveState: vi.fn(),
+        } as never,
         sourceCollectorRegistry: sourceCollectorRegistry as never,
       },
     );
@@ -104,6 +134,7 @@ describe("detail body service", () => {
     const firstCall = extract.mock.calls[0][0];
     expect(firstCall.asset.sourceUrl).toBe("https://example.com/episodes/1");
     expect(extract.mock.calls[0][1]?.getHost().logger).toBeDefined();
+    expect(findLatestByPluginSlug).toHaveBeenCalledWith("podcast-rss");
   });
 
   it("returns null when no stored html asset target exists", async () => {

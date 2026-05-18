@@ -3,6 +3,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { CreateObservedAssetsResult } from "../../db/asset-repository.js";
 import type { CollectorPluginStateRepository } from "../../db/collector-plugin-state-repository.js";
 import type { JobRepository } from "../../db/job-repository.js";
+import type { PluginGlobalRuntimeStateRepository } from "../../db/plugin-global-runtime-state-repository.js";
 import type {
   AcquireContentJobPayload,
   JobQueue,
@@ -18,6 +19,7 @@ import type { Result } from "../../lib/result.js";
 import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type { SourceCollectorRegistry } from "../../plugins/index.js";
+import { createPluginGlobalRuntimeStateHost } from "../../plugins/plugin-global-runtime-state-host.js";
 import type { ObservedAsset, ObservedContent } from "../../plugins/types.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
@@ -29,6 +31,7 @@ type HandleObserveSourceJobDependencies = {
   jobQueue: JobQueue;
   jobRepository: JobRepository;
   logger: Logger;
+  pluginGlobalRuntimeStateRepository: PluginGlobalRuntimeStateRepository;
   sourceCollectorRegistry: SourceCollectorRegistry;
 };
 
@@ -102,6 +105,10 @@ export async function handleObserveSourceJob(
         getHost() {
           return {
             logger: pluginLogger,
+            pluginGlobalRuntimeState: createPluginGlobalRuntimeStateHost(
+              dependencies.pluginGlobalRuntimeStateRepository,
+              payload.collector.pluginSlug,
+            ),
           };
         },
       },

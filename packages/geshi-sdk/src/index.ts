@@ -38,8 +38,36 @@ export interface PluginLogger {
   error(message: string, metadata?: PluginLogMetadata): void;
 }
 
+export type PluginGlobalRuntimeStateSnapshot = {
+  state: JsonObject | undefined;
+  version: number | null;
+};
+
+export type SavePluginGlobalRuntimeStateInput = {
+  expectedVersion: number | null;
+  state: JsonObject;
+};
+
+export type SavePluginGlobalRuntimeStateResult =
+  | {
+      ok: true;
+      version: number;
+    }
+  | {
+      ok: false;
+      reason: "conflict";
+    };
+
+export type PluginGlobalRuntimeStateHost = {
+  load(): Promise<PluginGlobalRuntimeStateSnapshot>;
+  save(
+    input: SavePluginGlobalRuntimeStateInput,
+  ): Promise<SavePluginGlobalRuntimeStateResult>;
+};
+
 export type SourceCollectorHost = {
   logger: PluginLogger;
+  pluginGlobalRuntimeState?: PluginGlobalRuntimeStateHost;
   putWorkObject?(input: {
     body: Uint8Array;
     overwrite: boolean;
@@ -232,6 +260,9 @@ export interface SourceCollectorPlugin {
     input: SourceCollectorSupportsInput,
     context: SourceCollectorExecutionContext,
   ): Promise<SourceCollectorSupportsResult>;
+  globalSettingSchema?():
+    | SourceCollectorSettingSchemaField[]
+    | Promise<SourceCollectorSettingSchemaField[]>;
   settingSchema():
     | SourceCollectorSettingSchemaField[]
     | Promise<SourceCollectorSettingSchemaField[]>;

@@ -8,6 +8,7 @@ import { ContentRepository } from "./db/content-repository.js";
 import { createDatabaseFromPool } from "./db/database.js";
 import { DetailBodyRepository } from "./db/detail-body-repository.js";
 import { JobRepository } from "./db/job-repository.js";
+import { PluginGlobalRuntimeStateRepository } from "./db/plugin-global-runtime-state-repository.js";
 import { SourceRepository } from "./db/source-repository.js";
 import { TranscriptRepository } from "./db/transcript-repository.js";
 import {
@@ -29,6 +30,7 @@ import { createAssetService } from "./service/asset-service.js";
 import { createContentService } from "./service/content-service.js";
 import { createDetailBodyService } from "./service/detail-body-service.js";
 import { createJobService } from "./service/job-service.js";
+import { createPluginGlobalSettingsService } from "./service/plugin-global-settings-service.js";
 import { createSourceInspectService } from "./service/source-inspect-service.js";
 import { createSourceService } from "./service/source-service.js";
 import { createTranscriptService } from "./service/transcript-service.js";
@@ -55,6 +57,11 @@ const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
 const detailBodyRepository = new DetailBodyRepository(database);
 const jobRepository = new JobRepository(database);
+const pluginGlobalRuntimeStateRepository =
+  new PluginGlobalRuntimeStateRepository(database);
+const pluginGlobalSettingsService = createPluginGlobalSettingsService({
+  pluginGlobalRuntimeStateRepository,
+});
 const sourceRepository = new SourceRepository(database);
 const sourceService = createSourceService(sourceRepository, {
   logger: logger.child({
@@ -65,6 +72,7 @@ const sourceInspectService = createSourceInspectService({
   logger: logger.child({
     service: "source-inspect",
   }),
+  pluginGlobalRuntimeStateRepository,
 });
 const jobQueue = new PgBossJobQueue(boss);
 const jobService = createJobService(sourceService, jobRepository, jobQueue);
@@ -84,6 +92,7 @@ const detailBodyService = createDetailBodyService(
     logger: logger.child({
       service: "detail-body",
     }),
+    pluginGlobalRuntimeStateRepository,
   },
 );
 
@@ -115,6 +124,7 @@ const app = createApp({
   contentService,
   detailBodyService,
   jobService,
+  pluginGlobalSettingsService,
   sourceInspectService,
   sourceService,
   storage,

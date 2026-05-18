@@ -106,6 +106,26 @@ export function createTestAppDependencies(
         ),
       ),
     } as unknown as JobService,
+    pluginGlobalSettingsService: {
+      getPluginGlobalSettings: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            baseVersion: null,
+            items: [],
+            pluginSlug: "podcast-rss",
+          }),
+        ),
+      ),
+      updatePluginGlobalSettings: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            baseVersion: 1,
+            items: [],
+            pluginSlug: "podcast-rss",
+          }),
+        ),
+      ),
+    },
     sourceInspectService: {
       inspectSource: vi.fn(() =>
         Promise.resolve(

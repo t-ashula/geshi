@@ -5,6 +5,7 @@ import { CollectorPluginStateRepository } from "../../db/collector-plugin-state-
 import { ContentRepository } from "../../db/content-repository.js";
 import { createDatabaseFromPool } from "../../db/database.js";
 import { JobRepository } from "../../db/job-repository.js";
+import { PluginGlobalRuntimeStateRepository } from "../../db/plugin-global-runtime-state-repository.js";
 import {
   createPgBoss,
   ensureQueue,
@@ -42,6 +43,8 @@ const assetService = createAssetService(assetRepository);
 const collectorPluginStateRepository = new CollectorPluginStateRepository(
   database,
 );
+const pluginGlobalRuntimeStateRepository =
+  new PluginGlobalRuntimeStateRepository(database);
 const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
@@ -72,6 +75,7 @@ await boss.work<ObserveSourceJobPayload>(
       jobQueue,
       jobRepository,
       logger,
+      pluginGlobalRuntimeStateRepository,
       sourceCollectorRegistry: defaultSourceCollectorRegistry,
     });
 

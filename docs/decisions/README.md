@@ -64,3 +64,5 @@
 - [ADR-0061: web client は plugin context ではなく SDK 提供 API として扱う](./0061-web-client-sdk-api.md)
 - [ADR-0062: plugin 実行時の logger 追加コンテキストは呼び出された側が付与する](./0062-plugin-logger-context-ownership.md)
 - [ADR-0063: transcript chunk の外部 ASR 通信は timeout を持ち終状態へ収束させる](./0063-transcript-chunk-timeout-and-terminal-state.md)
+- [ADR-0064: source をまたいで同じ pluginSlug で共有される実行時状態は source 状態と分けて host が保持する](./0064-plugin-global-runtime-state.md)
+- [ADR-0065: pluginSlug 単位の共有設定入力は source 設定と分けて schema 経由で管理する](./0065-plugin-global-settings-input.md)

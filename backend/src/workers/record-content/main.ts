@@ -5,6 +5,7 @@ import { CollectorPluginStateRepository } from "../../db/collector-plugin-state-
 import { ContentRepository } from "../../db/content-repository.js";
 import { createDatabaseFromPool } from "../../db/database.js";
 import { JobRepository } from "../../db/job-repository.js";
+import { PluginGlobalRuntimeStateRepository } from "../../db/plugin-global-runtime-state-repository.js";
 import { createPgBoss, ensureQueue } from "../../job-queue/pg-boss.js";
 import type { RecordContentJobPayload } from "../../job-queue/types.js";
 import { RECORD_CONTENT_JOB_NAME } from "../../job-queue/types.js";
@@ -41,6 +42,8 @@ const assetService = createAssetService(assetRepository);
 const collectorPluginStateRepository = new CollectorPluginStateRepository(
   database,
 );
+const pluginGlobalRuntimeStateRepository =
+  new PluginGlobalRuntimeStateRepository(database);
 const contentRepository = new ContentRepository(database);
 const contentService = createContentService(contentRepository);
 const jobRepository = new JobRepository(database);
@@ -118,6 +121,7 @@ if (directJobId !== null) {
           contentService,
           jobRepository,
           logger,
+          pluginGlobalRuntimeStateRepository,
           sourceCollectorRegistry: defaultSourceCollectorRegistry,
           storage,
           workStorage,
@@ -190,6 +194,7 @@ async function runDirectRecordContentJob(
     contentService,
     jobRepository,
     logger,
+    pluginGlobalRuntimeStateRepository,
     sourceCollectorRegistry,
     storage,
     workStorage,

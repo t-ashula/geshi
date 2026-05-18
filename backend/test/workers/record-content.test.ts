@@ -11,6 +11,16 @@ import { handleRecordContentJob } from "../../src/workers/record-content/handle.
 
 describe("record-content metadata updates", () => {
   it("preserves plugin arguments when progress metadata is replaced", async () => {
+    const findLatestByPluginSlug = vi.fn(() =>
+      Promise.resolve(
+        ok({
+          state: {
+            sessionId: "shared-session",
+          },
+          version: 2,
+        }),
+      ),
+    );
     const getMetadata = vi
       .fn()
       .mockResolvedValueOnce(
@@ -40,6 +50,7 @@ describe("record-content metadata updates", () => {
         }),
       );
     const replaceMetadata = vi.fn(() => Promise.resolve(ok(undefined)));
+    const saveState = vi.fn(() => Promise.resolve(ok(3)));
 
     const result = await handleRecordContentJob(
       {
@@ -90,6 +101,10 @@ describe("record-content metadata updates", () => {
           replaceMetadata,
         } as never,
         logger: createNoopLogger(),
+        pluginGlobalRuntimeStateRepository: {
+          findLatestByPluginSlug,
+          saveState,
+        } as never,
         sourceCollectorRegistry: {
           get: vi.fn(() => ({
             record: vi.fn(
@@ -97,6 +112,27 @@ describe("record-content metadata updates", () => {
                 input: SourceCollectorRecordInput,
                 context: SourceCollectorExecutionContext,
               ): Promise<RecordedAsset> => {
+                expect(
+                  await context.getHost().pluginGlobalRuntimeState?.load(),
+                ).toEqual({
+                  state: {
+                    sessionId: "shared-session",
+                  },
+                  version: 2,
+                });
+
+                expect(
+                  await context.getHost().pluginGlobalRuntimeState?.save({
+                    expectedVersion: 2,
+                    state: {
+                      sessionId: "refreshed-session",
+                    },
+                  }),
+                ).toEqual({
+                  ok: true,
+                  version: 3,
+                });
+
                 await context.getHost().replacePluginMetadata?.({
                   progress: {
                     phase: "fetching",
@@ -140,6 +176,16 @@ describe("record-content metadata updates", () => {
     );
 
     expect(result).toEqual(ok(undefined));
+    expect(findLatestByPluginSlug).toHaveBeenCalledWith(
+      "streaming-plugin-example",
+    );
+    expect(saveState).toHaveBeenCalledWith({
+      expectedVersion: 2,
+      pluginSlug: "streaming-plugin-example",
+      state: {
+        sessionId: "refreshed-session",
+      },
+    });
     expect(replaceMetadata).toHaveBeenCalledWith("record-job-1", {
       core: {
         actionKind: "record",

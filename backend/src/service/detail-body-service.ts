@@ -2,11 +2,13 @@ import type {
   DetailBodyRecord,
   DetailBodyRepository,
 } from "../db/detail-body-repository.js";
+import type { PluginGlobalRuntimeStateRepository } from "../db/plugin-global-runtime-state-repository.js";
 import type { Result } from "../lib/result.js";
 import { ok } from "../lib/result.js";
 import type { Logger } from "../logger/index.js";
 import type { SourceCollectorRegistry } from "../plugins/index.js";
 import { defaultSourceCollectorRegistry } from "../plugins/index.js";
+import { createPluginGlobalRuntimeStateHost } from "../plugins/plugin-global-runtime-state-host.js";
 import type { Storage } from "../storage/types.js";
 
 export interface DetailBodyService {
@@ -17,6 +19,7 @@ export interface DetailBodyService {
 
 export type CreateDetailBodyServiceDependencies = {
   logger: Logger;
+  pluginGlobalRuntimeStateRepository?: PluginGlobalRuntimeStateRepository;
   sourceCollectorRegistry?: SourceCollectorRegistry;
 };
 
@@ -28,6 +31,8 @@ export function createDetailBodyService(
   const logger = dependencies.logger;
   const sourceCollectorRegistry =
     dependencies.sourceCollectorRegistry ?? defaultSourceCollectorRegistry;
+  const pluginGlobalRuntimeStateRepository =
+    dependencies.pluginGlobalRuntimeStateRepository;
 
   return {
     async findOrCreateDetailBodyByContentId(
@@ -141,6 +146,7 @@ export function createDetailBodyService(
         pluginSlug: target.value.pluginSlug,
         sourceAssetSnapshotId: target.value.sourceAssetSnapshotId,
       });
+      const pluginSlug = target.value.pluginSlug;
 
       let extracted;
 
@@ -158,6 +164,13 @@ export function createDetailBodyService(
             getHost() {
               return {
                 logger: pluginLogger,
+                pluginGlobalRuntimeState:
+                  pluginGlobalRuntimeStateRepository === undefined
+                    ? undefined
+                    : createPluginGlobalRuntimeStateHost(
+                        pluginGlobalRuntimeStateRepository,
+                        pluginSlug,
+                      ),
               };
             },
           },

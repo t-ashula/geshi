@@ -5,6 +5,7 @@ import type {
 } from "@geshi/sdk";
 import { describe, expect, it, vi } from "vitest";
 
+import { ok } from "../../src/lib/result.js";
 import { createNoopLogger } from "../../src/logger/index.js";
 import { createSourceInspectService } from "../../src/service/source-inspect-service.js";
 import { assertErr, assertOk } from "../support/result.js";
@@ -86,6 +87,57 @@ describe("source inspect service", () => {
       url: "https://example.com/shows/example-feed",
     });
     expect(result.value.sourceSlug).toMatch(/^example-feed/);
+  });
+
+  it("exposes plugin global runtime state through the host object", async () => {
+    const findLatestByPluginSlug = vi.fn(() =>
+      Promise.resolve(
+        ok({
+          state: {
+            sessionId: "shared-session",
+          },
+          version: 4,
+        }),
+      ),
+    );
+    inspectMock.mockImplementationOnce(async (_input, context) => {
+      const snapshot = await context.getHost().pluginGlobalRuntimeState?.load();
+
+      expect(snapshot).toEqual({
+        state: {
+          sessionId: "shared-session",
+        },
+        version: 4,
+      });
+
+      return {
+        description: null,
+        title: "Example Feed",
+        url: "https://example.com/shows/example-feed",
+      };
+    });
+    const service = createSourceInspectService({
+      logger: createNoopLogger(),
+      pluginGlobalRuntimeStateRepository: {
+        findLatestByPluginSlug,
+        saveState: vi.fn(),
+      } as never,
+      sourceCollectorRegistry: {
+        get: vi.fn(() => ({
+          ...createRegistryPlugin(),
+        })),
+        list: vi.fn(() => []),
+        getSourceKind: vi.fn(() => "podcast" as const),
+      },
+    });
+
+    const result = await service.inspectSource({
+      pluginSlug: "go-jp-rss",
+      url: "https://example.com/feed.xml",
+    });
+
+    assertOk(result);
+    expect(findLatestByPluginSlug).toHaveBeenCalledWith("go-jp-rss");
   });
 
   it("returns inspect errors as results", async () => {

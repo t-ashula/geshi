@@ -16,6 +16,7 @@ import type {
   ContentListItem,
   CreateSourceRequest,
   PeriodicCrawlSettings,
+  PluginGlobalSettingsDetail,
   SourceCollectorPluginListItem,
   SourceCollectorSettingItem,
   SourceCollectorSettingsDetail,
@@ -25,6 +26,7 @@ import {
   createSource,
   getContentDetail,
   getPeriodicCrawlSettings,
+  getPluginGlobalSettings,
   getSourceCollectorSettings,
   inspectSource,
   listSourceCollectorPlugins,
@@ -34,6 +36,7 @@ import {
   requestTranscripts,
   retryTranscript,
   updatePeriodicCrawlSettings,
+  updatePluginGlobalSettings,
   updateSourceCollectorSettings,
 } from "./source-api.js";
 import {
@@ -71,6 +74,8 @@ const isDetailLoading = ref(false);
 const expandedAssetMenuId = ref<string | null>(null);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
+const isPluginGlobalSettingsLoading = ref(false);
+const isPluginGlobalSettingsSubmitting = ref<string | null>(null);
 const isSourceSettingsExpanded = ref(false);
 const isSourceCollectorSettingsLoading = ref(false);
 const errorMessage = ref<string | null>(null);
@@ -78,6 +83,7 @@ const detailErrorMessage = ref<string | null>(null);
 const inspectErrorMessage = ref<string | null>(null);
 const observeErrorMessage = ref<string | null>(null);
 const settingsErrorMessage = ref<string | null>(null);
+const pluginGlobalSettingsErrorMessage = ref<string | null>(null);
 const sourceCrawlErrorMessage = ref<string | null>(null);
 const transcriptActionErrorMessage = ref<string | null>(null);
 const validationMessage = ref<string | null>(null);
@@ -101,6 +107,13 @@ const sourceCrawlForm = ref<PeriodicCrawlSettings>({
 });
 const sourceCollectorSettings = ref<SourceCollectorSettingsDetail | null>(null);
 const sourceCollectorItemsForm = ref<Record<string, unknown>>({});
+const pluginGlobalSettings = ref<
+  Array<{
+    plugin: SourceCollectorPluginListItem;
+    settings: PluginGlobalSettingsDetail;
+  }>
+>([]);
+const pluginGlobalItemsForm = ref<Record<string, Record<string, unknown>>>({});
 const theme = ref<"light" | "dark">("light");
 const audioPlayer = useTemplateRef<HTMLAudioElement>("audioPlayer");
 const playback = ref<PlaybackState | null>(null);
@@ -237,12 +250,8 @@ onMounted(async () => {
 
   window.addEventListener("popstate", syncRouteFromLocation);
 
-  await Promise.all([
-    refreshSourceCollectorPlugins(),
-    refreshSources(),
-    refreshContents(),
-    refreshSettings(),
-  ]);
+  await refreshSourceCollectorPlugins();
+  await Promise.all([refreshSources(), refreshContents(), refreshSettings()]);
   await syncDetailWithRoute();
 });
 
@@ -756,6 +765,8 @@ async function refreshContents(): Promise<void> {
 
 async function refreshSettings(): Promise<void> {
   isSettingsLoading.value = true;
+  isPluginGlobalSettingsLoading.value = true;
+  pluginGlobalSettingsErrorMessage.value = null;
 
   try {
     periodicCrawlSettings.value = await getPeriodicCrawlSettings();
@@ -766,6 +777,91 @@ async function refreshSettings(): Promise<void> {
         : "Failed to load autonomous crawl settings.";
   } finally {
     isSettingsLoading.value = false;
+  }
+
+  try {
+    const pluginSettings = await loadPluginGlobalSettings();
+    pluginGlobalSettings.value = pluginSettings;
+    pluginGlobalItemsForm.value = Object.fromEntries(
+      pluginSettings.map(({ plugin, settings }) => [
+        plugin.pluginSlug,
+        Object.fromEntries(
+          settings.items.map((item) => [item.key, item.value]),
+        ),
+      ]),
+    );
+  } catch (error) {
+    pluginGlobalSettingsErrorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to load plugin global settings.";
+  } finally {
+    isPluginGlobalSettingsLoading.value = false;
+  }
+}
+
+async function loadPluginGlobalSettings(): Promise<
+  Array<{
+    plugin: SourceCollectorPluginListItem;
+    settings: PluginGlobalSettingsDetail;
+  }>
+> {
+  const availablePlugins = sourceCollectorPlugins.value.filter(
+    (plugin) => plugin.status === "available",
+  );
+  const results = await Promise.all(
+    availablePlugins.map(async (plugin) => ({
+      plugin,
+      settings: await getPluginGlobalSettings(plugin.pluginSlug),
+    })),
+  );
+
+  return results.filter(({ settings }) => settings.items.length > 0);
+}
+
+async function savePluginSettings(pluginSlug: string): Promise<void> {
+  const pluginSettings = pluginGlobalSettings.value.find(
+    ({ plugin }) => plugin.pluginSlug === pluginSlug,
+  );
+
+  if (pluginSettings === undefined) {
+    pluginGlobalSettingsErrorMessage.value = "Plugin settings unavailable.";
+    return;
+  }
+
+  isPluginGlobalSettingsSubmitting.value = pluginSlug;
+  pluginGlobalSettingsErrorMessage.value = null;
+
+  try {
+    const updatedSettings = await updatePluginGlobalSettings(pluginSlug, {
+      baseVersion: pluginSettings.settings.baseVersion,
+      items: pluginSettings.settings.items.map((item) => ({
+        key: item.key,
+        value: normalizeCollectorSettingFormValue(
+          item,
+          pluginGlobalItemsForm.value[pluginSlug]?.[item.key],
+        ),
+      })),
+    });
+
+    pluginGlobalSettings.value = pluginGlobalSettings.value.map((entry) =>
+      entry.plugin.pluginSlug === pluginSlug
+        ? {
+            ...entry,
+            settings: updatedSettings,
+          }
+        : entry,
+    );
+    pluginGlobalItemsForm.value[pluginSlug] = Object.fromEntries(
+      updatedSettings.items.map((item) => [item.key, item.value]),
+    );
+  } catch (error) {
+    pluginGlobalSettingsErrorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to update plugin global settings.";
+  } finally {
+    isPluginGlobalSettingsSubmitting.value = null;
   }
 }
 
@@ -1107,6 +1203,9 @@ function normalizeCollectorSettingFormValue(
       <p v-if="settingsErrorMessage" class="feedback error">
         {{ settingsErrorMessage }}
       </p>
+      <p v-if="pluginGlobalSettingsErrorMessage" class="feedback error">
+        {{ pluginGlobalSettingsErrorMessage }}
+      </p>
 
       <div v-if="isSettingsLoading" class="empty-state">
         Loading settings...
@@ -1139,6 +1238,72 @@ function normalizeCollectorSettingFormValue(
             :disabled="isSettingsSubmitting"
           >
             {{ isSettingsSubmitting ? "Saving..." : "Save settings" }}
+          </button>
+        </div>
+      </form>
+
+      <div class="settings-shell-header">
+        <div>
+          <p class="eyebrow">Plugins</p>
+          <h2>Shared Plugin Settings</h2>
+        </div>
+      </div>
+
+      <div v-if="isPluginGlobalSettingsLoading" class="empty-state">
+        Loading plugin settings...
+      </div>
+
+      <div v-else-if="pluginGlobalSettings.length === 0" class="empty-state">
+        No plugin shared settings.
+      </div>
+
+      <form
+        v-for="{ plugin, settings } in pluginGlobalSettings"
+        :key="plugin.pluginSlug"
+        class="settings-grid"
+        @submit.prevent="savePluginSettings(plugin.pluginSlug)"
+      >
+        <div class="settings-shell-header">
+          <div>
+            <p class="eyebrow">{{ plugin.sourceKind }}</p>
+            <h3>{{ plugin.displayName }}</h3>
+          </div>
+        </div>
+
+        <label
+          v-for="item in settings.items"
+          :key="item.key"
+          :class="{ 'toggle-field': isCheckboxCollectorSetting(item) }"
+        >
+          <span>{{ item.key }}</span>
+          <input
+            v-if="isCheckboxCollectorSetting(item)"
+            v-model="pluginGlobalItemsForm[plugin.pluginSlug][item.key]"
+            type="checkbox"
+          />
+          <input
+            v-else-if="isNumberCollectorSetting(item)"
+            v-model.number="pluginGlobalItemsForm[plugin.pluginSlug][item.key]"
+            type="number"
+          />
+          <input
+            v-else
+            v-model="pluginGlobalItemsForm[plugin.pluginSlug][item.key]"
+            type="text"
+          />
+        </label>
+
+        <div class="actions">
+          <button
+            type="submit"
+            class="primary-button"
+            :disabled="isPluginGlobalSettingsSubmitting === plugin.pluginSlug"
+          >
+            {{
+              isPluginGlobalSettingsSubmitting === plugin.pluginSlug
+                ? "Saving..."
+                : "Save plugin settings"
+            }}
           </button>
         </div>
       </form>

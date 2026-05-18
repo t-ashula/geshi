@@ -70,6 +70,20 @@ export type CollectorPluginStateSnapshotTable = {
   version: number;
 };
 
+export type PluginGlobalRuntimeStateTable = {
+  created_at: TimestampColumn;
+  id: string;
+  plugin_slug: string;
+};
+
+export type PluginGlobalRuntimeStateSnapshotTable = {
+  id: string;
+  plugin_global_runtime_state_id: string;
+  recorded_at: TimestampColumn;
+  state: JsonColumn;
+  version: number;
+};
+
 export type AppSettingTable = {
   created_at: TimestampColumn;
   id: string;
@@ -202,6 +216,8 @@ export type GeshiDatabase = {
   contents: ContentTable;
   detail_bodies: DetailBodyTable;
   jobs: JobTable;
+  plugin_global_runtime_states: PluginGlobalRuntimeStateTable;
+  plugin_global_runtime_state_snapshots: PluginGlobalRuntimeStateSnapshotTable;
   transcript_chunks: TranscriptChunkTable;
   transcripts: TranscriptTable;
   source_snapshots: SourceSnapshotTable;

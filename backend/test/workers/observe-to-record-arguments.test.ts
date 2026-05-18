@@ -154,6 +154,12 @@ describe("observe to record arguments handoff", () => {
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
         logger: createNoopLogger(),
+        pluginGlobalRuntimeStateRepository: {
+          findLatestByPluginSlug: vi.fn(() =>
+            Promise.resolve(ok({ state: undefined, version: null })),
+          ),
+          saveState: vi.fn(() => Promise.resolve(ok(1))),
+        } as never,
         sourceCollectorRegistry: {
           get: vi.fn(() => observePlugin),
         } as never,
@@ -206,6 +212,12 @@ describe("observe to record arguments handoff", () => {
         replaceMetadata: vi.fn(() => Promise.resolve(ok(undefined))),
       } as never,
       logger: createNoopLogger(),
+      pluginGlobalRuntimeStateRepository: {
+        findLatestByPluginSlug: vi.fn(() =>
+          Promise.resolve(ok({ state: undefined, version: null })),
+        ),
+        saveState: vi.fn(() => Promise.resolve(ok(1))),
+      } as never,
       sourceCollectorRegistry: {
         get: vi.fn(() => observePlugin),
       } as never,

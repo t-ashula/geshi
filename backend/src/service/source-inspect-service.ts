@@ -1,3 +1,4 @@
+import type { PluginGlobalRuntimeStateRepository } from "../db/plugin-global-runtime-state-repository.js";
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
 import { createSourceSlug } from "../lib/source-slug.js";
@@ -5,6 +6,7 @@ import type { Logger } from "../logger/index.js";
 import { createLogger } from "../logger/index.js";
 import type { SourceCollectorRegistry } from "../plugins/index.js";
 import { defaultSourceCollectorRegistry } from "../plugins/index.js";
+import { createPluginGlobalRuntimeStateHost } from "../plugins/plugin-global-runtime-state-host.js";
 import type {
   SourceCollectorInspectError,
   SourceMetadata,
@@ -39,6 +41,7 @@ export interface SourceInspectService {
 
 export type CreateSourceInspectServiceDependencies = {
   logger?: Logger;
+  pluginGlobalRuntimeStateRepository?: PluginGlobalRuntimeStateRepository;
   sourceCollectorRegistry?: SourceCollectorRegistry;
 };
 
@@ -52,6 +55,8 @@ export function createSourceInspectService(
     });
   const sourceCollectorRegistry =
     dependencies.sourceCollectorRegistry ?? defaultSourceCollectorRegistry;
+  const pluginGlobalRuntimeStateRepository =
+    dependencies.pluginGlobalRuntimeStateRepository;
 
   return {
     async inspectSource(
@@ -92,6 +97,13 @@ export function createSourceInspectService(
             getHost() {
               return {
                 logger: pluginLogger,
+                pluginGlobalRuntimeState:
+                  pluginGlobalRuntimeStateRepository === undefined
+                    ? undefined
+                    : createPluginGlobalRuntimeStateHost(
+                        pluginGlobalRuntimeStateRepository,
+                        request.pluginSlug ?? "podcast-rss",
+                      ),
               };
             },
           },

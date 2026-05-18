@@ -1,5 +1,6 @@
 import type { CollectorPluginStateRepository } from "../../db/collector-plugin-state-repository.js";
 import type { JobRepository } from "../../db/job-repository.js";
+import type { PluginGlobalRuntimeStateRepository } from "../../db/plugin-global-runtime-state-repository.js";
 import type { RecordContentJobPayload } from "../../job-queue/types.js";
 import { contentTypeToExtension } from "../../lib/content-type-extension.js";
 import { findLatestFingerprint } from "../../lib/fingerprint.js";
@@ -8,6 +9,7 @@ import type { Result } from "../../lib/result.js";
 import { err, ok } from "../../lib/result.js";
 import type { Logger } from "../../logger/index.js";
 import type { SourceCollectorRegistry } from "../../plugins/index.js";
+import { createPluginGlobalRuntimeStateHost } from "../../plugins/plugin-global-runtime-state-host.js";
 import type { JsonObject, RecordedAsset } from "../../plugins/types.js";
 import type { AssetService } from "../../service/asset-service.js";
 import type { ContentService } from "../../service/content-service.js";
@@ -19,6 +21,7 @@ type HandleRecordContentJobDependencies = {
   contentService: ContentService;
   jobRepository: JobRepository;
   logger: Logger;
+  pluginGlobalRuntimeStateRepository: PluginGlobalRuntimeStateRepository;
   sourceCollectorRegistry: SourceCollectorRegistry;
   storage: Storage;
   workStorage: Storage;
@@ -114,6 +117,10 @@ export async function handleRecordContentJob(
         getHost() {
           return {
             logger: pluginLogger,
+            pluginGlobalRuntimeState: createPluginGlobalRuntimeStateHost(
+              dependencies.pluginGlobalRuntimeStateRepository,
+              payload.collector.pluginSlug,
+            ),
             putWorkObject: async (input) => {
               const storedWorkFile = await dependencies.workStorage.put({
                 body: input.body,

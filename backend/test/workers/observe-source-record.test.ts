@@ -121,6 +121,12 @@ describe("observe-source record branching", () => {
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
         logger: createNoopLogger(),
+        pluginGlobalRuntimeStateRepository: {
+          findLatestByPluginSlug: vi.fn(() =>
+            Promise.resolve(ok({ state: undefined, version: null })),
+          ),
+          saveState: vi.fn(() => Promise.resolve(ok(1))),
+        } as never,
         sourceCollectorRegistry: {
           get: vi.fn(() => ({
             observe,
@@ -277,6 +283,12 @@ describe("observe-source record branching", () => {
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
         logger: createNoopLogger(),
+        pluginGlobalRuntimeStateRepository: {
+          findLatestByPluginSlug: vi.fn(() =>
+            Promise.resolve(ok({ state: undefined, version: null })),
+          ),
+          saveState: vi.fn(() => Promise.resolve(ok(1))),
+        } as never,
         sourceCollectorRegistry: {
           get: vi.fn(() => ({
             observe,
@@ -384,6 +396,12 @@ describe("observe-source record branching", () => {
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
         logger: createNoopLogger(),
+        pluginGlobalRuntimeStateRepository: {
+          findLatestByPluginSlug: vi.fn(() =>
+            Promise.resolve(ok({ state: undefined, version: null })),
+          ),
+          saveState: vi.fn(() => Promise.resolve(ok(1))),
+        } as never,
         sourceCollectorRegistry: {
           get: vi.fn(() => ({
             observe,
@@ -500,6 +518,12 @@ describe("observe-source record branching", () => {
           markSucceeded: vi.fn(() => Promise.resolve(ok(undefined))),
         } as never,
         logger: createNoopLogger(),
+        pluginGlobalRuntimeStateRepository: {
+          findLatestByPluginSlug: vi.fn(() =>
+            Promise.resolve(ok({ state: undefined, version: null })),
+          ),
+          saveState: vi.fn(() => Promise.resolve(ok(1))),
+        } as never,
         sourceCollectorRegistry: {
           get: vi.fn(() => ({
             observe,

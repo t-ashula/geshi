@@ -77,6 +77,20 @@ export type SourceCollectorSettingsDetail = {
   periodicCrawl: PeriodicCrawlSettings;
 };
 
+export type PluginGlobalSettingsUpdate = {
+  baseVersion: number | null;
+  items?: Array<{
+    key: string;
+    value: SourceCollectorSettingItem["value"];
+  }>;
+};
+
+export type PluginGlobalSettingsDetail = {
+  baseVersion: number | null;
+  items: SourceCollectorSettingItem[];
+  pluginSlug: string;
+};
+
 export type ContentListItem = {
   collectedAt: string;
   id: string;
@@ -205,6 +219,10 @@ type PeriodicCrawlSettingsResponse = {
 
 type SourceCollectorSettingsResponse = {
   data: SourceCollectorSettingsDetail;
+};
+
+type PluginGlobalSettingsResponse = {
+  data: PluginGlobalSettingsDetail;
 };
 
 export async function listSources(): Promise<SourceListItem[]> {
@@ -482,4 +500,49 @@ export async function getSourceCollectorSettings(
   }
 
   throw new Error("Failed to load source collector settings.");
+}
+
+export async function getPluginGlobalSettings(
+  pluginSlug: string,
+): Promise<PluginGlobalSettingsDetail> {
+  const response = await fetch(`/api/v1/settings/plugins/${pluginSlug}`);
+  const payload = (await response.json()) as
+    | PluginGlobalSettingsResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to load plugin global settings.");
+}
+
+export async function updatePluginGlobalSettings(
+  pluginSlug: string,
+  settings: PluginGlobalSettingsUpdate,
+): Promise<PluginGlobalSettingsDetail> {
+  const response = await fetch(`/api/v1/settings/plugins/${pluginSlug}`, {
+    body: JSON.stringify(settings),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "PATCH",
+  });
+  const payload = (await response.json()) as
+    | PluginGlobalSettingsResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to update plugin global settings.");
 }
