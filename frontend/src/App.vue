@@ -124,6 +124,7 @@ const isSeekingPlayback = ref(false);
 const pendingSeekTime = ref(0);
 const playbackVolume = ref(1);
 const isPlaybackMuted = ref(false);
+const expandedTranscriptIds = ref<Set<string>>(new Set());
 
 const selectedSourceSlug = computed(() => {
   const route = routeState.value;
@@ -195,6 +196,14 @@ const playbackVolumeValue = computed(() =>
   isPlaybackMuted.value ? 0 : playbackVolume.value,
 );
 
+const detailHeaderAudioAsset = computed(() => {
+  if (contentDetail.value === null) {
+    return null;
+  }
+
+  return firstPlayableAudioAsset(contentDetail.value);
+});
+
 watch(
   selectedSource,
   (source) => {
@@ -238,6 +247,19 @@ watch(isPlaybackMuted, (muted) => {
   if (element !== null) {
     element.muted = muted;
   }
+});
+
+watch(contentDetail, (detail) => {
+  if (detail === null) {
+    expandedTranscriptIds.value = new Set();
+    return;
+  }
+
+  expandedTranscriptIds.value = new Set(
+    detail.transcripts
+      .filter((transcript) => transcript.body !== null)
+      .map((transcript) => transcript.id),
+  );
 });
 
 onMounted(async () => {
@@ -515,6 +537,18 @@ function updatePlaybackVolume(nextVolume: number): void {
 
 function closeAssetMenu(): void {
   expandedAssetMenuId.value = null;
+}
+
+function toggleTranscriptExpanded(transcriptId: string): void {
+  const nextExpandedIds = new Set(expandedTranscriptIds.value);
+
+  if (nextExpandedIds.has(transcriptId)) {
+    nextExpandedIds.delete(transcriptId);
+  } else {
+    nextExpandedIds.add(transcriptId);
+  }
+
+  expandedTranscriptIds.value = nextExpandedIds;
 }
 
 async function inspectCurrentSource(): Promise<void> {
@@ -1051,6 +1085,16 @@ function formatDate(value: string | null): string {
 
 function detailPlayableAssets(detail: ContentDetailItem): ContentDetailAsset[] {
   return detail.assets.filter(isPlayableAsset);
+}
+
+function firstPlayableAudioAsset(
+  detail: ContentDetailItem,
+): ContentDetailAsset | null {
+  return (
+    detail.assets.find(
+      (asset) => asset.url !== null && asset.mimeType?.startsWith("audio/"),
+    ) ?? null
+  );
 }
 
 function detailReferenceAssets(
@@ -1759,14 +1803,33 @@ function normalizeCollectorSettingFormValue(
           <div class="pane-header">
             <div class="pane-heading">
               <p class="eyebrow">Detail</p>
-              <h2>
-                {{
-                  contentDetail?.title ??
-                  (routeState.kind === "browse-entry"
-                    ? "Entry detail"
-                    : "Select an entry")
-                }}
-              </h2>
+              <div class="pane-title-row">
+                <h2>
+                  {{
+                    contentDetail?.title ??
+                    (routeState.kind === "browse-entry"
+                      ? "Entry detail"
+                      : "Select an entry")
+                  }}
+                </h2>
+                <button
+                  v-if="contentDetail !== null && detailHeaderAudioAsset"
+                  type="button"
+                  class="secondary-button pane-title-action"
+                  :class="{
+                    active: isCurrentPlaybackAsset(detailHeaderAudioAsset.id),
+                  }"
+                  @click="startPlayback(contentDetail, detailHeaderAudioAsset)"
+                >
+                  {{
+                    isCurrentPlaybackAsset(detailHeaderAudioAsset.id)
+                      ? isPlaybackActive
+                        ? "Playing"
+                        : "Resume"
+                      : "Play"
+                  }}
+                </button>
+              </div>
               <p class="pane-caption">
                 {{
                   contentDetail?.source.title ??
@@ -1875,9 +1938,25 @@ function normalizeCollectorSettingFormValue(
                     </div>
                   </div>
 
-                  <p v-if="transcript.body" class="transcript-body">
-                    {{ transcript.body }}
-                  </p>
+                  <details
+                    v-if="transcript.body"
+                    class="transcript-disclosure"
+                    :open="expandedTranscriptIds.has(transcript.id)"
+                  >
+                    <summary
+                      class="transcript-summary"
+                      @click.prevent="toggleTranscriptExpanded(transcript.id)"
+                    >
+                      {{
+                        expandedTranscriptIds.has(transcript.id)
+                          ? "Hide transcript"
+                          : "Show transcript"
+                      }}
+                    </summary>
+                    <p class="transcript-body">
+                      {{ transcript.body }}
+                    </p>
+                  </details>
                   <p v-else class="asset-meta">
                     {{
                       transcript.status === "failed"
