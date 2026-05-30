@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 const sourceFeedUrl =
@@ -235,17 +236,14 @@ test("opens entry detail and exposes playable audio", async ({
   ).toBeVisible();
 });
 
-async function openSourceRegistration(page: import("@playwright/test").Page) {
+async function openSourceRegistration(page: Page) {
   await page.getByRole("button", { name: "Add source" }).click();
   await expect(
     page.getByRole("heading", { level: 2, name: "Add source" }),
   ).toBeVisible();
 }
 
-async function detectSources(
-  page: import("@playwright/test").Page,
-  url: string,
-) {
+async function detectSources(page: Page, url: string) {
   await page.getByRole("textbox", { name: "Discovery URL" }).fill(url);
   await page.getByRole("button", { name: "Detect sources" }).click();
   await expect(
@@ -253,11 +251,7 @@ async function detectSources(
   ).toBeVisible();
 }
 
-function candidateRow(
-  page: import("@playwright/test").Page,
-  title: string,
-  meta: string,
-) {
+function candidateRow(page: Page, title: string, meta: string) {
   return page.locator(".candidate-option").filter({
     has: page.locator(".candidate-option-title", { hasText: title }),
     hasText: meta,
