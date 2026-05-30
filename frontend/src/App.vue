@@ -378,6 +378,20 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
 
       return;
     }
+    case "o": {
+      if (triggerOriginalPageShortcut()) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+    case "p": {
+      if (triggerPlaybackShortcut()) {
+        event.preventDefault();
+      }
+
+      return;
+    }
     default: {
       return;
     }
@@ -1218,6 +1232,36 @@ function moveDetailSelection(direction: -1 | 1): boolean {
   return true;
 }
 
+function triggerOriginalPageShortcut(): boolean {
+  if (activeBrowsePane.value !== "detail" || contentDetail.value === null) {
+    return false;
+  }
+
+  const originalPageUrl = detailOriginalPageUrl(contentDetail.value);
+
+  if (originalPageUrl === null) {
+    return false;
+  }
+
+  openExternalUrl(originalPageUrl);
+  return true;
+}
+
+function triggerPlaybackShortcut(): boolean {
+  if (activeBrowsePane.value !== "detail" || contentDetail.value === null) {
+    return false;
+  }
+
+  const asset = detailHeaderAudioAsset.value;
+
+  if (asset === null) {
+    return false;
+  }
+
+  startPlayback(contentDetail.value, asset);
+  return true;
+}
+
 function selectRelativeItem<Item extends { id: string }>(
   items: Item[],
   selectedId: string | null,
@@ -1267,6 +1311,10 @@ function scrollSelectedRowIntoView(): void {
   selectedRow?.scrollIntoView({
     block: "nearest",
   });
+}
+
+function openExternalUrl(url: string): void {
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function normalizeRoute(pathname: string): RouteState {
