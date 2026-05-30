@@ -7,15 +7,18 @@ import {
 } from "../../src/db/source-repository.js";
 import {
   createCreateSourceEndpoint,
+  createDiscoverSourcesEndpoint,
   createEnqueueObserveSourceEndpoint,
   createGetSourceCollectorSettingsEndpoint,
   createInspectSourceEndpoint,
   createListSourceCollectorPluginsEndpoint,
   createListSourcesEndpoint,
   createPatchSourceCollectorSettingsEndpoint,
+  createPreviewSourceEndpoint,
 } from "../../src/endpoints/api/v1/sources.js";
 import { err, ok } from "../../src/lib/result.js";
 import type { JobService } from "../../src/service/job-service.js";
+import type { SourceDiscoveryService } from "../../src/service/source-discovery-service.js";
 import type { SourceInspectService } from "../../src/service/source-inspect-service.js";
 import type { SourceService } from "../../src/service/source-service.js";
 import { createTestAppDependencies } from "../support/app-dependencies.js";
@@ -382,6 +385,77 @@ describe("source endpoints", () => {
     expect(result.error).toEqual({
       code: "source_inspect_failed",
       message: "boom",
+    });
+  });
+
+  it("passes discovery results through unchanged", async () => {
+    const endpoint = createDiscoverSourcesEndpoint(
+      createTestAppDependencies({
+        sourceDiscoveryService: {
+          discoverSources: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                candidates: [
+                  {
+                    description: "desc",
+                    pluginSlug: "podcast-rss",
+                    previewAvailable: true,
+                    sourceKind: "podcast" as const,
+                    sourceSlug: "example-feed",
+                    title: "Example Feed",
+                    url: "https://example.com/feed.xml",
+                  },
+                ],
+              }),
+            ),
+          ),
+          previewSource: vi.fn(),
+        } satisfies SourceDiscoveryService,
+      }),
+    );
+
+    const result = await endpoint({
+      url: "https://example.com/",
+    });
+
+    assertOk(result);
+    expect(result.value.candidates[0]).toMatchObject({
+      pluginSlug: "podcast-rss",
+      sourceSlug: "example-feed",
+    });
+  });
+
+  it("passes preview results through unchanged", async () => {
+    const endpoint = createPreviewSourceEndpoint(
+      createTestAppDependencies({
+        sourceDiscoveryService: {
+          discoverSources: vi.fn(),
+          previewSource: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                items: [
+                  {
+                    kind: "episode",
+                    publishedAt: null,
+                    summary: "Summary",
+                    title: "Episode 1",
+                  },
+                ],
+              }),
+            ),
+          ),
+        } satisfies SourceDiscoveryService,
+      }),
+    );
+
+    const result = await endpoint({
+      pluginSlug: "podcast-rss",
+      url: "https://example.com/feed.xml",
+    });
+
+    assertOk(result);
+    expect(result.value.items[0]).toMatchObject({
+      title: "Episode 1",
     });
   });
 

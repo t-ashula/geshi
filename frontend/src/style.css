@@ -777,6 +777,59 @@ h3 {
   max-width: 520px;
 }
 
+.candidate-list-shell {
+  max-width: none;
+}
+
+.candidate-list {
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 8px;
+  border: 1px solid var(--color-border-soft);
+  background: var(--color-panel);
+}
+
+.candidate-option {
+  display: grid;
+  grid-template-columns:
+    auto
+    minmax(180px, 0.8fr)
+    minmax(180px, 0.8fr)
+    minmax(260px, 1.2fr)
+    minmax(220px, 1fr);
+  gap: 10px;
+  padding: 12px 14px;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-soft);
+  background: var(--color-panel-strong);
+}
+
+.candidate-option:last-child {
+  border-bottom: 0;
+}
+
+.candidate-option input[type="checkbox"] {
+  margin: 0;
+}
+
+.candidate-option-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.candidate-option-meta,
+.candidate-option-url,
+.candidate-option-preview {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.candidate-option-error {
+  margin: 0;
+  padding: 6px 8px;
+}
+
 .toggle-field {
   display: flex;
   align-items: center;
@@ -809,6 +862,20 @@ h3 {
 .create-grid label {
   display: grid;
   gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .candidate-option {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .candidate-option-meta,
+  .candidate-option-url,
+  .candidate-option-preview,
+  .candidate-option-error {
+    grid-column: 2;
+  }
 }
 
 .create-grid span {

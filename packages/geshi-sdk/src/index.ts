@@ -171,8 +171,43 @@ export type SourceCollectorSupportsResult = {
 
 export type SourceMetadata = {
   description: string | null;
+  sourceSlug?: string;
   title: string | null;
   url: string;
+};
+
+export type SourceDiscoveryCandidate = {
+  description: string | null;
+  sourceSlug: string;
+  title: string | null;
+  url: string;
+};
+
+export type SourceCollectorDiscoverInput = {
+  abortSignal: AbortSignal;
+  config: Record<string, unknown>;
+  inputUrl: string;
+};
+
+export type SourceCollectorDiscoverResult = {
+  candidates: SourceDiscoveryCandidate[];
+};
+
+export type SourceCollectorPreviewInput = {
+  abortSignal: AbortSignal;
+  config: Record<string, unknown>;
+  sourceUrl: string;
+};
+
+export type SourceCollectorPreviewItem = {
+  kind: string;
+  publishedAt: Date | null;
+  summary: string | null;
+  title: string | null;
+};
+
+export type SourceCollectorPreviewResult = {
+  items: SourceCollectorPreviewItem[];
 };
 
 export type SourceCollectorInspectErrorCode =
@@ -266,10 +301,18 @@ export interface SourceCollectorPlugin {
   settingSchema():
     | SourceCollectorSettingSchemaField[]
     | Promise<SourceCollectorSettingSchemaField[]>;
+  discover?(
+    input: SourceCollectorDiscoverInput,
+    context: SourceCollectorExecutionContext,
+  ): Promise<SourceCollectorDiscoverResult>;
   inspect(
     input: SourceCollectorInspectInput,
     context: SourceCollectorExecutionContext,
   ): Promise<SourceMetadata>;
+  preview?(
+    input: SourceCollectorPreviewInput,
+    context: SourceCollectorExecutionContext,
+  ): Promise<SourceCollectorPreviewResult>;
   observe(
     input: SourceCollectorObserveInput,
     context: SourceCollectorExecutionContext,

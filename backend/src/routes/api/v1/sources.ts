@@ -4,17 +4,21 @@ import { Hono } from "hono";
 import type { AppDependencies } from "../../../deps.js";
 import type {
   CreateSourceEndpointInput,
+  DiscoverSourcesEndpointInput,
   InspectSourceEndpointInput,
   PatchSourceCollectorSettingsEndpointInput,
+  PreviewSourceEndpointInput,
 } from "../../../endpoints/api/v1/sources.js";
 import {
   createCreateSourceEndpoint,
+  createDiscoverSourcesEndpoint,
   createEnqueueObserveSourceEndpoint,
   createGetSourceCollectorSettingsEndpoint,
   createInspectSourceEndpoint,
   createListSourceCollectorPluginsEndpoint,
   createListSourcesEndpoint,
   createPatchSourceCollectorSettingsEndpoint,
+  createPreviewSourceEndpoint,
 } from "../../../endpoints/api/v1/sources.js";
 import type { Result } from "../../../lib/result.js";
 import { err, ok } from "../../../lib/result.js";
@@ -38,7 +42,9 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
   const listSourceCollectorPlugins =
     createListSourceCollectorPluginsEndpoint(dependencies);
   const createSource = createCreateSourceEndpoint(dependencies);
+  const discoverSources = createDiscoverSourcesEndpoint(dependencies);
   const inspectSource = createInspectSourceEndpoint(dependencies);
+  const previewSource = createPreviewSourceEndpoint(dependencies);
   const enqueueObserveSource = createEnqueueObserveSourceEndpoint(dependencies);
   const getSourceCollectorSettings =
     createGetSourceCollectorSettingsEndpoint(dependencies);
@@ -99,6 +105,36 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
 
     return context.json({ data: result.value }, { status: 201 });
   });
+  router.post("/discover", async (context) => {
+    const json = await readJsonObject(context);
+
+    if (!json.ok) {
+      logger.warn("source discover rejected invalid JSON.", {
+        errorCode: json.error.code,
+      });
+      return context.json({ error: json.error }, { status: 400 });
+    }
+
+    const input = toDiscoverSourcesEndpointInput(json.value);
+    logger.info("source discover request received.", {
+      requestUrl: input.url,
+    });
+    const result = await discoverSources(input);
+
+    if (!result.ok) {
+      logger.warn("source discover request failed.", {
+        errorCode: result.error.code,
+        errorMessage: result.error.message,
+      });
+      return context.json({ error: result.error }, { status: 422 });
+    }
+
+    logger.info("source discover request completed.", {
+      candidateCount: result.value.candidates.length,
+    });
+
+    return context.json({ data: result.value });
+  });
   router.post("/inspect", async (context) => {
     const json = await readJsonObject(context);
 
@@ -122,6 +158,40 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
         },
       );
     }
+
+    return context.json({ data: result.value });
+  });
+  router.post("/preview", async (context) => {
+    const json = await readJsonObject(context);
+
+    if (!json.ok) {
+      logger.warn("source preview rejected invalid JSON.", {
+        errorCode: json.error.code,
+      });
+      return context.json({ error: json.error }, { status: 400 });
+    }
+
+    const input = toPreviewSourceEndpointInput(json.value);
+    logger.info("source preview request received.", {
+      pluginSlug: input.pluginSlug,
+      requestUrl: input.url,
+    });
+    const result = await previewSource(input);
+
+    if (!result.ok) {
+      logger.warn("source preview request failed.", {
+        errorCode: result.error.code,
+        errorMessage: result.error.message,
+      });
+      return context.json(
+        { error: result.error },
+        { status: result.error.code === "source_preview_failed" ? 500 : 422 },
+      );
+    }
+
+    logger.info("source preview request completed.", {
+      itemCount: result.value.items.length,
+    });
 
     return context.json({ data: result.value });
   });
@@ -233,6 +303,23 @@ function toCreateSourceEndpointInput(
 function toInspectSourceEndpointInput(
   value: Record<string, unknown>,
 ): InspectSourceEndpointInput {
+  return {
+    pluginSlug: toOptionalString(value.pluginSlug),
+    url: toOptionalString(value.url),
+  };
+}
+
+function toDiscoverSourcesEndpointInput(
+  value: Record<string, unknown>,
+): DiscoverSourcesEndpointInput {
+  return {
+    url: toOptionalString(value.url),
+  };
+}
+
+function toPreviewSourceEndpointInput(
+  value: Record<string, unknown>,
+): PreviewSourceEndpointInput {
   return {
     pluginSlug: toOptionalString(value.pluginSlug),
     url: toOptionalString(value.url),

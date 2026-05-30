@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  discoverSources,
   getContentDetail,
   getSourceCollectorSettings,
   inspectSource,
   listSourceCollectorPlugins,
+  previewSource,
 } from "../src/source-api.js";
 
 describe("inspectSource", () => {
@@ -85,6 +87,113 @@ describe("inspectSource", () => {
         url: "https://example.com/feed.xml",
       }),
     ).rejects.toThrow("The given URL is not a supported RSS feed.");
+  });
+});
+
+describe("discoverSources", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns discovery data on success", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: {
+              candidates: [
+                {
+                  description: "Weekly notes",
+                  pluginSlug: "podcast-rss",
+                  previewAvailable: true,
+                  sourceKind: "podcast",
+                  sourceSlug: "example-feed",
+                  title: "Example Feed",
+                  url: "https://example.com/feed.xml",
+                },
+              ],
+            },
+          }),
+          {
+            headers: {
+              "content-type": "application/json",
+            },
+            status: 200,
+          },
+        ),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      discoverSources({
+        url: "https://example.com/",
+      }),
+    ).resolves.toEqual({
+      candidates: [
+        {
+          description: "Weekly notes",
+          pluginSlug: "podcast-rss",
+          previewAvailable: true,
+          sourceKind: "podcast",
+          sourceSlug: "example-feed",
+          title: "Example Feed",
+          url: "https://example.com/feed.xml",
+        },
+      ],
+    });
+  });
+});
+
+describe("previewSource", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns preview data on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                items: [
+                  {
+                    kind: "episode",
+                    publishedAt: null,
+                    summary: "Summary",
+                    title: "Episode 1",
+                  },
+                ],
+              },
+            }),
+            {
+              headers: {
+                "content-type": "application/json",
+              },
+              status: 200,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await expect(
+      previewSource({
+        pluginSlug: "podcast-rss",
+        url: "https://example.com/feed.xml",
+      }),
+    ).resolves.toEqual({
+      items: [
+        {
+          kind: "episode",
+          publishedAt: null,
+          summary: "Summary",
+          title: "Episode 1",
+        },
+      ],
+    });
   });
 });
 

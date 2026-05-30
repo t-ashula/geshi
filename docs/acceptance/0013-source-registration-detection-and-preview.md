@@ -1,12 +1,14 @@
 # Source Registration Detection And Preview
 
-この開発項目では，source 登録フローを「plugin を先に選ぶ画面」から，「URL から候補を検知し，preview を確認して，登録対象を確定する流れ」へ置き換え，その登録体験が backend API と frontend UI を通して実際に利用可能になっていることを受け入れ条件とする．初手の対象は built-in の `rss` / `podcast-rss` plugin とし，この 2 つで成立することをもって今回の完了条件とする．
+この開発項目では，任意 URL を起点に登録可能な source を検出し，必要なら複数候補を提示し，preview を確認したうえで登録対象を確定できる登録体験を，backend API と frontend UI を通して実際に利用可能にすることを受け入れ条件とする．
+初手の対象は built-in の `rss` / `podcast-rss` plugin とし，この 2 つで成立することをもって今回の完了条件とする．
 
 ## 受け入れ条件
 
-- source 登録画面で，source collector plugin を先に選ばなくても URL だけを入力して候補検知を開始できる
+- source 登録画面で，source collector plugin を先に選ばなくても URL だけを入力して source 検出を開始できる
 - built-in の `rss` / `podcast-rss` plugin が，今回の detect / preview / register 経路で利用可能になっている
-- source 登録画面で URL を入力すると，検知結果として 0 件，1 件，複数件の候補を利用者へ提示できる
+- source 登録画面で URL を入力すると，その URL から発見された結果として 0 件，1 件，複数件の source 候補を利用者へ提示できる
+- 入力として与えた URL は，登録対象 source 自体の URL に限らず，そこから登録候補を発見できる URL を許容できる
 - 検知結果の各候補には，少なくとも `pluginSlug`，`sourceKind`，正規化後 URL，title，description，slug 候補，相当の識別情報が表示され，利用者がどの候補を登録するか判断できる
 - 候補ごとに preview を表示でき，利用者が「何が取れそうか」を登録前に確認できる
 - preview は登録処理と分離され，preview を見た後に登録するかどうかを利用者が選べる
@@ -17,6 +19,7 @@
 - register 実行後，選ばれた候補に対応する source が永続化され，source 一覧から確認できる
 - `rss` source を検知して登録できる
 - `podcast-rss` source を検知して登録できる
+- 1 つの入力 URL から複数の source 候補が返る場合は，その中から登録対象を選べる
 - register 後の source には，検知時に得られた正規化後 URL，title，description，slug 候補のうち採用した値が反映される
 - 候補 0 件の場合，登録処理へ進まず，利用者に候補が見つからなかったことが分かる表示になる
 - preview 取得に失敗した場合，その失敗が利用者に分かる形で表示され，画面全体が破綻しない
@@ -30,10 +33,11 @@
 
 ## 確認方法
 
-- source 登録 UI を開き，plugin 未選択でも URL 入力から候補検知を開始できることを確認する
+- source 登録 UI を開き，plugin 未選択でも URL 入力から source 検出を開始できることを確認する
 - built-in `rss` source の URL を入力し，`rss` plugin による候補検知，preview，register が成立することを確認する
 - built-in `podcast-rss` source の URL を入力し，`podcast-rss` plugin による候補検知，preview，register が成立することを確認する
-- 検知可能な URL を入力し，候補が 1 件または複数件表示され，各候補の識別情報が登録判断に足る形で見えることを確認する
+- 検知可能な URL を入力し，その URL から発見された候補が 1 件または複数件表示され，各候補の識別情報が登録判断に足る形で見えることを確認する
+- 1 つの入力 URL から複数候補を返せるケースでは，複数候補が表示され，登録対象を選べることを確認する
 - preview を開き，登録前に候補内容を確認できることを確認する
 - 候補を選んで register し，source 一覧に反映されることを確認する
 - 候補 0 件となる URL を入力し，登録へ進まず，候補なしの表示になることを確認する

@@ -2,88 +2,89 @@ import { expect, test } from "@playwright/test";
 
 const sourceFeedUrl =
   process.env.E2E_SOURCE_FEED_URL ?? "http://127.0.0.1:3401/feeds/podcast.xml";
-const nonRssSourceUrl =
-  process.env.E2E_NON_RSS_SOURCE_URL ??
-  "http://127.0.0.1:3401/feeds/not-rss.xml";
+const discoveryPageUrl =
+  process.env.E2E_DISCOVERY_PAGE_URL ??
+  "http://127.0.0.1:3401/discovery/index.html";
 const sourceOrigin = new URL(sourceFeedUrl).origin;
 
-test("shows available external plugin in source registration", async ({
+test("detects multiple source candidates from a discovery page and registers them", async ({
   page,
+  request,
 }) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Add source" }).click();
+  await openSourceRegistration(page);
+  await detectSources(page, discoveryPageUrl);
 
-  const pluginSelect = page.getByRole("combobox", {
-    name: "Collector Plugin",
-  });
+  const rdfCandidate = candidateRow(page, "Geshi E2E RDF Feed", "rss / feed");
+  const podcastCandidate = candidateRow(
+    page,
+    "Geshi E2E Discovery Podcast",
+    "podcast-rss / podcast",
+  );
+  const duplicatePodcastCandidate = candidateRow(
+    page,
+    "Geshi E2E Discovery Podcast",
+    "rss / feed",
+  );
 
-  await expect(pluginSelect).toBeVisible();
-  await expect(pluginSelect).toContainText("Radiko (streaming)");
-});
+  await expect(rdfCandidate).toBeVisible();
+  await expect(podcastCandidate).toBeVisible();
+  await expect(rdfCandidate.getByText("Discovery Entry 1")).toBeVisible();
+  await expect(podcastCandidate.getByText("Discovery Episode 1")).toBeVisible();
+  await duplicatePodcastCandidate.getByRole("checkbox").uncheck();
 
-test("autofills source fields via inspect", async ({ page }) => {
-  await page.goto("/");
-
-  await page.getByRole("button", { name: "Add source" }).click();
   await page
-    .getByRole("combobox", { name: "Collector Plugin" })
-    .selectOption("podcast-rss");
-
-  const urlInput = page.getByRole("textbox", { name: "Source URL" });
-  await urlInput.fill(sourceFeedUrl);
-  await urlInput.blur();
-
-  await expect(page.getByRole("textbox", { name: "Source Slug" })).toHaveValue(
-    /geshi-e2e-feed-/,
-  );
-  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue(
-    "Geshi E2E Feed",
-  );
-  await expect(page.getByRole("textbox", { name: "Description" })).toHaveValue(
-    "Fixture feed for E2E tests.",
-  );
-});
-
-test("allows manual registration after inspect failure", async ({ page }) => {
-  await page.goto("/");
-
-  await page.getByRole("button", { name: "Add source" }).click();
-  await page
-    .getByRole("combobox", { name: "Collector Plugin" })
-    .selectOption("podcast-rss");
-
-  const urlInput = page.getByRole("textbox", { name: "Source URL" });
-  await urlInput.fill(nonRssSourceUrl);
-  await urlInput.blur();
-
-  await expect(page.getByRole("textbox", { name: "Source Slug" })).toHaveValue(
-    "",
-  );
-  await expect(page.getByRole("textbox", { name: "Title" })).toHaveValue("");
-
-  await page.getByRole("textbox", { name: "Title" }).fill("Manual Source");
-  await page
-    .getByRole("textbox", { name: "Description" })
-    .fill("Registered after inspect failure.");
-  await page.getByRole("button", { name: "Register", exact: true }).click();
+    .getByRole("button", { name: "Register selected sources" })
+    .click();
 
   await expect(
-    page.getByRole("heading", { level: 2, name: "Manual Source" }),
-  ).toBeVisible();
+    page.getByRole("heading", { level: 2, name: "Add source" }),
+  ).toHaveCount(0);
+
+  await expect
+    .poll(
+      async () => {
+        const response = await request.get("/api/v1/sources");
+        const payload = (await response.json()) as {
+          data: Array<{ title: string | null }>;
+        };
+
+        const titles = payload.data.map((source) => source.title);
+
+        return (
+          titles.includes("Geshi E2E RDF Feed") &&
+          titles.includes("Geshi E2E Discovery Podcast")
+        );
+      },
+      {
+        timeout: 30_000,
+      },
+    )
+    .toBe(true);
 });
 
-test("registers a source and observes contents", async ({ page, request }) => {
+test("registers a source from direct feed discovery and observes contents", async ({
+  page,
+  request,
+}) => {
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Add source" }).click();
+  await openSourceRegistration(page);
+  await detectSources(page, sourceFeedUrl);
+  const selectedCandidate = candidateRow(
+    page,
+    "Geshi E2E Feed",
+    "podcast-rss / podcast",
+  );
+  const duplicateCandidate = candidateRow(page, "Geshi E2E Feed", "rss / feed");
+
+  await expect(selectedCandidate).toBeVisible();
+  await expect(selectedCandidate.getByText("Episode 1")).toBeVisible();
+  await duplicateCandidate.getByRole("checkbox").uncheck();
   await page
-    .getByRole("combobox", { name: "Collector Plugin" })
-    .selectOption("podcast-rss");
-  const urlInput = page.getByRole("textbox", { name: "Source URL" });
-  await urlInput.fill(sourceFeedUrl);
-  await urlInput.blur();
-  await page.getByRole("button", { name: "Register", exact: true }).click();
+    .getByRole("button", { name: "Register selected sources" })
+    .click();
 
   await expect(
     page.getByRole("heading", { level: 2, name: "Geshi E2E Feed" }),
@@ -121,14 +122,14 @@ test("opens entry detail and exposes playable audio", async ({
 
   await page.goto("/");
 
-  await page.getByRole("button", { name: "Add source" }).click();
+  await openSourceRegistration(page);
+  await detectSources(page, playbackSourceFeedUrl);
+  await candidateRow(page, "Geshi E2E Feed", "rss / feed")
+    .getByRole("checkbox")
+    .uncheck();
   await page
-    .getByRole("combobox", { name: "Collector Plugin" })
-    .selectOption("podcast-rss");
-  const urlInput = page.getByRole("textbox", { name: "Source URL" });
-  await urlInput.fill(playbackSourceFeedUrl);
-  await urlInput.blur();
-  await page.getByRole("button", { name: "Register", exact: true }).click();
+    .getByRole("button", { name: "Register selected sources" })
+    .click();
 
   await expect(
     page.getByRole("heading", { level: 2, name: "Geshi E2E Feed" }),
@@ -209,14 +210,23 @@ test("opens entry detail and exposes playable audio", async ({
   await expect(
     page.getByRole("link", { name: "Original page" }),
   ).toHaveAttribute("href", `${sourceOrigin}/episodes/1.html`);
+  await expect(
+    page.getByRole("heading", { level: 3, name: "Playable assets" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Play" }).first().click();
+  await expect(page.getByText("Episode 1").last()).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Stop playback" }),
+  ).toBeVisible();
 
   const audio = page.locator("audio");
-  await expect(audio).toBeVisible();
+  await expect(audio).toHaveAttribute(
+    "src",
+    /\/media\/assets\/[0-9a-f-]+\.mp3$/u,
+  );
 
-  const audioSourceUrl = await page
-    .locator("audio source")
-    .first()
-    .getAttribute("src");
+  const audioSourceUrl = await audio.getAttribute("src");
 
   expect(audioSourceUrl).toMatch(/^\/media\/assets\/[0-9a-f-]+\.mp3$/u);
 
@@ -230,3 +240,32 @@ test("opens entry detail and exposes playable audio", async ({
     page.getByRole("menuitem", { name: "Request transcripts" }),
   ).toBeVisible();
 });
+
+async function openSourceRegistration(page: import("@playwright/test").Page) {
+  await page.getByRole("button", { name: "Add source" }).click();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Add source" }),
+  ).toBeVisible();
+}
+
+async function detectSources(
+  page: import("@playwright/test").Page,
+  url: string,
+) {
+  await page.getByRole("textbox", { name: "Discovery URL" }).fill(url);
+  await page.getByRole("button", { name: "Detect sources" }).click();
+  await expect(
+    page.getByRole("heading", { level: 3, name: "Select sources to register" }),
+  ).toBeVisible();
+}
+
+function candidateRow(
+  page: import("@playwright/test").Page,
+  title: string,
+  meta: string,
+) {
+  return page.locator(".candidate-option").filter({
+    has: page.locator(".candidate-option-title", { hasText: title }),
+    hasText: meta,
+  });
+}

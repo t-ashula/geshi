@@ -7,6 +7,11 @@ import {
 import type { AppDependencies } from "../../../deps.js";
 import type { Result } from "../../../lib/result.js";
 import { err, ok } from "../../../lib/result.js";
+import type {
+  DiscoverSourcesResult,
+  PreviewSourceError,
+  PreviewSourceResult,
+} from "../../../service/source-discovery-service.js";
 import type { InspectSourceError } from "../../../service/source-inspect-service.js";
 import type { InspectSourceResult } from "../../../service/source-inspect-service.js";
 import type {
@@ -82,6 +87,15 @@ export type CreateSourceEndpointInput = {
 };
 
 export type InspectSourceEndpointInput = {
+  pluginSlug?: string;
+  url?: string;
+};
+
+export type DiscoverSourcesEndpointInput = {
+  url?: string;
+};
+
+export type PreviewSourceEndpointInput = {
   pluginSlug?: string;
   url?: string;
 };
@@ -200,6 +214,27 @@ export function createInspectSourceEndpoint(dependencies: AppDependencies) {
     dependencies.sourceInspectService.inspectSource({
       url: input.url ?? "",
       pluginSlug: input.pluginSlug,
+    });
+}
+
+export function createDiscoverSourcesEndpoint(dependencies: AppDependencies) {
+  return async (
+    input: DiscoverSourcesEndpointInput,
+  ): Promise<
+    Result<DiscoverSourcesResult, { code: string; message: string }>
+  > =>
+    dependencies.sourceDiscoveryService.discoverSources({
+      url: input.url ?? "",
+    });
+}
+
+export function createPreviewSourceEndpoint(dependencies: AppDependencies) {
+  return async (
+    input: PreviewSourceEndpointInput,
+  ): Promise<Result<PreviewSourceResult, PreviewSourceError>> =>
+    dependencies.sourceDiscoveryService.previewSource({
+      pluginSlug: input.pluginSlug ?? "",
+      url: input.url ?? "",
     });
 }
 

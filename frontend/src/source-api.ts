@@ -11,6 +11,15 @@ export type InspectSourceRequest = {
   url: string;
 };
 
+export type DiscoverSourcesRequest = {
+  url: string;
+};
+
+export type PreviewSourceRequest = {
+  pluginSlug: string;
+  url: string;
+};
+
 export type SourceCollectorPluginListItem = {
   description: string | null;
   displayName: string;
@@ -35,6 +44,31 @@ export type InspectSourceDraft = {
   sourceSlug: string;
   title: string | null;
   url: string;
+};
+
+export type SourceDiscoveryCandidate = {
+  description: string | null;
+  pluginSlug: string;
+  previewAvailable: boolean;
+  sourceKind: "feed" | "podcast" | "streaming";
+  sourceSlug: string;
+  title: string | null;
+  url: string;
+};
+
+export type DiscoverSourcesResult = {
+  candidates: SourceDiscoveryCandidate[];
+};
+
+export type SourcePreviewItem = {
+  kind: string;
+  publishedAt: string | null;
+  summary: string | null;
+  title: string | null;
+};
+
+export type PreviewSourceResult = {
+  items: SourcePreviewItem[];
 };
 
 export type ApiError = {
@@ -213,6 +247,14 @@ type InspectSourceResponse = {
   data: InspectSourceDraft;
 };
 
+type DiscoverSourcesResponse = {
+  data: DiscoverSourcesResult;
+};
+
+type PreviewSourceResponse = {
+  data: PreviewSourceResult;
+};
+
 type PeriodicCrawlSettingsResponse = {
   data: PeriodicCrawlSettings;
 };
@@ -299,6 +341,56 @@ export async function inspectSource(
   }
 
   throw new Error("Source inspect failed.");
+}
+
+export async function discoverSources(
+  request: DiscoverSourcesRequest,
+): Promise<DiscoverSourcesResult> {
+  const response = await fetch("/api/v1/sources/discover", {
+    body: JSON.stringify(request),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const payload = (await response.json()) as
+    | DiscoverSourcesResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Source discovery failed.");
+}
+
+export async function previewSource(
+  request: PreviewSourceRequest,
+): Promise<PreviewSourceResult> {
+  const response = await fetch("/api/v1/sources/preview", {
+    body: JSON.stringify(request),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const payload = (await response.json()) as
+    | PreviewSourceResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Source preview failed.");
 }
 
 export async function observeSource(sourceId: string): Promise<JobListItem> {

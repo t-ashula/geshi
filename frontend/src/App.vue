@@ -14,9 +14,11 @@ import type {
   ContentDetailItem,
   ContentTranscriptItem,
   ContentListItem,
-  CreateSourceRequest,
+  DiscoverSourcesResult,
   PeriodicCrawlSettings,
   PluginGlobalSettingsDetail,
+  PreviewSourceResult,
+  SourceDiscoveryCandidate,
   SourceCollectorPluginListItem,
   SourceCollectorSettingItem,
   SourceCollectorSettingsDetail,
@@ -24,15 +26,16 @@ import type {
 } from "./source-api.js";
 import {
   createSource,
+  discoverSources,
   getContentDetail,
   getPeriodicCrawlSettings,
   getPluginGlobalSettings,
   getSourceCollectorSettings,
-  inspectSource,
   listSourceCollectorPlugins,
   listContents,
   listSources,
   observeSource,
+  previewSource,
   requestTranscripts,
   retryTranscript,
   updatePeriodicCrawlSettings,
@@ -48,7 +51,6 @@ import {
   selectDetailDisplayContent,
 } from "./content-detail.js";
 import type { PlaybackState } from "./playback.js";
-import { validateCreateSourceRequest } from "./source-form.js";
 
 type RouteState =
   | { kind: "browse-index" }
@@ -62,7 +64,8 @@ const contentDetail = ref<ContentDetailItem | null>(null);
 const sourceCollectorPlugins = ref<SourceCollectorPluginListItem[]>([]);
 const sources = ref<SourceListItem[]>([]);
 const isCreateFormVisible = ref(false);
-const isInspecting = ref(false);
+const isDiscovering = ref(false);
+const isLoadingPreviews = ref(false);
 const isSubmitting = ref(false);
 const isObserveSubmitting = ref<string | null>(null);
 const isSourceCrawlSubmitting = ref<string | null>(null);
@@ -87,16 +90,13 @@ const pluginGlobalSettingsErrorMessage = ref<string | null>(null);
 const sourceCrawlErrorMessage = ref<string | null>(null);
 const transcriptActionErrorMessage = ref<string | null>(null);
 const validationMessage = ref<string | null>(null);
-const lastInspectedUrl = ref<string | null>(null);
-const lastInspectedPluginSlug = ref<string | null>(null);
 const routeState = ref<RouteState>(normalizeRoute(window.location.pathname));
-const form = ref<CreateSourceRequest>({
-  description: "",
-  pluginSlug: "",
-  sourceSlug: "",
-  title: "",
-  url: "",
-});
+const discoveryUrl = ref("");
+const hasAttemptedDiscovery = ref(false);
+const discoveredSources = ref<SourceDiscoveryCandidate[]>([]);
+const discoveredPreviews = ref<Record<string, PreviewSourceResult>>({});
+const discoveredPreviewErrors = ref<Record<string, string>>({});
+const selectedDiscoveryKeys = ref<string[]>([]);
 const periodicCrawlSettings = ref<PeriodicCrawlSettings>({
   enabled: true,
   intervalMinutes: 60,
@@ -304,38 +304,31 @@ function syncRouteFromLocation(): void {
 
 function openCreateForm(): void {
   isCreateFormVisible.value = true;
+  isDiscovering.value = false;
+  isLoadingPreviews.value = false;
   errorMessage.value = null;
   inspectErrorMessage.value = null;
-  lastInspectedUrl.value = null;
-  lastInspectedPluginSlug.value = null;
   validationMessage.value = null;
-}
-
-function handlePluginSlugChange(pluginSlug: string): void {
-  form.value.pluginSlug = pluginSlug;
-  form.value.description = "";
-  form.value.sourceSlug = "";
-  form.value.title = "";
-  lastInspectedUrl.value = null;
-  lastInspectedPluginSlug.value = null;
-  inspectErrorMessage.value = null;
-  validationMessage.value = null;
-
-  if (form.value.url.trim() !== "") {
-    void inspectCurrentSource();
-  }
-}
-
-function handlePluginSelection(event: Event): void {
-  handlePluginSlugChange((event.target as HTMLSelectElement).value);
+  discoveryUrl.value = "";
+  hasAttemptedDiscovery.value = false;
+  discoveredSources.value = [];
+  discoveredPreviews.value = {};
+  discoveredPreviewErrors.value = {};
+  selectedDiscoveryKeys.value = [];
 }
 
 function closeCreateForm(): void {
   isCreateFormVisible.value = false;
+  isDiscovering.value = false;
+  isLoadingPreviews.value = false;
   inspectErrorMessage.value = null;
-  lastInspectedUrl.value = null;
-  lastInspectedPluginSlug.value = null;
   validationMessage.value = null;
+  discoveryUrl.value = "";
+  hasAttemptedDiscovery.value = false;
+  discoveredSources.value = [];
+  discoveredPreviews.value = {};
+  discoveredPreviewErrors.value = {};
+  selectedDiscoveryKeys.value = [];
 }
 
 function toggleTheme(): void {
@@ -551,52 +544,11 @@ function toggleTranscriptExpanded(transcriptId: string): void {
   expandedTranscriptIds.value = nextExpandedIds;
 }
 
-async function inspectCurrentSource(): Promise<void> {
-  const trimmedUrl = form.value.url.trim();
-  const trimmedPluginSlug = (form.value.pluginSlug ?? "").trim();
-
-  if (
-    trimmedUrl === "" ||
-    (lastInspectedUrl.value === trimmedUrl &&
-      lastInspectedPluginSlug.value === trimmedPluginSlug)
-  ) {
-    return;
-  }
-
-  validationMessage.value = validateCreateSourceRequest(form.value);
-
-  if (validationMessage.value !== null) {
-    inspectErrorMessage.value = validationMessage.value;
-    return;
-  }
-
-  isInspecting.value = true;
-  inspectErrorMessage.value = null;
-
-  try {
-    const draft = await inspectSource({
-      pluginSlug: form.value.pluginSlug,
-      url: trimmedUrl,
-    });
-    form.value = {
-      description: draft.description ?? "",
-      pluginSlug: form.value.pluginSlug,
-      sourceSlug: draft.sourceSlug,
-      title: draft.title ?? "",
-      url: draft.url,
-    };
-    lastInspectedUrl.value = draft.url;
-    lastInspectedPluginSlug.value = trimmedPluginSlug;
-  } catch (error) {
-    inspectErrorMessage.value =
-      error instanceof Error ? error.message : "Source inspect failed.";
-  } finally {
-    isInspecting.value = false;
-  }
-}
-
 async function submitSource(): Promise<void> {
-  validationMessage.value = validateCreateSourceRequest(form.value);
+  const candidates = selectedDiscoveredSources.value;
+
+  validationMessage.value =
+    candidates.length === 0 ? "Select at least one source candidate." : null;
 
   if (validationMessage.value !== null) {
     return;
@@ -606,29 +558,135 @@ async function submitSource(): Promise<void> {
   errorMessage.value = null;
 
   try {
-    const source = await createSource(form.value);
+    const createdSources: SourceListItem[] = [];
+
+    for (const candidate of candidates) {
+      const source = await createSource({
+        description: candidate.description ?? "",
+        pluginSlug: candidate.pluginSlug,
+        sourceSlug: candidate.sourceSlug,
+        title: candidate.title ?? "",
+        url: candidate.url,
+      });
+      createdSources.push(source);
+    }
+
     sources.value = [
       ...sources.value.filter(
-        (existingSource) => existingSource.id !== source.id,
+        (existingSource) =>
+          !createdSources.some((source) => source.id === existingSource.id),
       ),
-      source,
+      ...createdSources,
     ];
     void refreshSources();
-    form.value = {
-      description: "",
-      pluginSlug: form.value.pluginSlug,
-      sourceSlug: "",
-      title: "",
-      url: "",
-    };
     closeCreateForm();
-    navigateTo(`/browse/feed/${encodeURIComponent(source.slug)}`);
+    if (createdSources.length === 1 && createdSources[0] !== undefined) {
+      navigateTo(`/browse/feed/${encodeURIComponent(createdSources[0].slug)}`);
+    }
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Source registration failed.";
   } finally {
     isSubmitting.value = false;
   }
+}
+
+const selectedDiscoveredSources = computed(() => {
+  const selectedKeys = new Set(selectedDiscoveryKeys.value);
+
+  return discoveredSources.value.filter((candidate) =>
+    selectedKeys.has(toDiscoveryKey(candidate)),
+  );
+});
+
+async function discoverCurrentSources(): Promise<void> {
+  const trimmedUrl = discoveryUrl.value.trim();
+  validationMessage.value = validateDiscoveryUrl(trimmedUrl);
+
+  if (validationMessage.value !== null) {
+    inspectErrorMessage.value = validationMessage.value;
+    return;
+  }
+
+  isDiscovering.value = true;
+  inspectErrorMessage.value = null;
+  hasAttemptedDiscovery.value = true;
+  discoveredSources.value = [];
+  discoveredPreviews.value = {};
+  discoveredPreviewErrors.value = {};
+  selectedDiscoveryKeys.value = [];
+
+  try {
+    const result = await discoverSources({
+      url: trimmedUrl,
+    });
+    discoveredSources.value = result.candidates;
+    selectedDiscoveryKeys.value = result.candidates.map((candidate) =>
+      toDiscoveryKey(candidate),
+    );
+    void loadDiscoveryPreviews(result);
+  } catch (error) {
+    inspectErrorMessage.value =
+      error instanceof Error ? error.message : "Source discovery failed.";
+  } finally {
+    isDiscovering.value = false;
+  }
+}
+
+async function loadDiscoveryPreviews(
+  result: DiscoverSourcesResult,
+): Promise<void> {
+  isLoadingPreviews.value = true;
+  const previewEntries = await Promise.all(
+    result.candidates.map(async (candidate) => {
+      if (!candidate.previewAvailable) {
+        return [toDiscoveryKey(candidate), { items: [] }] as const;
+      }
+
+      try {
+        const loadedPreview = await previewSource({
+          pluginSlug: candidate.pluginSlug,
+          url: candidate.url,
+        });
+
+        return [toDiscoveryKey(candidate), loadedPreview] as const;
+      } catch (error) {
+        discoveredPreviewErrors.value[toDiscoveryKey(candidate)] =
+          error instanceof Error ? error.message : "Preview unavailable.";
+        return [toDiscoveryKey(candidate), { items: [] }] as const;
+      }
+    }),
+  );
+
+  discoveredPreviews.value = Object.fromEntries(previewEntries);
+  isLoadingPreviews.value = false;
+}
+
+function toDiscoveryKey(candidate: SourceDiscoveryCandidate): string {
+  return [
+    candidate.pluginSlug,
+    candidate.sourceKind,
+    candidate.sourceSlug,
+    candidate.url,
+  ].join("::");
+}
+
+function validateDiscoveryUrl(url: string): string | null {
+  if (url === "") {
+    return "Source URL is required.";
+  }
+
+  try {
+    const parsed = new URL(url);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "Source URL must be an absolute http or https URL.";
+    }
+  } catch {
+    return "Source URL must be an absolute http or https URL.";
+  }
+
+  return null;
 }
 
 async function runObserve(sourceId: string): Promise<void> {
@@ -731,16 +789,6 @@ async function refreshSources(): Promise<void> {
 async function refreshSourceCollectorPlugins(): Promise<void> {
   try {
     sourceCollectorPlugins.value = await listSourceCollectorPlugins();
-    const firstAvailablePlugin = sourceCollectorPlugins.value.find(
-      (plugin) => plugin.status === "available",
-    );
-
-    if (
-      (form.value.pluginSlug ?? "") === "" &&
-      firstAvailablePlugin !== undefined
-    ) {
-      form.value.pluginSlug = firstAvailablePlugin.pluginSlug;
-    }
   } catch (error) {
     errorMessage.value =
       error instanceof Error
@@ -1367,82 +1415,106 @@ function normalizeCollectorSettingFormValue(
 
         <div class="create-grid">
           <label>
-            <span>Collector Plugin</span>
-            <select
-              :value="form.pluginSlug"
-              :disabled="isInspecting || isSubmitting"
-              @change="handlePluginSelection"
-            >
-              <option value="" disabled>Select a plugin</option>
-              <option
-                v-for="plugin in sourceCollectorPlugins"
-                :key="plugin.pluginSlug"
-                :value="plugin.pluginSlug"
-                :disabled="plugin.status !== 'available'"
-              >
-                {{ plugin.displayName }} ({{ plugin.sourceKind }}){{
-                  plugin.status === "available" ? "" : " unavailable"
-                }}
-              </option>
-            </select>
-          </label>
-
-          <p
-            v-if="
-              sourceCollectorPlugins.find(
-                (plugin) => plugin.pluginSlug === form.pluginSlug,
-              )?.message
-            "
-            class="feedback error"
-          >
-            {{
-              sourceCollectorPlugins.find(
-                (plugin) => plugin.pluginSlug === form.pluginSlug,
-              )?.message
-            }}
-          </p>
-
-          <label>
-            <span>Source URL</span>
+            <span>Discovery URL</span>
             <input
-              v-model="form.url"
-              :disabled="isInspecting || isSubmitting"
+              v-model="discoveryUrl"
+              :disabled="isSubmitting"
               type="url"
               placeholder="https://example.com/feed.xml"
-              @change="inspectCurrentSource"
             />
           </label>
 
-          <label>
-            <span>Source Slug</span>
-            <input
-              :value="form.sourceSlug"
-              readonly
-              type="text"
-              placeholder="Filled by inspect when available"
-            />
-          </label>
-
-          <label>
-            <span>Title</span>
-            <input
-              v-model="form.title"
-              :disabled="isInspecting || isSubmitting"
-              type="text"
-              placeholder="Optional"
-            />
-          </label>
-
-          <label class="create-grid-wide">
-            <span>Description</span>
-            <textarea
-              v-model="form.description"
-              :disabled="isInspecting || isSubmitting"
-              rows="4"
-              placeholder="Optional"
-            ></textarea>
-          </label>
+          <div class="actions create-grid-wide">
+            <button
+              type="button"
+              class="primary-button"
+              :disabled="isDiscovering || isSubmitting"
+              @click="discoverCurrentSources"
+            >
+              {{ isDiscovering ? "Detecting..." : "Detect sources" }}
+            </button>
+          </div>
         </div>
+
+        <p v-if="isDiscovering" class="feedback">Detecting sources...</p>
+        <p v-else-if="isLoadingPreviews" class="feedback">
+          Loading previews...
+        </p>
+
+        <div
+          v-if="discoveredSources.length > 0"
+          class="settings-grid candidate-list-shell"
+        >
+          <div class="create-grid-wide settings-shell-header">
+            <div>
+              <p class="eyebrow">Detected Sources</p>
+              <h3>Select sources to register</h3>
+            </div>
+            <div class="actions">
+              <button
+                type="button"
+                class="primary-button"
+                :disabled="
+                  isSubmitting || selectedDiscoveredSources.length === 0
+                "
+                @click="submitSource"
+              >
+                {{
+                  isSubmitting ? "Registering..." : "Register selected sources"
+                }}
+              </button>
+            </div>
+          </div>
+
+          <div class="create-grid-wide candidate-list">
+            <label
+              v-for="candidate in discoveredSources"
+              :key="toDiscoveryKey(candidate)"
+              class="candidate-option"
+            >
+              <input
+                v-model="selectedDiscoveryKeys"
+                :disabled="isSubmitting"
+                :value="toDiscoveryKey(candidate)"
+                name="source-candidate"
+                type="checkbox"
+              />
+              <strong class="candidate-option-title">
+                {{ candidate.title ?? candidate.sourceSlug }}
+              </strong>
+              <span class="candidate-option-meta">
+                {{ candidate.pluginSlug }} / {{ candidate.sourceKind }} /
+                {{ candidate.sourceSlug }}
+              </span>
+              <span class="candidate-option-url">{{ candidate.url }}</span>
+              <span
+                v-if="
+                  (discoveredPreviews[toDiscoveryKey(candidate)]?.items
+                    .length ?? 0) > 0
+                "
+                class="candidate-option-preview"
+              >
+                {{
+                  discoveredPreviews[toDiscoveryKey(candidate)]?.items
+                    .map((item) => item.title ?? item.kind)
+                    .join(" / ")
+                }}
+              </span>
+              <span
+                v-if="discoveredPreviewErrors[toDiscoveryKey(candidate)]"
+                class="feedback error candidate-option-error"
+              >
+                {{ discoveredPreviewErrors[toDiscoveryKey(candidate)] }}
+              </span>
+            </label>
+          </div>
+        </div>
+        <p
+          v-else-if="hasAttemptedDiscovery && !isDiscovering"
+          class="feedback error"
+        >
+          No source candidates found.
+        </p>
 
         <p v-if="inspectErrorMessage" class="feedback error">
           {{ inspectErrorMessage }}
@@ -1458,20 +1530,6 @@ function normalizeCollectorSettingFormValue(
             @click="closeCreateForm"
           >
             Cancel
-          </button>
-          <button
-            type="button"
-            class="primary-button"
-            :disabled="isInspecting || isSubmitting"
-            @click="submitSource"
-          >
-            {{
-              isSubmitting
-                ? "Registering..."
-                : isInspecting
-                  ? "Inspecting..."
-                  : "Register"
-            }}
           </button>
         </div>
       </section>
