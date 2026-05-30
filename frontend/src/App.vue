@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  nextTick,
   onMounted,
   onUnmounted,
   ref,
@@ -58,6 +59,8 @@ type RouteState =
   | { entryId: string; kind: "browse-entry" }
   | { kind: "settings" }
   | { kind: "not-found" };
+
+type BrowsePane = "contents" | "detail" | "sources";
 
 const contents = ref<ContentListItem[]>([]);
 const contentDetail = ref<ContentDetailItem | null>(null);
@@ -125,6 +128,7 @@ const pendingSeekTime = ref(0);
 const playbackVolume = ref(1);
 const isPlaybackMuted = ref(false);
 const expandedTranscriptIds = ref<Set<string>>(new Set());
+const activeBrowsePane = ref<BrowsePane>("sources");
 
 const selectedSourceSlug = computed(() => {
   const route = routeState.value;
@@ -262,6 +266,33 @@ watch(contentDetail, (detail) => {
   );
 });
 
+watch(
+  routeState,
+  (route) => {
+    if (route.kind === "browse-entry") {
+      if (activeBrowsePane.value === "sources") {
+        activeBrowsePane.value = "detail";
+      }
+
+      return;
+    }
+
+    if (activeBrowsePane.value === "detail") {
+      activeBrowsePane.value = "contents";
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  [selectedSourceSlug, selectedContentId, activeBrowsePane],
+  async () => {
+    await nextTick();
+    scrollSelectedRowIntoView();
+  },
+  { flush: "post" },
+);
+
 onMounted(async () => {
   if (window.location.pathname === "/") {
     replaceLocation("/browse");
@@ -271,6 +302,7 @@ onMounted(async () => {
   theme.value = readInitialTheme();
 
   window.addEventListener("popstate", syncRouteFromLocation);
+  window.addEventListener("keydown", handleGlobalKeydown);
 
   await refreshSourceCollectorPlugins();
   await Promise.all([refreshSources(), refreshContents(), refreshSettings()]);
@@ -279,6 +311,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("popstate", syncRouteFromLocation);
+  window.removeEventListener("keydown", handleGlobalKeydown);
 });
 
 watch(audioPlayer, (element, previousElement) => {
@@ -300,6 +333,55 @@ watch(audioPlayer, (element, previousElement) => {
 function syncRouteFromLocation(): void {
   routeState.value = normalizeRoute(window.location.pathname);
   void syncDetailWithRoute();
+}
+
+function handleGlobalKeydown(event: KeyboardEvent): void {
+  if (
+    event.defaultPrevented ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    isCreateFormVisible.value ||
+    routeState.value.kind === "settings" ||
+    routeState.value.kind === "not-found" ||
+    shouldIgnoreKeyboardNavigationTarget(event.target)
+  ) {
+    return;
+  }
+
+  switch (event.key) {
+    case "j": {
+      if (handleVerticalBrowseMove(1)) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+    case "k": {
+      if (handleVerticalBrowseMove(-1)) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+    case "l": {
+      if (movePaneFocus(1)) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+    case "m": {
+      if (movePaneFocus(-1)) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+    default: {
+      return;
+    }
+  }
 }
 
 function openCreateForm(): void {
@@ -1028,6 +1110,165 @@ function openEntry(content: ContentListItem): void {
   navigateTo(`/browse/entry/${content.id}`);
 }
 
+function handleVerticalBrowseMove(direction: -1 | 1): boolean {
+  switch (activeBrowsePane.value) {
+    case "sources":
+      return moveSourceSelection(direction);
+    case "contents":
+      return moveContentSelection(direction);
+    case "detail":
+      return moveDetailSelection(direction);
+  }
+}
+
+function movePaneFocus(direction: -1 | 1): boolean {
+  const orderedPanes: BrowsePane[] = ["sources", "contents", "detail"];
+  const currentIndex = orderedPanes.indexOf(activeBrowsePane.value);
+  const nextPane = orderedPanes[currentIndex + direction];
+
+  if (nextPane === undefined) {
+    return false;
+  }
+
+  if (nextPane === "sources") {
+    activeBrowsePane.value = "sources";
+
+    if (selectedSource.value !== null) {
+      openFeed(selectedSource.value);
+      return true;
+    }
+
+    navigateTo("/browse");
+    return true;
+  }
+
+  if (nextPane === "contents") {
+    activeBrowsePane.value = "contents";
+
+    if (selectedSource.value !== null) {
+      openFeed(selectedSource.value);
+      return true;
+    }
+
+    if (window.location.pathname !== "/browse") {
+      navigateTo("/browse");
+    }
+
+    return true;
+  }
+
+  const contentToOpen =
+    visibleContents.value.find((content) => content.id === selectedContentId.value) ??
+    visibleContents.value[0];
+
+  if (contentToOpen === undefined) {
+    return false;
+  }
+
+  activeBrowsePane.value = "detail";
+  openEntry(contentToOpen);
+  return true;
+}
+
+function moveSourceSelection(direction: -1 | 1): boolean {
+  const nextSource = selectRelativeItem(
+    sources.value,
+    selectedSource.value?.id ?? null,
+    direction,
+  );
+
+  if (nextSource === null) {
+    return false;
+  }
+
+  activeBrowsePane.value = "sources";
+  openFeed(nextSource);
+  return true;
+}
+
+function moveContentSelection(direction: -1 | 1): boolean {
+  const nextContent = selectRelativeItem(
+    visibleContents.value,
+    selectedContentId.value,
+    direction,
+  );
+
+  if (nextContent === null) {
+    return false;
+  }
+
+  activeBrowsePane.value = "contents";
+  openEntry(nextContent);
+  return true;
+}
+
+function moveDetailSelection(direction: -1 | 1): boolean {
+  const nextContent = selectRelativeItem(
+    visibleContents.value,
+    selectedContentId.value,
+    direction,
+  );
+
+  if (nextContent === null) {
+    return false;
+  }
+
+  activeBrowsePane.value = "detail";
+  openEntry(nextContent);
+  return true;
+}
+
+function selectRelativeItem<Item extends { id: string }>(
+  items: Item[],
+  selectedId: string | null,
+  direction: -1 | 1,
+): Item | null {
+  if (items.length === 0) {
+    return null;
+  }
+
+  const currentIndex = selectedId
+    ? items.findIndex((item) => item.id === selectedId)
+    : -1;
+  const fallbackIndex = direction > 0 ? 0 : items.length - 1;
+  const nextIndex =
+    currentIndex === -1
+      ? fallbackIndex
+      : Math.max(0, Math.min(items.length - 1, currentIndex + direction));
+
+  return items[nextIndex] ?? null;
+}
+
+function shouldIgnoreKeyboardNavigationTarget(
+  target: EventTarget | null,
+): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  const editableContainer = target.closest(
+    "input, textarea, select, button, summary, [contenteditable='true']",
+  );
+
+  return editableContainer !== null;
+}
+
+function scrollSelectedRowIntoView(): void {
+  const selector =
+    activeBrowsePane.value === "sources"
+      ? ".source-row.selected"
+      : ".content-row.selected";
+  const selectedRow = document.querySelector<HTMLElement>(selector);
+
+  selectedRow?.scrollIntoView({
+    block: "nearest",
+  });
+}
+
 function normalizeRoute(pathname: string): RouteState {
   if (pathname === "/browse") {
     return { kind: "browse-index" };
@@ -1535,7 +1776,10 @@ function normalizeCollectorSettingFormValue(
       </section>
 
       <section class="browser-shell">
-        <aside class="pane pane-sources">
+        <aside
+          class="pane pane-sources"
+          @pointerdown.capture="activeBrowsePane = 'sources'"
+        >
           <div class="pane-header">
             <div class="pane-heading">
               <p class="eyebrow">Feeds</p>
@@ -1614,7 +1858,10 @@ function normalizeCollectorSettingFormValue(
           </div>
         </aside>
 
-        <section class="pane pane-contents">
+        <section
+          class="pane pane-contents"
+          @pointerdown.capture="activeBrowsePane = 'contents'"
+        >
           <div class="pane-header">
             <div class="pane-heading">
               <p class="eyebrow">Entries</p>
@@ -1857,7 +2104,10 @@ function normalizeCollectorSettingFormValue(
           <div v-else class="empty-state">No contents yet.</div>
         </section>
 
-        <section class="pane pane-detail">
+        <section
+          class="pane pane-detail"
+          @pointerdown.capture="activeBrowsePane = 'detail'"
+        >
           <div class="pane-header">
             <div class="pane-heading">
               <p class="eyebrow">Detail</p>
