@@ -34,9 +34,7 @@ test("detects multiple source candidates from a discovery page and registers the
   await expect(podcastCandidate.getByText("Discovery Episode 1")).toBeVisible();
   await duplicatePodcastCandidate.getByRole("checkbox").uncheck();
 
-  await page
-    .getByRole("button", { name: "Register selected sources" })
-    .click();
+  await page.getByRole("button", { name: "Register selected sources" }).click();
 
   await expect(
     page.getByRole("heading", { level: 2, name: "Add source" }),
@@ -82,9 +80,7 @@ test("registers a source from direct feed discovery and observes contents", asyn
   await expect(selectedCandidate).toBeVisible();
   await expect(selectedCandidate.getByText("Episode 1")).toBeVisible();
   await duplicateCandidate.getByRole("checkbox").uncheck();
-  await page
-    .getByRole("button", { name: "Register selected sources" })
-    .click();
+  await page.getByRole("button", { name: "Register selected sources" }).click();
 
   await expect(
     page.getByRole("heading", { level: 2, name: "Geshi E2E Feed" }),
@@ -127,9 +123,7 @@ test("opens entry detail and exposes playable audio", async ({
   await candidateRow(page, "Geshi E2E Feed", "rss / feed")
     .getByRole("checkbox")
     .uncheck();
-  await page
-    .getByRole("button", { name: "Register selected sources" })
-    .click();
+  await page.getByRole("button", { name: "Register selected sources" }).click();
 
   await expect(
     page.getByRole("heading", { level: 2, name: "Geshi E2E Feed" }),
