@@ -181,6 +181,45 @@ describe("rssPlugin.inspect", () => {
       url: "https://example.com/feed.xml",
     });
   });
+
+  it("returns source metadata from rdf channel fields", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?>
+            <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+              <channel>
+                <title> Example RDF Feed </title>
+                <description> RDF notes </description>
+              </channel>
+              <item>
+                <title>Entry 1</title>
+                <link>https://example.com/posts/1</link>
+              </item>
+            </rdf:RDF>`,
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    const result = await rssPlugin.inspect(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.rdf",
+      },
+      createPluginContext(),
+    );
+
+    expect(result).toMatchObject({
+      description: "RDF notes",
+      title: "Example RDF Feed",
+      url: "https://example.com/feed.rdf",
+    });
+  });
 });
 
 describe("rssPlugin.extract", () => {

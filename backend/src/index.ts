@@ -31,6 +31,7 @@ import { createContentService } from "./service/content-service.js";
 import { createDetailBodyService } from "./service/detail-body-service.js";
 import { createJobService } from "./service/job-service.js";
 import { createPluginGlobalSettingsService } from "./service/plugin-global-settings-service.js";
+import { createSourceDiscoveryService } from "./service/source-discovery-service.js";
 import { createSourceInspectService } from "./service/source-inspect-service.js";
 import { createSourceService } from "./service/source-service.js";
 import { createTranscriptService } from "./service/transcript-service.js";
@@ -71,6 +72,12 @@ const sourceService = createSourceService(sourceRepository, {
 const sourceInspectService = createSourceInspectService({
   logger: logger.child({
     service: "source-inspect",
+  }),
+  pluginGlobalRuntimeStateRepository,
+});
+const sourceDiscoveryService = createSourceDiscoveryService({
+  logger: logger.child({
+    service: "source-discovery",
   }),
   pluginGlobalRuntimeStateRepository,
 });
@@ -125,6 +132,7 @@ const app = createApp({
   detailBodyService,
   jobService,
   pluginGlobalSettingsService,
+  sourceDiscoveryService,
   sourceInspectService,
   sourceService,
   storage,

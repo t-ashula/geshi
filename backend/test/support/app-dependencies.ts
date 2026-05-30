@@ -6,6 +6,7 @@ import type { AppSettingService } from "../../src/service/app-setting-service.js
 import type { AssetService } from "../../src/service/asset-service.js";
 import type { ContentService } from "../../src/service/content-service.js";
 import type { JobService } from "../../src/service/job-service.js";
+import type { SourceDiscoveryService } from "../../src/service/source-discovery-service.js";
 import type { SourceInspectService } from "../../src/service/source-inspect-service.js";
 import type { SourceService } from "../../src/service/source-service.js";
 import type { Storage } from "../../src/storage/types.js";
@@ -126,6 +127,39 @@ export function createTestAppDependencies(
         ),
       ),
     },
+    sourceDiscoveryService: {
+      discoverSources: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            candidates: [
+              {
+                description: null,
+                pluginSlug: "podcast-rss",
+                previewAvailable: true,
+                sourceKind: "podcast" as const,
+                sourceSlug: "example-feed",
+                title: "Example Feed",
+                url: "https://example.com/feed.xml",
+              },
+            ],
+          }),
+        ),
+      ),
+      previewSource: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            items: [
+              {
+                kind: "episode",
+                publishedAt: null,
+                summary: null,
+                title: "Episode 1",
+              },
+            ],
+          }),
+        ),
+      ),
+    } satisfies SourceDiscoveryService,
     sourceInspectService: {
       inspectSource: vi.fn(() =>
         Promise.resolve(

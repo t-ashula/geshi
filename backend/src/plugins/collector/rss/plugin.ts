@@ -1,20 +1,28 @@
 import { XMLParser } from "fast-xml-parser";
 
+import { createSourceSlug } from "../../../lib/source-slug.js";
 import type {
   AcquiredAsset,
   ExtractedDetailBody,
   ObservedAsset,
   ObservedContent,
   SourceCollectorAcquireInput,
+  SourceCollectorDiscoverInput,
+  SourceCollectorDiscoverResult,
+  SourceCollectorExecutionContext,
   SourceCollectorExtractInput,
   SourceCollectorInspectErrorCode,
   SourceCollectorInspectInput,
   SourceCollectorObserveInput,
   SourceCollectorPlugin,
   SourceCollectorPluginDefinition,
+  SourceCollectorPreviewInput,
+  SourceCollectorPreviewResult,
+  SourceDiscoveryCandidate,
   SourceMetadata,
 } from "../../types.js";
 import { WebClient } from "../../types.js";
+import { extractDiscoveredFeedUrls } from "../feed-discovery-html.js";
 import type {
   AcquiredAssetFingerprintInput,
   AcquiredAssetFingerprintSpec,
@@ -38,6 +46,10 @@ type RssChannel = {
 };
 
 type RssFeed = {
+  "rdf:RDF"?: {
+    channel?: RssChannel;
+    item?: RssItem | RssItem[];
+  };
   rss?: {
     channel?: RssChannel;
   };
@@ -94,36 +106,47 @@ export const plugin: SourceCollectorPlugin = {
     return [];
   },
 
+  async discover(
+    input: SourceCollectorDiscoverInput,
+    context,
+  ): Promise<SourceCollectorDiscoverResult> {
+    const discoveredUrls = await discoverCandidateUrls(
+      input.inputUrl,
+      input.abortSignal,
+      context,
+    );
+    const candidates: SourceDiscoveryCandidate[] = [];
+
+    for (const sourceUrl of discoveredUrls) {
+      const metadata = await inspectRssSource(
+        sourceUrl,
+        input.abortSignal,
+        context,
+      );
+
+      if (metadata === null) {
+        continue;
+      }
+
+      candidates.push({
+        ...metadata,
+        sourceSlug: createSourceSlug(metadata.url, metadata.title ?? undefined),
+      });
+    }
+
+    return {
+      candidates,
+    };
+  },
+
   async inspect(input: SourceCollectorInspectInput, context) {
-    const webClient = WebClient.create({ kind: "fetch" });
-    const userAgent = await readConfiguredUserAgent(context);
-    let response: Response;
+    const metadata = await inspectRssSource(
+      input.sourceUrl,
+      input.abortSignal,
+      context,
+    );
 
-    try {
-      response = await webClient.fetch(
-        new Request(input.sourceUrl, {
-          headers: createRequestHeaders(userAgent),
-          signal: input.abortSignal,
-        }),
-      );
-    } catch {
-      throw new SourceCollectorInspectPluginError(
-        "source_inspect_fetch_failed",
-        "Failed to fetch source metadata.",
-      );
-    }
-
-    if (!response.ok) {
-      throw new SourceCollectorInspectPluginError(
-        "source_inspect_fetch_failed",
-        "Failed to fetch source metadata.",
-      );
-    }
-
-    const body = await response.text();
-    const parsedFeed = parseRssFeed(body);
-
-    if (parsedFeed === null) {
+    if (metadata === null) {
       throw new SourceCollectorInspectPluginError(
         "source_inspect_unrecognized",
         "The given URL is not a supported RSS feed.",
@@ -131,9 +154,32 @@ export const plugin: SourceCollectorPlugin = {
     }
 
     return {
-      description: parsedFeed.metadata.description,
-      title: parsedFeed.metadata.title,
-      url: input.sourceUrl,
+      description: metadata.description,
+      title: metadata.title,
+      url: metadata.url,
+    };
+  },
+
+  async preview(
+    input: SourceCollectorPreviewInput,
+    context,
+  ): Promise<SourceCollectorPreviewResult> {
+    const observed = await this.observe(
+      {
+        abortSignal: input.abortSignal,
+        config: input.config,
+        sourceUrl: input.sourceUrl,
+      },
+      context,
+    );
+
+    return {
+      items: observed.contents.slice(0, 3).map((content) => ({
+        kind: content.kind,
+        publishedAt: content.publishedAt,
+        summary: content.summary,
+        title: content.title,
+      })),
     };
   },
 
@@ -234,13 +280,92 @@ export const definition: SourceCollectorPluginDefinition = {
 export const rssPlugin = plugin;
 export const rssPluginDefinition = definition;
 
-async function readConfiguredUserAgent(context: {
-  getHost(): {
-    pluginGlobalRuntimeState?: {
-      load(): Promise<{ state: Record<string, unknown> | undefined }>;
-    };
+async function inspectRssSource(
+  sourceUrl: string,
+  abortSignal: AbortSignal,
+  context: SourceCollectorExecutionContext,
+): Promise<SourceMetadata | null> {
+  const webClient = WebClient.create({ kind: "fetch" });
+  const userAgent = await readConfiguredUserAgent(context);
+  let response: Response;
+
+  try {
+    response = await webClient.fetch(
+      new Request(sourceUrl, {
+        headers: createRequestHeaders(userAgent),
+        signal: abortSignal,
+      }),
+    );
+  } catch {
+    throw new SourceCollectorInspectPluginError(
+      "source_inspect_fetch_failed",
+      "Failed to fetch source metadata.",
+    );
+  }
+
+  if (!response.ok) {
+    throw new SourceCollectorInspectPluginError(
+      "source_inspect_fetch_failed",
+      "Failed to fetch source metadata.",
+    );
+  }
+
+  const body = await response.text();
+  const parsedFeed = parseRssFeed(body);
+
+  if (parsedFeed === null) {
+    return null;
+  }
+
+  return {
+    description: parsedFeed.metadata.description,
+    title: parsedFeed.metadata.title,
+    url: sourceUrl,
   };
-}): Promise<string | null> {
+}
+
+async function discoverCandidateUrls(
+  inputUrl: string,
+  abortSignal: AbortSignal,
+  context: SourceCollectorExecutionContext,
+): Promise<string[]> {
+  const webClient = WebClient.create({ kind: "fetch" });
+  const userAgent = await readConfiguredUserAgent(context);
+  let response: Response;
+
+  try {
+    response = await webClient.fetch(
+      new Request(inputUrl, {
+        headers: createRequestHeaders(userAgent),
+        signal: abortSignal,
+      }),
+    );
+  } catch {
+    throw new SourceCollectorInspectPluginError(
+      "source_inspect_fetch_failed",
+      "Failed to fetch source metadata.",
+    );
+  }
+
+  if (!response.ok) {
+    throw new SourceCollectorInspectPluginError(
+      "source_inspect_fetch_failed",
+      "Failed to fetch source metadata.",
+    );
+  }
+
+  const body = await response.text();
+
+  if (parseRssFeed(body) !== null) {
+    return [inputUrl];
+  }
+
+  return extractDiscoveredFeedUrls(body, inputUrl);
+}
+
+async function readConfiguredUserAgent(
+  context: SourceCollectorExecutionContext,
+): Promise<string | null> {
   const snapshot = await context.getHost().pluginGlobalRuntimeState?.load();
   const candidate = snapshot?.state?.userAgent;
   return typeof candidate === "string" && candidate.trim() !== ""
@@ -430,14 +555,14 @@ function normalizeContentType(value: string | null): string | null {
 
 function parseRssFeed(value: string): ParsedRssFeed | null {
   const parsedFeed = parser.parse(value) as RssFeed;
-  const channel = parsedFeed.rss?.channel;
+  const channel = parsedFeed.rss?.channel ?? parsedFeed["rdf:RDF"]?.channel;
 
   if (channel === undefined) {
     return null;
   }
 
   return {
-    items: toArray(channel.item),
+    items: toArray(channel.item ?? parsedFeed["rdf:RDF"]?.item),
     metadata: {
       description: normalizeString(channel.description),
       title: normalizeString(channel.title),

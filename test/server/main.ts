@@ -43,6 +43,60 @@ app.get("/feeds/podcast.xml", (context) => {
   });
 });
 
+app.get("/feeds/discovery-news.rdf", (context) => {
+  const origin = new URL(context.req.url).origin;
+  const entryPageUrl = `${origin}/episodes/1.html`;
+
+  const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <channel>
+    <title>Geshi E2E RDF Feed</title>
+    <description>Fixture RDF feed for discovery E2E tests.</description>
+    <link>${origin}</link>
+  </channel>
+  <item>
+    <title>Discovery Entry 1</title>
+    <link>${entryPageUrl}</link>
+    <description>Hello from RDF discovery fixture.</description>
+  </item>
+</rdf:RDF>`;
+
+  return new Response(feed, {
+    headers: {
+      "content-type": "application/rdf+xml; charset=utf-8",
+    },
+  });
+});
+
+app.get("/feeds/discovery-podcast.xml", (context) => {
+  const origin = new URL(context.req.url).origin;
+  const episodePageUrl = `${origin}/episodes/1.html`;
+  const audioUrl = `${origin}/assets/dummy.mp3`;
+
+  const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Geshi E2E Discovery Podcast</title>
+    <description>Fixture podcast feed for discovery E2E tests.</description>
+    <link>${origin}</link>
+    <item>
+      <guid>e2e-discovery-podcast-1</guid>
+      <title>Discovery Episode 1</title>
+      <description>Hello from podcast discovery fixture.</description>
+      <link>${episodePageUrl}</link>
+      <enclosure url="${audioUrl}" type="audio/mpeg" />
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+
+  return new Response(feed, {
+    headers: {
+      "content-type": "application/rss+xml; charset=utf-8",
+    },
+  });
+});
+
 app.get("/feeds/not-rss.xml", () => {
   return new Response("<html><body>not rss</body></html>", {
     headers: {
@@ -82,6 +136,37 @@ app.get("/feeds/botchan.xml", (context) => {
   return new Response(feed, {
     headers: {
       "content-type": "application/rss+xml; charset=utf-8",
+    },
+  });
+});
+
+app.get("/discovery/index.html", (context) => {
+  const origin = new URL(context.req.url).origin;
+  const rdfUrl = `${origin}/feeds/discovery-news.rdf`;
+  const podcastUrl = `${origin}/feeds/discovery-podcast.xml`;
+
+  const body = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Geshi E2E Discovery Index</title>
+    <link rel="alternate" type="application/rss+xml" title="Discovery Podcast Feed" href="${podcastUrl}" />
+  </head>
+  <body>
+    <main>
+      <h1>Discovery Samples</h1>
+      <p>Fixture page exposing multiple source candidates.</p>
+      <ul>
+        <li><a href="${rdfUrl}">RDF discovery feed</a></li>
+        <li><a href="${podcastUrl}">Podcast discovery feed</a></li>
+      </ul>
+    </main>
+  </body>
+</html>`;
+
+  return new Response(body, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
     },
   });
 });
