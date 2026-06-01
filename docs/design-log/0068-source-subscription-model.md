@@ -24,6 +24,19 @@
 - 将来，再 subscription が起こりうる
 - current state と event history を 1 つの列や 1 行だけで持つと，再購読や履歴照会が窮屈になりやすい
 
+## 現時点で採る前提
+
+- source 登録時に，その user に対する subscription も同時に発生する
+- つまり，現在の register 操作は user 視点では subscribe を含む
+- 将来 user が増えたときは，register 時に既存の source が見つかれば，新しい source を複製するのではなく，その source への subscription を作る形に寄せる
+
+この前提により，register は次の 2 通りを取りうる．
+
+- 新規 source を作成し，同時に subscription を作る
+- 既存 source を再利用し，subscription だけを作る
+
+user が触る操作名としては当面 register のままでもよいが，内部 model としては「source の確保」と「subscription の作成」を分けて考える．
+
 ## 現時点の有力案
 
 ### 1. subscription は主体 model として持つ
@@ -95,31 +108,31 @@ collection 所属については，少なくとも次の 2 案がある．
 
 ## unsubscribe 時の扱いで未決なこと
 
-### 1. subscription row を再利用するか
+### 1. unsubscribe では current relationship を外し，履歴は event へ残す
+
+現時点では次を採る．
+
+- unsubscribe では，current state としての subscription relationship は解除する
+- subscribe / unsubscribe の履歴は `subscription_event` に残す
+- 再 subscription 時は，新たな current relationship を作り，履歴側へ event を積む
+
+この方針では，current state と履歴を明確に分ける．
+
+- 「今購読しているか」は current relationship を見る
+- 「いつ購読し，いつ解除したか」は event を見る
+
+### 2. unsubscribe 時に collection 所属をどうするか
 
 案:
 
-- unsubscribe しても `subscription` row 自体は残す
-- 再 subscription 時は同じ `subscription` を active 側へ戻す
-- そのたびに `subscription_event` を追加する
-
-良さそうな点:
-
-- collection 所属や購読単位設定を維持しやすい
-- user から見た「同じ購読対象」に対する連続した履歴を持ちやすい
-
-### 2. unsubscribe 時に collection 所属を残すか
-
-案:
-
-- inactive な subscription でも collection 所属は残す
-- UI で inactive 表示にする
+- unsubscribe と同時に，その relationship にぶら下がる collection 所属も外す
 
 別案:
 
-- unsubscribe 時に collection 所属を外す
+- collection 所属を別履歴として残し，再 subscription 時に復元できるようにする
 
-現時点では前者の方が，再 subscription 時に user の整理状態を保ちやすそうに見える．
+現時点では前者，つまり current relationship と一緒に collection 所属も外す方が，current model の整合は分かりやすい．
+再 subscription 時に以前の整理状態を復元したいかは，別途 UI / domain 要件として詰める．
 
 ## この時点で ADR にまだ入れないこと
 
@@ -136,5 +149,8 @@ collection 所属については，少なくとも次の 2 案がある．
 - `subscription` は導入しないと model が整合しにくい
 - `subscription` は中間 table より主体 model として扱う方が自然
 - subscribe / unsubscribe の記録は event として分ける案が有力
+- source 登録時には subscription も同時に発生する前提で考える
+- 将来の register は，既存 source の再利用と subscription 作成を許す形が自然
+- unsubscribe では current relationship を外し，履歴は event 側へ残す
 - collection は source ではなく subscription を整理する
 - 詳細 schema と current state / event の最終切り方は，実装直前にもう一段詰める
