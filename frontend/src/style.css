@@ -378,6 +378,47 @@ h3 {
   overflow: auto;
 }
 
+.collection-browser {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  overflow: auto;
+}
+
+.collection-group {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--color-border-soft);
+  background: var(--color-panel);
+}
+
+.collection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--color-border-soft);
+  background: var(--color-panel-muted);
+}
+
+.collection-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collection-source-list {
+  padding: 0;
+  flex: initial;
+  overflow: visible;
+}
+
+.compact-empty-state {
+  padding: 14px;
+  min-height: auto;
+}
+
 .asset-list {
   display: grid;
   gap: 10px;

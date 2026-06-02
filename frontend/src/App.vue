@@ -19,6 +19,7 @@ import type {
   PeriodicCrawlSettings,
   PluginGlobalSettingsDetail,
   PreviewSourceResult,
+  SourceCollectionListItem,
   SourceDiscoveryCandidate,
   SourceCollectorPluginListItem,
   SourceCollectorSettingItem,
@@ -26,6 +27,8 @@ import type {
   SourceListItem,
 } from "./source-api.js";
 import {
+  assignSourceToCollection,
+  createSourceCollection,
   createSource,
   discoverSources,
   getContentDetail,
@@ -33,14 +36,17 @@ import {
   getPluginGlobalSettings,
   getSourceCollectorSettings,
   listSourceCollectorPlugins,
+  listSourceCollections,
   listContents,
   listSources,
   observeSource,
   previewSource,
   requestTranscripts,
   retryTranscript,
+  unsubscribeSource,
   updatePeriodicCrawlSettings,
   updatePluginGlobalSettings,
+  updateSourceCollection,
   updateSourceCollectorSettings,
 } from "./source-api.js";
 import {
@@ -61,16 +67,20 @@ type RouteState =
   | { kind: "not-found" };
 
 type BrowsePane = "contents" | "detail" | "sources";
+type SourceDisplayMode = "collections" | "flat";
 
 const contents = ref<ContentListItem[]>([]);
 const contentDetail = ref<ContentDetailItem | null>(null);
 const sourceCollectorPlugins = ref<SourceCollectorPluginListItem[]>([]);
+const sourceCollections = ref<SourceCollectionListItem[]>([]);
 const sources = ref<SourceListItem[]>([]);
+const sourceDisplayMode = ref<SourceDisplayMode>("collections");
 const isCreateFormVisible = ref(false);
 const isDiscovering = ref(false);
 const isLoadingPreviews = ref(false);
 const isSubmitting = ref(false);
 const isObserveSubmitting = ref<string | null>(null);
+const isUnsubscribeSubmitting = ref<string | null>(null);
 const isSourceCrawlSubmitting = ref<string | null>(null);
 const isSettingsSubmitting = ref(false);
 const isSourcesLoading = ref(true);
@@ -129,6 +139,8 @@ const playbackVolume = ref(1);
 const isPlaybackMuted = ref(false);
 const expandedTranscriptIds = ref<Set<string>>(new Set());
 const activeBrowsePane = ref<BrowsePane>("sources");
+const draggedCollectionId = ref<string | null>(null);
+const draggedSourceId = ref<string | null>(null);
 
 const selectedSourceSlug = computed(() => {
   const route = routeState.value;
@@ -167,6 +179,22 @@ const visibleContents = computed(() => {
 
   return [...filteredContents].sort(compareContentListItems);
 });
+
+const sortedSourceCollections = computed(() =>
+  [...sourceCollections.value].sort((left, right) => {
+    if (left.position !== right.position) {
+      return left.position - right.position;
+    }
+
+    return left.createdAt.localeCompare(right.createdAt);
+  }),
+);
+
+const uncategorizedSources = computed(() =>
+  [...sources.value]
+    .filter((source) => source.collectionId === null)
+    .sort(compareSubscriptionListItems),
+);
 
 const routeHeadline = computed(() => {
   if (routeState.value.kind === "not-found") {
@@ -873,12 +901,197 @@ async function refreshSources(): Promise<void> {
   isSourcesLoading.value = true;
 
   try {
-    sources.value = await listSources();
+    const [loadedSources, loadedCollections] = await Promise.all([
+      listSources(),
+      listSourceCollections(),
+    ]);
+    sources.value = loadedSources;
+    sourceCollections.value = loadedCollections;
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Failed to load sources.";
   } finally {
     isSourcesLoading.value = false;
+  }
+}
+
+async function promptCreateCollection(): Promise<void> {
+  const title = window.prompt("Collection name");
+
+  if (title === null) {
+    return;
+  }
+
+  const trimmedTitle = title.trim();
+
+  if (trimmedTitle === "") {
+    errorMessage.value = "Collection name is required.";
+    return;
+  }
+
+  try {
+    const collection = await createSourceCollection({
+      position: sourceCollections.value.length,
+      title: trimmedTitle,
+    });
+    sourceCollections.value = [...sourceCollections.value, collection];
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : "Failed to create collection.";
+  }
+}
+
+async function promptRenameCollection(
+  collection: SourceCollectionListItem,
+): Promise<void> {
+  const title = window.prompt("Rename collection", collection.title);
+
+  if (title === null) {
+    return;
+  }
+
+  const trimmedTitle = title.trim();
+
+  if (trimmedTitle === "") {
+    errorMessage.value = "Collection name is required.";
+    return;
+  }
+
+  try {
+    const updated = await updateSourceCollection(collection.id, {
+      parentCollectionId: collection.parentCollectionId,
+      position: collection.position,
+      title: trimmedTitle,
+    });
+    sourceCollections.value = sourceCollections.value.map((item) =>
+      item.id === updated.id ? updated : item,
+    );
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : "Failed to rename collection.";
+  }
+}
+
+function sourcesForCollection(collectionId: string): SourceListItem[] {
+  return [...sources.value]
+    .filter((source) => source.collectionId === collectionId)
+    .sort(compareSubscriptionListItems);
+}
+
+function beginCollectionDrag(collectionId: string): void {
+  draggedCollectionId.value = collectionId;
+}
+
+function beginSourceDrag(sourceId: string): void {
+  draggedSourceId.value = sourceId;
+}
+
+async function dropCollectionBefore(
+  targetCollection: SourceCollectionListItem,
+): Promise<void> {
+  const sourceCollectionId = draggedCollectionId.value;
+
+  if (
+    sourceCollectionId === null ||
+    sourceCollectionId === targetCollection.id
+  ) {
+    return;
+  }
+
+  const orderedCollections = [...sortedSourceCollections.value];
+  const movingIndex = orderedCollections.findIndex(
+    (collection) => collection.id === sourceCollectionId,
+  );
+  const targetIndex = orderedCollections.findIndex(
+    (collection) => collection.id === targetCollection.id,
+  );
+
+  if (movingIndex === -1 || targetIndex === -1) {
+    return;
+  }
+
+  const [movingCollection] = orderedCollections.splice(movingIndex, 1);
+
+  if (movingCollection === undefined) {
+    return;
+  }
+
+  orderedCollections.splice(targetIndex, 0, movingCollection);
+
+  try {
+    const updates = await Promise.all(
+      orderedCollections.map((collection, index) =>
+        updateSourceCollection(collection.id, {
+          parentCollectionId: collection.parentCollectionId,
+          position: index,
+          title: collection.title,
+        }),
+      ),
+    );
+    sourceCollections.value = updates;
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : "Failed to reorder collections.";
+  } finally {
+    draggedCollectionId.value = null;
+  }
+}
+
+async function dropSourceIntoCollection(
+  collectionId: string | null,
+  position: number,
+): Promise<void> {
+  const sourceId = draggedSourceId.value;
+
+  if (sourceId === null) {
+    return;
+  }
+
+  try {
+    const updatedSource = await assignSourceToCollection(sourceId, {
+      collectionId,
+      position,
+    });
+    sources.value = sources.value.map((source) =>
+      source.id === updatedSource.id ? updatedSource : source,
+    );
+    await refreshSources();
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to move source subscription.";
+  } finally {
+    draggedSourceId.value = null;
+  }
+}
+
+async function unsubscribeSelectedSource(): Promise<void> {
+  if (selectedSource.value === null) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Unsubscribe from ${selectedSource.value.title ?? selectedSource.value.slug}?`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  isUnsubscribeSubmitting.value = selectedSource.value.subscriptionId;
+
+  try {
+    await unsubscribeSource(selectedSource.value.subscriptionId);
+    sourceCrawlErrorMessage.value = null;
+    isSourceSettingsExpanded.value = false;
+    navigateTo("/browse");
+    await Promise.all([refreshSources(), refreshContents()]);
+  } catch (error) {
+    sourceCrawlErrorMessage.value =
+      error instanceof Error ? error.message : "Failed to unsubscribe source.";
+  } finally {
+    isUnsubscribeSubmitting.value = null;
   }
 }
 
@@ -1172,8 +1385,9 @@ function movePaneFocus(direction: -1 | 1): boolean {
   }
 
   const contentToOpen =
-    visibleContents.value.find((content) => content.id === selectedContentId.value) ??
-    visibleContents.value[0];
+    visibleContents.value.find(
+      (content) => content.id === selectedContentId.value,
+    ) ?? visibleContents.value[0];
 
   if (contentToOpen === undefined) {
     return false;
@@ -1281,6 +1495,17 @@ function selectRelativeItem<Item extends { id: string }>(
       : Math.max(0, Math.min(items.length - 1, currentIndex + direction));
 
   return items[nextIndex] ?? null;
+}
+
+function compareSubscriptionListItems(
+  left: SourceListItem,
+  right: SourceListItem,
+): number {
+  if (left.subscriptionPosition !== right.subscriptionPosition) {
+    return left.subscriptionPosition - right.subscriptionPosition;
+  }
+
+  return right.createdAt.localeCompare(left.createdAt);
 }
 
 function shouldIgnoreKeyboardNavigationTarget(
@@ -1694,8 +1919,8 @@ function normalizeCollectorSettingFormValue(
       <section v-if="isCreateFormVisible" class="create-shell">
         <div class="create-shell-header">
           <div>
-            <p class="eyebrow">Register source</p>
-            <h2>Add source</h2>
+            <p class="eyebrow">Subscribe Source</p>
+            <h2>Add subscription</h2>
           </div>
           <button class="ghost-button" type="button" @click="closeCreateForm">
             Close
@@ -1737,7 +1962,7 @@ function normalizeCollectorSettingFormValue(
           <div class="create-grid-wide settings-shell-header">
             <div>
               <p class="eyebrow">Detected Sources</p>
-              <h3>Select sources to register</h3>
+              <h3>Select sources to subscribe</h3>
             </div>
             <div class="actions">
               <button
@@ -1749,7 +1974,7 @@ function normalizeCollectorSettingFormValue(
                 @click="submitSource"
               >
                 {{
-                  isSubmitting ? "Registering..." : "Register selected sources"
+                  isSubmitting ? "Subscribing..." : "Subscribe selected sources"
                 }}
               </button>
             </div>
@@ -1830,12 +2055,37 @@ function normalizeCollectorSettingFormValue(
         >
           <div class="pane-header">
             <div class="pane-heading">
-              <p class="eyebrow">Feeds</p>
-              <h2>Sources</h2>
-              <p class="pane-caption">Registered feeds and collectors</p>
+              <p class="eyebrow">Subscriptions</p>
+              <h2>Subscribed sources</h2>
+              <p class="pane-caption">Sources you subscribed to and collect</p>
             </div>
             <span class="pane-count">{{ sources.length }}</span>
             <div class="pane-actions">
+              <button
+                type="button"
+                class="ghost-button menu-toggle-button"
+                :class="{ active: sourceDisplayMode === 'collections' }"
+                @click="sourceDisplayMode = 'collections'"
+              >
+                Folders
+              </button>
+              <button
+                type="button"
+                class="ghost-button menu-toggle-button"
+                :class="{ active: sourceDisplayMode === 'flat' }"
+                @click="sourceDisplayMode = 'flat'"
+              >
+                Flat
+              </button>
+              <button
+                type="button"
+                class="ghost-button menu-toggle-button"
+                aria-label="Add collection"
+                title="Add collection"
+                @click="promptCreateCollection"
+              >
+                Folder
+              </button>
               <button
                 type="button"
                 class="ghost-button menu-toggle-button pane-add-button"
@@ -1858,6 +2108,163 @@ function normalizeCollectorSettingFormValue(
 
           <div v-if="isSourcesLoading" class="empty-state">
             Loading sources...
+          </div>
+
+          <div
+            v-else-if="sourceDisplayMode === 'collections'"
+            class="collection-browser"
+          >
+            <section
+              class="collection-group"
+              @dragover.prevent
+              @drop.prevent="void dropSourceIntoCollection(null, 0)"
+            >
+              <div class="collection-header">
+                <div>
+                  <p class="eyebrow">Unsorted</p>
+                  <h3>Uncategorized</h3>
+                </div>
+                <span class="pane-count">{{
+                  uncategorizedSources.length
+                }}</span>
+              </div>
+              <ul
+                v-if="uncategorizedSources.length > 0"
+                class="source-list collection-source-list"
+              >
+                <li
+                  v-for="source in uncategorizedSources"
+                  :key="source.subscriptionId"
+                >
+                  <button
+                    type="button"
+                    class="source-row"
+                    :class="{ selected: isSourceSelected(source) }"
+                    draggable="true"
+                    @click="openFeed(source)"
+                    @dragstart="beginSourceDrag(source.id)"
+                  >
+                    <span class="source-row-head">
+                      <span class="source-row-title">
+                        {{ source.title ?? source.slug }}
+                      </span>
+                      <span
+                        class="source-row-status"
+                        :class="{
+                          active: source.periodicCrawlEnabled,
+                          idle: !source.periodicCrawlEnabled,
+                        }"
+                      >
+                        {{
+                          source.periodicCrawlEnabled
+                            ? `Auto ${source.periodicCrawlIntervalMinutes}m`
+                            : "Manual"
+                        }}
+                      </span>
+                    </span>
+                    <span class="source-row-meta-line">
+                      <span class="source-row-domain">
+                        {{ sourceDomainLabel(source.url) }}
+                      </span>
+                      <span class="source-row-meta"
+                        >{{ source.kind }} · {{ source.slug }}</span
+                      >
+                    </span>
+                  </button>
+                </li>
+              </ul>
+              <div v-else class="empty-state compact-empty-state">
+                No uncategorized subscriptions.
+              </div>
+            </section>
+
+            <section
+              v-for="collection in sortedSourceCollections"
+              :key="collection.id"
+              class="collection-group"
+              draggable="true"
+              @dragstart="beginCollectionDrag(collection.id)"
+              @dragover.prevent
+              @drop.prevent="void dropCollectionBefore(collection)"
+            >
+              <div
+                class="collection-header"
+                @dragover.prevent
+                @drop.prevent="
+                  void dropSourceIntoCollection(
+                    collection.id,
+                    sourcesForCollection(collection.id).length,
+                  )
+                "
+              >
+                <div>
+                  <p class="eyebrow">Folder</p>
+                  <h3>{{ collection.title }}</h3>
+                </div>
+                <div class="collection-actions">
+                  <span class="pane-count">{{ collection.sourceCount }}</span>
+                  <button
+                    type="button"
+                    class="ghost-button menu-toggle-button"
+                    @click="void promptRenameCollection(collection)"
+                  >
+                    Rename
+                  </button>
+                </div>
+              </div>
+              <ul
+                v-if="sourcesForCollection(collection.id).length > 0"
+                class="source-list collection-source-list"
+              >
+                <li
+                  v-for="(source, index) in sourcesForCollection(collection.id)"
+                  :key="source.subscriptionId"
+                  @dragover.prevent
+                  @drop.prevent="
+                    void dropSourceIntoCollection(collection.id, index)
+                  "
+                >
+                  <button
+                    type="button"
+                    class="source-row"
+                    :class="{ selected: isSourceSelected(source) }"
+                    draggable="true"
+                    @click="openFeed(source)"
+                    @dragstart="beginSourceDrag(source.id)"
+                  >
+                    <span class="source-row-head">
+                      <span class="source-row-title">
+                        {{ source.title ?? source.slug }}
+                      </span>
+                      <span
+                        class="source-row-status"
+                        :class="{
+                          active: source.periodicCrawlEnabled,
+                          idle: !source.periodicCrawlEnabled,
+                        }"
+                      >
+                        {{
+                          source.periodicCrawlEnabled
+                            ? `Auto ${source.periodicCrawlIntervalMinutes}m`
+                            : "Manual"
+                        }}
+                      </span>
+                    </span>
+                    <span class="source-row-meta-line">
+                      <span class="source-row-domain">
+                        {{ sourceDomainLabel(source.url) }}
+                      </span>
+                      <span class="source-row-meta"
+                        >{{ source.kind }} · {{ source.slug }}</span
+                      >
+                    </span>
+                  </button>
+                </li>
+              </ul>
+              <div v-else class="empty-state compact-empty-state">
+                Drop a subscription here.
+              </div>
+            </section>
           </div>
 
           <ul v-else-if="sources.length > 0" class="source-list">
@@ -1902,7 +2309,7 @@ function normalizeCollectorSettingFormValue(
           </ul>
 
           <div v-else class="empty-state">
-            No sources registered yet. Add a feed to get started.
+            No subscriptions yet. Add a source to get started.
           </div>
         </aside>
 
@@ -1917,7 +2324,7 @@ function normalizeCollectorSettingFormValue(
               <p class="pane-caption">
                 {{
                   selectedSource === null
-                    ? "Across every registered source"
+                    ? "Across every subscribed source"
                     : sourceDomainLabel(selectedSource.url)
                 }}
               </p>
@@ -2052,6 +2459,20 @@ function normalizeCollectorSettingFormValue(
                     isSourceCrawlSubmitting === selectedSource.id
                       ? "Saving..."
                       : "Save source settings"
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="ghost-button"
+                  :disabled="
+                    isUnsubscribeSubmitting === selectedSource.subscriptionId
+                  "
+                  @click="unsubscribeSelectedSource"
+                >
+                  {{
+                    isUnsubscribeSubmitting === selectedSource.subscriptionId
+                      ? "Unsubscribing..."
+                      : "Unsubscribe"
                   }}
                 </button>
               </div>

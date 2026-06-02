@@ -9,6 +9,45 @@ create table sources (
     created_at timestamptz not null default current_timestamp
 );
 
+create table users (
+    id uuid primary key,
+    slug varchar(128) not null unique,
+    created_at timestamptz not null default current_timestamp
+);
+
+create table subscriptions (
+    id uuid primary key,
+    user_id uuid not null references users (id),
+    source_id uuid not null references sources (id),
+    collection_id uuid,
+    position integer not null default 0,
+    created_at timestamptz not null default current_timestamp,
+    constraint subscriptions_user_id_source_id_key unique (user_id, source_id)
+);
+
+create table collections (
+    id uuid primary key,
+    user_id uuid not null references users (id),
+    parent_collection_id uuid references collections (id),
+    title text not null,
+    position integer not null default 0,
+    created_at timestamptz not null default current_timestamp
+);
+
+alter table subscriptions
+    add constraint subscriptions_collection_id_fkey
+    foreign key (collection_id) references collections (id);
+
+create table subscription_events (
+    id uuid primary key,
+    user_id uuid not null references users (id),
+    source_id uuid not null references sources (id),
+    kind text not null constraint subscription_events_kind_check check (
+        kind = any(array ['subscribed'::text, 'unsubscribed'::text])
+    ),
+    occurred_at timestamptz not null default current_timestamp
+);
+
 create table source_snapshots (
     id uuid primary key,
     source_id uuid not null references sources (id),
@@ -219,6 +258,28 @@ create table transcript_chunks (
 );
 
 create index if not exists sources_created_at_idx on sources (created_at);
+
+create index if not exists users_slug_idx on users (slug);
+
+create index if not exists subscriptions_user_id_idx on subscriptions (user_id);
+
+create index if not exists subscriptions_source_id_idx on subscriptions (source_id);
+
+create index if not exists subscriptions_collection_id_idx on subscriptions (collection_id);
+
+create index if not exists subscription_events_user_id_occurred_at_idx on subscription_events (
+    user_id,
+    occurred_at desc
+);
+create index if not exists subscription_events_source_id_occurred_at_idx on subscription_events (
+    source_id,
+    occurred_at desc
+);
+
+create index if not exists collections_user_id_position_idx on collections (
+    user_id,
+    position
+);
 
 create index if not exists source_snapshots_version_idx on source_snapshots (version);
 

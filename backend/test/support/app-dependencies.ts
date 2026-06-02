@@ -176,6 +176,7 @@ export function createTestAppDependencies(
       createSource: vi.fn(() =>
         Promise.resolve(
           ok({
+            collectionId: null,
             collectorSettingsVersion: 1,
             createdAt: new Date("2026-05-01T00:00:00.000Z"),
             description: null,
@@ -185,6 +186,8 @@ export function createTestAppDependencies(
             periodicCrawlIntervalMinutes: 60,
             recordedAt: null,
             slug: "example-feed",
+            subscriptionId: "subscription-1",
+            subscriptionPosition: 0,
             title: "Example Feed",
             url: "https://example.com/feed.xml",
             urlHash: "hash-1",
@@ -216,10 +219,10 @@ export function createTestAppDependencies(
           }),
         ),
       ),
-      listSources: vi.fn(() => Promise.resolve(ok([]))),
-      updateSourceCollectorSettings: vi.fn(() =>
+      assignSourceToCollection: vi.fn(() =>
         Promise.resolve(
           ok({
+            collectionId: null,
             collectorSettingsVersion: 1,
             createdAt: new Date("2026-05-01T00:00:00.000Z"),
             description: null,
@@ -229,6 +232,57 @@ export function createTestAppDependencies(
             periodicCrawlIntervalMinutes: 60,
             recordedAt: null,
             slug: "example-feed",
+            subscriptionId: "subscription-1",
+            subscriptionPosition: 0,
+            title: "Example Feed",
+            url: "https://example.com/feed.xml",
+            urlHash: "hash-1",
+            version: 1,
+          }),
+        ),
+      ),
+      createCollection: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            id: "collection-1",
+            parentCollectionId: null,
+            position: 0,
+            sourceCount: 0,
+            title: "Default",
+          }),
+        ),
+      ),
+      listSources: vi.fn(() => Promise.resolve(ok([]))),
+      listSourceCollections: vi.fn(() => Promise.resolve(ok([]))),
+      unsubscribe: vi.fn(() => Promise.resolve(ok(undefined))),
+      updateCollection: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            id: "collection-1",
+            parentCollectionId: null,
+            position: 0,
+            sourceCount: 0,
+            title: "Default",
+          }),
+        ),
+      ),
+      updateSourceCollectorSettings: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            collectionId: null,
+            collectorSettingsVersion: 1,
+            createdAt: new Date("2026-05-01T00:00:00.000Z"),
+            description: null,
+            id: "source-1",
+            kind: "podcast",
+            periodicCrawlEnabled: true,
+            periodicCrawlIntervalMinutes: 60,
+            recordedAt: null,
+            slug: "example-feed",
+            subscriptionId: "subscription-1",
+            subscriptionPosition: 0,
             title: "Example Feed",
             url: "https://example.com/feed.xml",
             urlHash: "hash-1",
