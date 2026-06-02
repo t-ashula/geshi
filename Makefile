@@ -1,6 +1,8 @@
 .PHONY: db-up db-down dev-up dev-down dev-reset \
 	db-schema-dry-run db-schema-apply db-schema-apply-with-drop \
-	e2e-db-up e2e-db-down e2e-db-reset e2e-db-schema-apply test-e2e
+	db-data-migrate \
+	e2e-db-up e2e-db-down e2e-db-reset e2e-db-schema-apply \
+	test-e2e
 
 PSQLDEF_VERSION ?= 3.11.1
 PSQLDEF_IMAGE := sqldef/psqldef:$(PSQLDEF_VERSION)
@@ -12,6 +14,7 @@ DB_NAME ?= geshi
 DB_PORT ?= 55432
 DEV_COMPOSE := docker compose -f compose.yaml
 TEST_COMPOSE := docker compose -f test/compose.test.yaml
+DATA_MIGRATION ?=
 
 db-up:
 	$(DEV_COMPOSE) up -d postgres
@@ -64,6 +67,11 @@ db-schema-apply-with-drop:
 		--enable-drop \
 		--config-inline $(PSQLDEF_CONFIG_INLINE) \
 		--apply < db/schema.sql 2>&1 | tee $(DB_SCHEMA_APPLY_WITH_DROP_LOG)
+
+db-data-migrate:
+	@test -n "$(DATA_MIGRATION)" || (echo "DATA_MIGRATION is required" >&2; exit 1)
+	@COMPOSE_FILE_PATH=compose.yaml DB_NAME=$(DB_NAME) DB_USER=geshi \
+		sh scripts/run-data-migration.sh "$(DATA_MIGRATION)"
 
 e2e-db-up:
 	$(TEST_COMPOSE) up -d postgres
