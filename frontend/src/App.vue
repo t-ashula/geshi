@@ -68,6 +68,7 @@ type RouteState =
 
 type BrowsePane = "contents" | "detail" | "sources";
 type SourceDisplayMode = "collections" | "flat";
+type CollectionDialogMode = "create" | "rename";
 
 const contents = ref<ContentListItem[]>([]);
 const contentDetail = ref<ContentDetailItem | null>(null);
@@ -75,7 +76,11 @@ const sourceCollectorPlugins = ref<SourceCollectorPluginListItem[]>([]);
 const sourceCollections = ref<SourceCollectionListItem[]>([]);
 const sources = ref<SourceListItem[]>([]);
 const sourceDisplayMode = ref<SourceDisplayMode>("collections");
+const collectionDialogMode = ref<CollectionDialogMode | null>(null);
+const collectionDialogTarget = ref<SourceCollectionListItem | null>(null);
+const collectionDialogTitle = ref("");
 const isCreateFormVisible = ref(false);
+const isCollectionDialogSubmitting = ref(false);
 const isDiscovering = ref(false);
 const isLoadingPreviews = ref(false);
 const isSubmitting = ref(false);
@@ -87,6 +92,7 @@ const isSourcesLoading = ref(true);
 const isContentsLoading = ref(true);
 const isContentActionsExpanded = ref(false);
 const isDetailLoading = ref(false);
+const collapsedCollectionIds = ref<Set<string>>(new Set());
 const expandedAssetMenuId = ref<string | null>(null);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
@@ -128,6 +134,9 @@ const pluginGlobalSettings = ref<
 >([]);
 const pluginGlobalItemsForm = ref<Record<string, Record<string, unknown>>>({});
 const theme = ref<"light" | "dark">("light");
+const collectionDialogInput = useTemplateRef<HTMLInputElement>(
+  "collectionDialogInput",
+);
 const audioPlayer = useTemplateRef<HTMLAudioElement>("audioPlayer");
 const playback = ref<PlaybackState | null>(null);
 const playbackCurrentTime = ref(0);
@@ -209,6 +218,11 @@ const orderedSourcesForBrowse = computed(() => {
   ];
 });
 
+const isAllSourcesSelected = computed(
+  () =>
+    routeState.value.kind === "browse-index" && selectedSource.value === null,
+);
+
 const routeHeadline = computed(() => {
   if (routeState.value.kind === "not-found") {
     return "Page not found";
@@ -278,6 +292,10 @@ watch(theme, (currentTheme) => {
   window.localStorage.setItem("geshi-theme", currentTheme);
 });
 
+watch(sourceDisplayMode, (currentMode) => {
+  window.localStorage.setItem("geshi-source-display-mode", currentMode);
+});
+
 watch(playbackVolume, (nextVolume) => {
   const element = audioPlayer.value;
 
@@ -341,6 +359,7 @@ onMounted(async () => {
   }
 
   theme.value = readInitialTheme();
+  sourceDisplayMode.value = readInitialSourceDisplayMode();
 
   window.addEventListener("popstate", syncRouteFromLocation);
   window.addEventListener("keydown", handleGlobalKeydown);
@@ -382,6 +401,7 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     event.altKey ||
     event.ctrlKey ||
     event.metaKey ||
+    collectionDialogMode.value !== null ||
     isCreateFormVisible.value ||
     routeState.value.kind === "settings" ||
     routeState.value.kind === "not-found" ||
@@ -468,8 +488,33 @@ function closeCreateForm(): void {
   selectedDiscoveryKeys.value = [];
 }
 
-function toggleTheme(): void {
-  theme.value = theme.value === "dark" ? "light" : "dark";
+async function openCreateCollectionDialog(): Promise<void> {
+  collectionDialogMode.value = "create";
+  collectionDialogTarget.value = null;
+  collectionDialogTitle.value = "";
+  errorMessage.value = null;
+  await nextTick();
+  collectionDialogInput.value?.focus();
+  collectionDialogInput.value?.select();
+}
+
+async function openRenameCollectionDialog(
+  collection: SourceCollectionListItem,
+): Promise<void> {
+  collectionDialogMode.value = "rename";
+  collectionDialogTarget.value = collection;
+  collectionDialogTitle.value = collection.title;
+  errorMessage.value = null;
+  await nextTick();
+  collectionDialogInput.value?.focus();
+  collectionDialogInput.value?.select();
+}
+
+function closeCollectionDialog(): void {
+  collectionDialogMode.value = null;
+  collectionDialogTarget.value = null;
+  collectionDialogTitle.value = "";
+  isCollectionDialogSubmitting.value = false;
 }
 
 function toggleSourceSettings(): void {
@@ -928,60 +973,52 @@ async function refreshSources(): Promise<void> {
   }
 }
 
-async function promptCreateCollection(): Promise<void> {
-  const title = window.prompt("Collection name");
-
-  if (title === null) {
-    return;
-  }
-
-  const trimmedTitle = title.trim();
+async function submitCollectionDialog(): Promise<void> {
+  const trimmedTitle = collectionDialogTitle.value.trim();
 
   if (trimmedTitle === "") {
     errorMessage.value = "Collection name is required.";
     return;
   }
 
-  try {
-    const collection = await createSourceCollection({
-      position: sourceCollections.value.length,
-      title: trimmedTitle,
-    });
-    sourceCollections.value = [...sourceCollections.value, collection];
-  } catch (error) {
-    errorMessage.value =
-      error instanceof Error ? error.message : "Failed to create collection.";
-  }
-}
+  const mode = collectionDialogMode.value;
+  const target = collectionDialogTarget.value;
 
-async function promptRenameCollection(
-  collection: SourceCollectionListItem,
-): Promise<void> {
-  const title = window.prompt("Rename collection", collection.title);
-
-  if (title === null) {
+  if (mode === null) {
     return;
   }
 
-  const trimmedTitle = title.trim();
-
-  if (trimmedTitle === "") {
-    errorMessage.value = "Collection name is required.";
-    return;
-  }
+  isCollectionDialogSubmitting.value = true;
 
   try {
-    const updated = await updateSourceCollection(collection.id, {
-      parentCollectionId: collection.parentCollectionId,
-      position: collection.position,
-      title: trimmedTitle,
-    });
-    sourceCollections.value = sourceCollections.value.map((item) =>
-      item.id === updated.id ? updated : item,
-    );
+    if (mode === "create") {
+      const collection = await createSourceCollection({
+        position: sourceCollections.value.length,
+        title: trimmedTitle,
+      });
+      sourceCollections.value = [...sourceCollections.value, collection];
+      sourceDisplayMode.value = "collections";
+    } else if (target !== null) {
+      const updated = await updateSourceCollection(target.id, {
+        parentCollectionId: target.parentCollectionId,
+        position: target.position,
+        title: trimmedTitle,
+      });
+      sourceCollections.value = sourceCollections.value.map((item) =>
+        item.id === updated.id ? updated : item,
+      );
+    }
+
+    closeCollectionDialog();
   } catch (error) {
     errorMessage.value =
-      error instanceof Error ? error.message : "Failed to rename collection.";
+      error instanceof Error
+        ? error.message
+        : mode === "create"
+          ? "Failed to create collection."
+          : "Failed to rename collection.";
+  } finally {
+    isCollectionDialogSubmitting.value = false;
   }
 }
 
@@ -997,6 +1034,22 @@ function beginCollectionDrag(collectionId: string): void {
 
 function beginSourceDrag(sourceId: string): void {
   draggedSourceId.value = sourceId;
+}
+
+function isCollectionExpanded(collectionId: string): boolean {
+  return !collapsedCollectionIds.value.has(collectionId);
+}
+
+function toggleCollectionExpanded(collectionId: string): void {
+  const next = new Set(collapsedCollectionIds.value);
+
+  if (next.has(collectionId)) {
+    next.delete(collectionId);
+  } else {
+    next.add(collectionId);
+  }
+
+  collapsedCollectionIds.value = next;
 }
 
 async function dropCollectionBefore(
@@ -1048,6 +1101,20 @@ async function dropCollectionBefore(
   } finally {
     draggedCollectionId.value = null;
   }
+}
+
+async function handleCollectionGroupDrop(
+  targetCollection: SourceCollectionListItem,
+): Promise<void> {
+  if (draggedSourceId.value !== null) {
+    await dropSourceIntoCollection(
+      targetCollection.id,
+      sourcesForCollection(targetCollection.id).length,
+    );
+    return;
+  }
+
+  await dropCollectionBefore(targetCollection);
 }
 
 async function dropSourceIntoCollection(
@@ -1346,6 +1413,10 @@ function openFeed(source: SourceListItem): void {
   navigateTo(`/browse/feed/${encodeURIComponent(source.slug)}`);
 }
 
+function openAllEntries(): void {
+  navigateTo("/browse");
+}
+
 function openEntry(content: ContentListItem): void {
   navigateTo(`/browse/entry/${content.id}`);
 }
@@ -1412,17 +1483,39 @@ function movePaneFocus(direction: -1 | 1): boolean {
 }
 
 function moveSourceSelection(direction: -1 | 1): boolean {
-  const nextSource = selectRelativeItem(
-    orderedSourcesForBrowse.value,
-    selectedSource.value?.id ?? null,
-    direction,
-  );
+  const orderedItems = orderedSourcesForBrowse.value;
 
-  if (nextSource === null) {
+  if (orderedItems.length === 0) {
     return false;
   }
 
+  const currentIndex = selectedSource.value
+    ? orderedItems.findIndex((source) => source.id === selectedSource.value?.id)
+    : -1;
+  const virtualIndex = isAllSourcesSelected.value ? -1 : currentIndex;
+  const nextIndex =
+    virtualIndex === -1
+      ? direction > 0
+        ? 0
+        : -1
+      : Math.max(
+          -1,
+          Math.min(orderedItems.length - 1, virtualIndex + direction),
+        );
+
   activeBrowsePane.value = "sources";
+
+  if (nextIndex === -1) {
+    openAllEntries();
+    return true;
+  }
+
+  const nextSource = orderedItems[nextIndex];
+
+  if (nextSource === undefined) {
+    return false;
+  }
+
   openFeed(nextSource);
   return true;
 }
@@ -1525,6 +1618,10 @@ function shouldIgnoreKeyboardNavigationTarget(
   target: EventTarget | null,
 ): boolean {
   if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.closest(".source-row, .content-row") !== null) {
     return false;
   }
 
@@ -1640,6 +1737,16 @@ function readInitialTheme(): "light" | "dark" {
   const initialTheme = "dark";
   document.documentElement.dataset.theme = initialTheme;
   return initialTheme;
+}
+
+function readInitialSourceDisplayMode(): SourceDisplayMode {
+  const storedMode = window.localStorage.getItem("geshi-source-display-mode");
+
+  if (storedMode === "collections" || storedMode === "flat") {
+    return storedMode;
+  }
+
+  return "collections";
 }
 
 function sourceDomainLabel(sourceUrl: string): string {
@@ -1800,9 +1907,6 @@ function normalizeCollectorSettingFormValue(
             Settings
           </button>
         </nav>
-        <button class="ghost-button" type="button" @click="toggleTheme">
-          {{ theme === "dark" ? "Light" : "Dark" }}
-        </button>
       </div>
     </header>
 
@@ -1812,6 +1916,31 @@ function normalizeCollectorSettingFormValue(
     </p>
 
     <section v-if="routeState.kind === 'settings'" class="settings-shell">
+      <div class="settings-shell-header">
+        <div>
+          <p class="eyebrow">Interface</p>
+          <h2>Appearance and Browse Layout</h2>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <label>
+          <span>Theme</span>
+          <select v-model="theme">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Source Display Mode</span>
+          <select v-model="sourceDisplayMode">
+            <option value="collections">Folders</option>
+            <option value="flat">Flat</option>
+          </select>
+        </label>
+      </div>
+
       <div class="settings-shell-header">
         <div>
           <p class="eyebrow">Operations</p>
@@ -1929,6 +2058,81 @@ function normalizeCollectorSettingFormValue(
     </section>
 
     <template v-else>
+      <section
+        v-if="collectionDialogMode !== null"
+        class="collection-dialog-backdrop"
+        @click.self="closeCollectionDialog"
+      >
+        <div class="collection-dialog" role="dialog" aria-modal="true">
+          <div class="create-shell-header">
+            <div>
+              <p class="eyebrow">Collection</p>
+              <h2>
+                {{
+                  collectionDialogMode === "create"
+                    ? "Create collection"
+                    : "Rename collection"
+                }}
+              </h2>
+            </div>
+            <button
+              class="ghost-button"
+              type="button"
+              @click="closeCollectionDialog"
+            >
+              Close
+            </button>
+          </div>
+
+          <form
+            class="create-grid"
+            @submit.prevent="void submitCollectionDialog()"
+          >
+            <label class="create-grid-wide">
+              <span>Name</span>
+              <input
+                ref="collectionDialogInput"
+                v-model="collectionDialogTitle"
+                :disabled="isCollectionDialogSubmitting"
+                type="text"
+                maxlength="120"
+                placeholder="Work"
+              />
+            </label>
+
+            <p v-if="errorMessage" class="feedback error create-grid-wide">
+              {{ errorMessage }}
+            </p>
+
+            <div class="actions create-grid-wide">
+              <button
+                type="submit"
+                class="primary-button"
+                :disabled="isCollectionDialogSubmitting"
+              >
+                {{
+                  isCollectionDialogSubmitting
+                    ? collectionDialogMode === "create"
+                      ? "Creating..."
+                      : "Saving..."
+                    : collectionDialogMode === "create"
+                      ? "Create collection"
+                      : "Save changes"
+                }}
+              </button>
+              <button
+                type="button"
+                class="secondary-button"
+                :disabled="isCollectionDialogSubmitting"
+                @click="closeCollectionDialog"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
       <section v-if="isCreateFormVisible" class="create-shell">
         <div class="create-shell-header">
           <div>
@@ -2077,25 +2281,9 @@ function normalizeCollectorSettingFormValue(
               <button
                 type="button"
                 class="ghost-button menu-toggle-button"
-                :class="{ active: sourceDisplayMode === 'collections' }"
-                @click="sourceDisplayMode = 'collections'"
-              >
-                Folders
-              </button>
-              <button
-                type="button"
-                class="ghost-button menu-toggle-button"
-                :class="{ active: sourceDisplayMode === 'flat' }"
-                @click="sourceDisplayMode = 'flat'"
-              >
-                Flat
-              </button>
-              <button
-                type="button"
-                class="ghost-button menu-toggle-button"
                 aria-label="Add collection"
                 title="Add collection"
-                @click="promptCreateCollection"
+                @click="openCreateCollectionDialog"
               >
                 Folder
               </button>
@@ -2123,164 +2311,175 @@ function normalizeCollectorSettingFormValue(
             Loading sources...
           </div>
 
-          <div
+          <ul
             v-else-if="sourceDisplayMode === 'collections'"
-            class="collection-browser"
+            class="source-list collection-tree"
+            @dragover.prevent
+            @drop.prevent="void dropSourceIntoCollection(null, 0)"
           >
-            <section
-              class="collection-group"
-              @dragover.prevent
-              @drop.prevent="void dropSourceIntoCollection(null, 0)"
-            >
-              <div class="collection-header">
-                <div>
-                  <p class="eyebrow">Unsorted</p>
-                  <h3>Uncategorized</h3>
-                </div>
-                <span class="pane-count">{{
-                  uncategorizedSources.length
-                }}</span>
-              </div>
-              <ul
-                v-if="uncategorizedSources.length > 0"
-                class="source-list collection-source-list"
+            <li>
+              <button
+                type="button"
+                class="source-row"
+                :class="{ selected: isAllSourcesSelected }"
+                @click="openAllEntries"
               >
-                <li
-                  v-for="source in uncategorizedSources"
-                  :key="source.subscriptionId"
-                >
-                  <button
-                    type="button"
-                    class="source-row"
-                    :class="{ selected: isSourceSelected(source) }"
-                    draggable="true"
-                    @click="openFeed(source)"
-                    @dragstart="beginSourceDrag(source.id)"
-                  >
-                    <span class="source-row-head">
-                      <span class="source-row-title">
-                        {{ source.title ?? source.slug }}
-                      </span>
-                      <span
-                        class="source-row-status"
-                        :class="{
-                          active: source.periodicCrawlEnabled,
-                          idle: !source.periodicCrawlEnabled,
-                        }"
-                      >
-                        {{
-                          source.periodicCrawlEnabled
-                            ? `Auto ${source.periodicCrawlIntervalMinutes}m`
-                            : "Manual"
-                        }}
-                      </span>
-                    </span>
-                    <span class="source-row-meta-line">
-                      <span class="source-row-domain">
-                        {{ sourceDomainLabel(source.url) }}
-                      </span>
-                      <span class="source-row-meta"
-                        >{{ source.kind }} · {{ source.slug }}</span
-                      >
-                    </span>
-                  </button>
-                </li>
-              </ul>
-              <div v-else class="empty-state compact-empty-state">
-                No uncategorized subscriptions.
-              </div>
-            </section>
+                <span class="source-row-main">
+                  <span class="source-row-icon" aria-hidden="true">
+                    <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                      <path
+                        d="M4 6h16M4 12h16M4 18h16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </span>
+                  <span class="source-row-title">All</span>
+                </span>
+              </button>
+            </li>
+            <li
+              v-for="source in uncategorizedSources"
+              :key="source.subscriptionId"
+            >
+              <button
+                type="button"
+                class="source-row"
+                :class="{ selected: isSourceSelected(source) }"
+                draggable="true"
+                @click="openFeed(source)"
+                @dragstart="beginSourceDrag(source.id)"
+              >
+                <span class="source-row-main">
+                  <span class="source-row-icon" aria-hidden="true">
+                    <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                      <path
+                        d="M6 17a1.5 1.5 0 1 1 0 .01M5 10a9 9 0 0 1 9 9M5 5a14 14 0 0 1 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </span>
+                  <span class="source-row-title">
+                    {{ source.title ?? source.slug }}
+                  </span>
+                </span>
+              </button>
+            </li>
 
-            <section
+            <template
               v-for="collection in sortedSourceCollections"
               :key="collection.id"
-              class="collection-group"
-              draggable="true"
-              @dragstart="beginCollectionDrag(collection.id)"
-              @dragover.prevent
-              @drop.prevent="void dropCollectionBefore(collection)"
             >
-              <div
-                class="collection-header"
+              <li
+                class="collection-tree-folder"
+                draggable="true"
+                @dragstart="beginCollectionDrag(collection.id)"
                 @dragover.prevent
-                @drop.prevent="
-                  void dropSourceIntoCollection(
-                    collection.id,
-                    sourcesForCollection(collection.id).length,
-                  )
-                "
+                @drop.prevent="void handleCollectionGroupDrop(collection)"
               >
-                <div>
-                  <p class="eyebrow">Folder</p>
-                  <h3>{{ collection.title }}</h3>
-                </div>
-                <div class="collection-actions">
-                  <span class="pane-count">{{ collection.sourceCount }}</span>
-                  <button
-                    type="button"
-                    class="ghost-button menu-toggle-button"
-                    @click="void promptRenameCollection(collection)"
-                  >
-                    Rename
-                  </button>
-                </div>
-              </div>
-              <ul
-                v-if="sourcesForCollection(collection.id).length > 0"
-                class="source-list collection-source-list"
-              >
-                <li
-                  v-for="(source, index) in sourcesForCollection(collection.id)"
-                  :key="source.subscriptionId"
+                <div
+                  class="source-row collection-row"
                   @dragover.prevent
                   @drop.prevent="
-                    void dropSourceIntoCollection(collection.id, index)
+                    void dropSourceIntoCollection(
+                      collection.id,
+                      sourcesForCollection(collection.id).length,
+                    )
                   "
                 >
-                  <button
-                    type="button"
-                    class="source-row"
-                    :class="{ selected: isSourceSelected(source) }"
-                    draggable="true"
-                    @click="openFeed(source)"
-                    @dragstart="beginSourceDrag(source.id)"
-                  >
-                    <span class="source-row-head">
-                      <span class="source-row-title">
-                        {{ source.title ?? source.slug }}
-                      </span>
-                      <span
-                        class="source-row-status"
-                        :class="{
-                          active: source.periodicCrawlEnabled,
-                          idle: !source.periodicCrawlEnabled,
-                        }"
+                  <div class="collection-row-main">
+                    <button
+                      type="button"
+                      class="collection-toggle"
+                      :aria-expanded="isCollectionExpanded(collection.id)"
+                      @click.stop="toggleCollectionExpanded(collection.id)"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="collection-toggle-icon"
+                        viewBox="0 0 24 24"
                       >
-                        {{
-                          source.periodicCrawlEnabled
-                            ? `Auto ${source.periodicCrawlIntervalMinutes}m`
-                            : "Manual"
-                        }}
-                      </span>
+                        <path
+                          d="M9 6l6 6-6 6"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="square"
+                          stroke-width="1.8"
+                        />
+                      </svg>
+                    </button>
+                    <span class="source-row-title">{{ collection.title }}</span>
+                  </div>
+                </div>
+              </li>
+              <li
+                v-for="(source, index) in sourcesForCollection(collection.id)"
+                v-show="isCollectionExpanded(collection.id)"
+                :key="source.subscriptionId"
+                class="collection-tree-child"
+                @dragover.prevent
+                @drop.prevent="
+                  void dropSourceIntoCollection(collection.id, index)
+                "
+              >
+                <button
+                  type="button"
+                  class="source-row source-row-child"
+                  :class="{ selected: isSourceSelected(source) }"
+                  draggable="true"
+                  @click="openFeed(source)"
+                  @dragstart="beginSourceDrag(source.id)"
+                >
+                  <span class="source-row-main">
+                    <span class="source-row-icon" aria-hidden="true">
+                      <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                        <path
+                          d="M6 17a1.5 1.5 0 1 1 0 .01M5 10a9 9 0 0 1 9 9M5 5a14 14 0 0 1 14 14"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="square"
+                          stroke-width="1.8"
+                        />
+                      </svg>
                     </span>
-                    <span class="source-row-meta-line">
-                      <span class="source-row-domain">
-                        {{ sourceDomainLabel(source.url) }}
-                      </span>
-                      <span class="source-row-meta"
-                        >{{ source.kind }} · {{ source.slug }}</span
-                      >
+                    <span class="source-row-title">
+                      {{ source.title ?? source.slug }}
                     </span>
-                  </button>
-                </li>
-              </ul>
-              <div v-else class="empty-state compact-empty-state">
-                Drop a subscription here.
-              </div>
-            </section>
-          </div>
+                  </span>
+                </button>
+              </li>
+            </template>
+          </ul>
 
           <ul v-else-if="sources.length > 0" class="source-list">
+            <li>
+              <button
+                type="button"
+                class="source-row"
+                :class="{ selected: isAllSourcesSelected }"
+                @click="openAllEntries"
+              >
+                <span class="source-row-main">
+                  <span class="source-row-icon" aria-hidden="true">
+                    <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                      <path
+                        d="M4 6h16M4 12h16M4 18h16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </span>
+                  <span class="source-row-title">All</span>
+                </span>
+              </button>
+            </li>
             <li v-for="source in sources" :key="source.id">
               <button
                 type="button"
@@ -2288,34 +2487,21 @@ function normalizeCollectorSettingFormValue(
                 :class="{ selected: isSourceSelected(source) }"
                 @click="openFeed(source)"
               >
-                <span class="source-row-head">
+                <span class="source-row-main">
+                  <span class="source-row-icon" aria-hidden="true">
+                    <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                      <path
+                        d="M6 17a1.5 1.5 0 1 1 0 .01M5 10a9 9 0 0 1 9 9M5 5a14 14 0 0 1 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </span>
                   <span class="source-row-title">
                     {{ source.title ?? source.slug }}
                   </span>
-                  <span
-                    class="source-row-status"
-                    :class="{
-                      active: source.periodicCrawlEnabled,
-                      idle: !source.periodicCrawlEnabled,
-                    }"
-                  >
-                    {{
-                      source.periodicCrawlEnabled
-                        ? `Auto ${source.periodicCrawlIntervalMinutes}m`
-                        : "Manual"
-                    }}
-                  </span>
-                </span>
-                <span class="source-row-meta-line">
-                  <span class="source-row-domain">
-                    {{ sourceDomainLabel(source.url) }}
-                  </span>
-                  <span class="source-row-meta"
-                    >{{ source.kind }} · {{ source.slug }}</span
-                  >
-                </span>
-                <span v-if="source.description" class="source-row-description">
-                  {{ source.description }}
                 </span>
               </button>
             </li>
