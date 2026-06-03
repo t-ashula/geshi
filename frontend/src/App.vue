@@ -196,6 +196,19 @@ const uncategorizedSources = computed(() =>
     .sort(compareSubscriptionListItems),
 );
 
+const orderedSourcesForBrowse = computed(() => {
+  if (sourceDisplayMode.value === "flat") {
+    return [...sources.value];
+  }
+
+  return [
+    ...uncategorizedSources.value,
+    ...sortedSourceCollections.value.flatMap((collection) =>
+      sourcesForCollection(collection.id),
+    ),
+  ];
+});
+
 const routeHeadline = computed(() => {
   if (routeState.value.kind === "not-found") {
     return "Page not found";
@@ -1400,7 +1413,7 @@ function movePaneFocus(direction: -1 | 1): boolean {
 
 function moveSourceSelection(direction: -1 | 1): boolean {
   const nextSource = selectRelativeItem(
-    sources.value,
+    orderedSourcesForBrowse.value,
     selectedSource.value?.id ?? null,
     direction,
   );
