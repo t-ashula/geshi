@@ -19,6 +19,7 @@ import type {
   PeriodicCrawlSettings,
   PluginGlobalSettingsDetail,
   PreviewSourceResult,
+  SourceCollectionListItem,
   SourceDiscoveryCandidate,
   SourceCollectorPluginListItem,
   SourceCollectorSettingItem,
@@ -26,6 +27,8 @@ import type {
   SourceListItem,
 } from "./source-api.js";
 import {
+  assignSourceToCollection,
+  createSourceCollection,
   createSource,
   discoverSources,
   getContentDetail,
@@ -33,14 +36,17 @@ import {
   getPluginGlobalSettings,
   getSourceCollectorSettings,
   listSourceCollectorPlugins,
+  listSourceCollections,
   listContents,
   listSources,
   observeSource,
   previewSource,
   requestTranscripts,
   retryTranscript,
+  unsubscribeSource,
   updatePeriodicCrawlSettings,
   updatePluginGlobalSettings,
+  updateSourceCollection,
   updateSourceCollectorSettings,
 } from "./source-api.js";
 import {
@@ -61,22 +67,32 @@ type RouteState =
   | { kind: "not-found" };
 
 type BrowsePane = "contents" | "detail" | "sources";
+type SourceDisplayMode = "collections" | "flat";
+type CollectionDialogMode = "create" | "rename";
 
 const contents = ref<ContentListItem[]>([]);
 const contentDetail = ref<ContentDetailItem | null>(null);
 const sourceCollectorPlugins = ref<SourceCollectorPluginListItem[]>([]);
+const sourceCollections = ref<SourceCollectionListItem[]>([]);
 const sources = ref<SourceListItem[]>([]);
+const sourceDisplayMode = ref<SourceDisplayMode>("collections");
+const collectionDialogMode = ref<CollectionDialogMode | null>(null);
+const collectionDialogTarget = ref<SourceCollectionListItem | null>(null);
+const collectionDialogTitle = ref("");
 const isCreateFormVisible = ref(false);
+const isCollectionDialogSubmitting = ref(false);
 const isDiscovering = ref(false);
 const isLoadingPreviews = ref(false);
 const isSubmitting = ref(false);
 const isObserveSubmitting = ref<string | null>(null);
+const isUnsubscribeSubmitting = ref<string | null>(null);
 const isSourceCrawlSubmitting = ref<string | null>(null);
 const isSettingsSubmitting = ref(false);
 const isSourcesLoading = ref(true);
 const isContentsLoading = ref(true);
 const isContentActionsExpanded = ref(false);
 const isDetailLoading = ref(false);
+const collapsedCollectionIds = ref<Set<string>>(new Set());
 const expandedAssetMenuId = ref<string | null>(null);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
@@ -118,6 +134,9 @@ const pluginGlobalSettings = ref<
 >([]);
 const pluginGlobalItemsForm = ref<Record<string, Record<string, unknown>>>({});
 const theme = ref<"light" | "dark">("light");
+const collectionDialogInput = useTemplateRef<HTMLInputElement>(
+  "collectionDialogInput",
+);
 const audioPlayer = useTemplateRef<HTMLAudioElement>("audioPlayer");
 const playback = ref<PlaybackState | null>(null);
 const playbackCurrentTime = ref(0);
@@ -129,6 +148,8 @@ const playbackVolume = ref(1);
 const isPlaybackMuted = ref(false);
 const expandedTranscriptIds = ref<Set<string>>(new Set());
 const activeBrowsePane = ref<BrowsePane>("sources");
+const draggedCollectionId = ref<string | null>(null);
+const draggedSourceId = ref<string | null>(null);
 
 const selectedSourceSlug = computed(() => {
   const route = routeState.value;
@@ -167,6 +188,40 @@ const visibleContents = computed(() => {
 
   return [...filteredContents].sort(compareContentListItems);
 });
+
+const sortedSourceCollections = computed(() =>
+  [...sourceCollections.value].sort((left, right) => {
+    if (left.position !== right.position) {
+      return left.position - right.position;
+    }
+
+    return left.createdAt.localeCompare(right.createdAt);
+  }),
+);
+
+const uncategorizedSources = computed(() =>
+  [...sources.value]
+    .filter((source) => source.collectionId === null)
+    .sort(compareSubscriptionListItems),
+);
+
+const orderedSourcesForBrowse = computed(() => {
+  if (sourceDisplayMode.value === "flat") {
+    return [...sources.value];
+  }
+
+  return [
+    ...uncategorizedSources.value,
+    ...sortedSourceCollections.value.flatMap((collection) =>
+      sourcesForCollection(collection.id),
+    ),
+  ];
+});
+
+const isAllSourcesSelected = computed(
+  () =>
+    routeState.value.kind === "browse-index" && selectedSource.value === null,
+);
 
 const routeHeadline = computed(() => {
   if (routeState.value.kind === "not-found") {
@@ -237,6 +292,10 @@ watch(theme, (currentTheme) => {
   window.localStorage.setItem("geshi-theme", currentTheme);
 });
 
+watch(sourceDisplayMode, (currentMode) => {
+  window.localStorage.setItem("geshi-source-display-mode", currentMode);
+});
+
 watch(playbackVolume, (nextVolume) => {
   const element = audioPlayer.value;
 
@@ -300,6 +359,7 @@ onMounted(async () => {
   }
 
   theme.value = readInitialTheme();
+  sourceDisplayMode.value = readInitialSourceDisplayMode();
 
   window.addEventListener("popstate", syncRouteFromLocation);
   window.addEventListener("keydown", handleGlobalKeydown);
@@ -341,6 +401,7 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     event.altKey ||
     event.ctrlKey ||
     event.metaKey ||
+    collectionDialogMode.value !== null ||
     isCreateFormVisible.value ||
     routeState.value.kind === "settings" ||
     routeState.value.kind === "not-found" ||
@@ -373,6 +434,20 @@ function handleGlobalKeydown(event: KeyboardEvent): void {
     }
     case "m": {
       if (movePaneFocus(-1)) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+    case "o": {
+      if (triggerOriginalPageShortcut()) {
+        event.preventDefault();
+      }
+
+      return;
+    }
+    case "p": {
+      if (triggerPlaybackShortcut()) {
         event.preventDefault();
       }
 
@@ -413,8 +488,33 @@ function closeCreateForm(): void {
   selectedDiscoveryKeys.value = [];
 }
 
-function toggleTheme(): void {
-  theme.value = theme.value === "dark" ? "light" : "dark";
+async function openCreateCollectionDialog(): Promise<void> {
+  collectionDialogMode.value = "create";
+  collectionDialogTarget.value = null;
+  collectionDialogTitle.value = "";
+  errorMessage.value = null;
+  await nextTick();
+  collectionDialogInput.value?.focus();
+  collectionDialogInput.value?.select();
+}
+
+async function openRenameCollectionDialog(
+  collection: SourceCollectionListItem,
+): Promise<void> {
+  collectionDialogMode.value = "rename";
+  collectionDialogTarget.value = collection;
+  collectionDialogTitle.value = collection.title;
+  errorMessage.value = null;
+  await nextTick();
+  collectionDialogInput.value?.focus();
+  collectionDialogInput.value?.select();
+}
+
+function closeCollectionDialog(): void {
+  collectionDialogMode.value = null;
+  collectionDialogTarget.value = null;
+  collectionDialogTitle.value = "";
+  isCollectionDialogSubmitting.value = false;
 }
 
 function toggleSourceSettings(): void {
@@ -859,12 +959,219 @@ async function refreshSources(): Promise<void> {
   isSourcesLoading.value = true;
 
   try {
-    sources.value = await listSources();
+    const [loadedSources, loadedCollections] = await Promise.all([
+      listSources(),
+      listSourceCollections(),
+    ]);
+    sources.value = loadedSources;
+    sourceCollections.value = loadedCollections;
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Failed to load sources.";
   } finally {
     isSourcesLoading.value = false;
+  }
+}
+
+async function submitCollectionDialog(): Promise<void> {
+  const trimmedTitle = collectionDialogTitle.value.trim();
+
+  if (trimmedTitle === "") {
+    errorMessage.value = "Collection name is required.";
+    return;
+  }
+
+  const mode = collectionDialogMode.value;
+  const target = collectionDialogTarget.value;
+
+  if (mode === null) {
+    return;
+  }
+
+  isCollectionDialogSubmitting.value = true;
+
+  try {
+    if (mode === "create") {
+      const collection = await createSourceCollection({
+        position: sourceCollections.value.length,
+        title: trimmedTitle,
+      });
+      sourceCollections.value = [...sourceCollections.value, collection];
+      sourceDisplayMode.value = "collections";
+    } else if (target !== null) {
+      const updated = await updateSourceCollection(target.id, {
+        parentCollectionId: target.parentCollectionId,
+        position: target.position,
+        title: trimmedTitle,
+      });
+      sourceCollections.value = sourceCollections.value.map((item) =>
+        item.id === updated.id ? updated : item,
+      );
+    }
+
+    closeCollectionDialog();
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : mode === "create"
+          ? "Failed to create collection."
+          : "Failed to rename collection.";
+  } finally {
+    isCollectionDialogSubmitting.value = false;
+  }
+}
+
+function sourcesForCollection(collectionId: string): SourceListItem[] {
+  return [...sources.value]
+    .filter((source) => source.collectionId === collectionId)
+    .sort(compareSubscriptionListItems);
+}
+
+function beginCollectionDrag(collectionId: string): void {
+  draggedCollectionId.value = collectionId;
+}
+
+function beginSourceDrag(sourceId: string): void {
+  draggedSourceId.value = sourceId;
+}
+
+function isCollectionExpanded(collectionId: string): boolean {
+  return !collapsedCollectionIds.value.has(collectionId);
+}
+
+function toggleCollectionExpanded(collectionId: string): void {
+  const next = new Set(collapsedCollectionIds.value);
+
+  if (next.has(collectionId)) {
+    next.delete(collectionId);
+  } else {
+    next.add(collectionId);
+  }
+
+  collapsedCollectionIds.value = next;
+}
+
+async function dropCollectionBefore(
+  targetCollection: SourceCollectionListItem,
+): Promise<void> {
+  const sourceCollectionId = draggedCollectionId.value;
+
+  if (
+    sourceCollectionId === null ||
+    sourceCollectionId === targetCollection.id
+  ) {
+    return;
+  }
+
+  const orderedCollections = [...sortedSourceCollections.value];
+  const movingIndex = orderedCollections.findIndex(
+    (collection) => collection.id === sourceCollectionId,
+  );
+  const targetIndex = orderedCollections.findIndex(
+    (collection) => collection.id === targetCollection.id,
+  );
+
+  if (movingIndex === -1 || targetIndex === -1) {
+    return;
+  }
+
+  const [movingCollection] = orderedCollections.splice(movingIndex, 1);
+
+  if (movingCollection === undefined) {
+    return;
+  }
+
+  orderedCollections.splice(targetIndex, 0, movingCollection);
+
+  try {
+    const updates = await Promise.all(
+      orderedCollections.map((collection, index) =>
+        updateSourceCollection(collection.id, {
+          parentCollectionId: collection.parentCollectionId,
+          position: index,
+          title: collection.title,
+        }),
+      ),
+    );
+    sourceCollections.value = updates;
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : "Failed to reorder collections.";
+  } finally {
+    draggedCollectionId.value = null;
+  }
+}
+
+async function handleCollectionGroupDrop(
+  targetCollection: SourceCollectionListItem,
+): Promise<void> {
+  if (draggedSourceId.value !== null) {
+    await dropSourceIntoCollection(
+      targetCollection.id,
+      sourcesForCollection(targetCollection.id).length,
+    );
+    return;
+  }
+
+  await dropCollectionBefore(targetCollection);
+}
+
+async function dropSourceIntoCollection(
+  collectionId: string | null,
+  position: number,
+): Promise<void> {
+  const sourceId = draggedSourceId.value;
+
+  if (sourceId === null) {
+    return;
+  }
+
+  try {
+    const updatedSource = await assignSourceToCollection(sourceId, {
+      collectionId,
+      position,
+    });
+    sources.value = sources.value.map((source) =>
+      source.id === updatedSource.id ? updatedSource : source,
+    );
+    await refreshSources();
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to move source subscription.";
+  } finally {
+    draggedSourceId.value = null;
+  }
+}
+
+async function unsubscribeSelectedSource(): Promise<void> {
+  if (selectedSource.value === null) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Unsubscribe from ${selectedSource.value.title ?? selectedSource.value.slug}?`,
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  isUnsubscribeSubmitting.value = selectedSource.value.subscriptionId;
+
+  try {
+    await unsubscribeSource(selectedSource.value.subscriptionId);
+    sourceCrawlErrorMessage.value = null;
+    isSourceSettingsExpanded.value = false;
+    navigateTo("/browse");
+    await Promise.all([refreshSources(), refreshContents()]);
+  } catch (error) {
+    sourceCrawlErrorMessage.value =
+      error instanceof Error ? error.message : "Failed to unsubscribe source.";
+  } finally {
+    isUnsubscribeSubmitting.value = null;
   }
 }
 
@@ -1106,6 +1413,10 @@ function openFeed(source: SourceListItem): void {
   navigateTo(`/browse/feed/${encodeURIComponent(source.slug)}`);
 }
 
+function openAllEntries(): void {
+  navigateTo("/browse");
+}
+
 function openEntry(content: ContentListItem): void {
   navigateTo(`/browse/entry/${content.id}`);
 }
@@ -1158,8 +1469,9 @@ function movePaneFocus(direction: -1 | 1): boolean {
   }
 
   const contentToOpen =
-    visibleContents.value.find((content) => content.id === selectedContentId.value) ??
-    visibleContents.value[0];
+    visibleContents.value.find(
+      (content) => content.id === selectedContentId.value,
+    ) ?? visibleContents.value[0];
 
   if (contentToOpen === undefined) {
     return false;
@@ -1171,17 +1483,39 @@ function movePaneFocus(direction: -1 | 1): boolean {
 }
 
 function moveSourceSelection(direction: -1 | 1): boolean {
-  const nextSource = selectRelativeItem(
-    sources.value,
-    selectedSource.value?.id ?? null,
-    direction,
-  );
+  const orderedItems = orderedSourcesForBrowse.value;
 
-  if (nextSource === null) {
+  if (orderedItems.length === 0) {
     return false;
   }
 
+  const currentIndex = selectedSource.value
+    ? orderedItems.findIndex((source) => source.id === selectedSource.value?.id)
+    : -1;
+  const virtualIndex = isAllSourcesSelected.value ? -1 : currentIndex;
+  const nextIndex =
+    virtualIndex === -1
+      ? direction > 0
+        ? 0
+        : -1
+      : Math.max(
+          -1,
+          Math.min(orderedItems.length - 1, virtualIndex + direction),
+        );
+
   activeBrowsePane.value = "sources";
+
+  if (nextIndex === -1) {
+    openAllEntries();
+    return true;
+  }
+
+  const nextSource = orderedItems[nextIndex];
+
+  if (nextSource === undefined) {
+    return false;
+  }
+
   openFeed(nextSource);
   return true;
 }
@@ -1218,6 +1552,36 @@ function moveDetailSelection(direction: -1 | 1): boolean {
   return true;
 }
 
+function triggerOriginalPageShortcut(): boolean {
+  if (activeBrowsePane.value !== "detail" || contentDetail.value === null) {
+    return false;
+  }
+
+  const originalPageUrl = detailOriginalPageUrl(contentDetail.value);
+
+  if (originalPageUrl === null) {
+    return false;
+  }
+
+  openExternalUrl(originalPageUrl);
+  return true;
+}
+
+function triggerPlaybackShortcut(): boolean {
+  if (activeBrowsePane.value !== "detail" || contentDetail.value === null) {
+    return false;
+  }
+
+  const asset = detailHeaderAudioAsset.value;
+
+  if (asset === null) {
+    return false;
+  }
+
+  startPlayback(contentDetail.value, asset);
+  return true;
+}
+
 function selectRelativeItem<Item extends { id: string }>(
   items: Item[],
   selectedId: string | null,
@@ -1239,10 +1603,25 @@ function selectRelativeItem<Item extends { id: string }>(
   return items[nextIndex] ?? null;
 }
 
+function compareSubscriptionListItems(
+  left: SourceListItem,
+  right: SourceListItem,
+): number {
+  if (left.subscriptionPosition !== right.subscriptionPosition) {
+    return left.subscriptionPosition - right.subscriptionPosition;
+  }
+
+  return right.createdAt.localeCompare(left.createdAt);
+}
+
 function shouldIgnoreKeyboardNavigationTarget(
   target: EventTarget | null,
 ): boolean {
   if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.closest(".source-row, .content-row") !== null) {
     return false;
   }
 
@@ -1267,6 +1646,10 @@ function scrollSelectedRowIntoView(): void {
   selectedRow?.scrollIntoView({
     block: "nearest",
   });
+}
+
+function openExternalUrl(url: string): void {
+  window.open(url, "_blank", "noopener,noreferrer");
 }
 
 function normalizeRoute(pathname: string): RouteState {
@@ -1354,6 +1737,16 @@ function readInitialTheme(): "light" | "dark" {
   const initialTheme = "dark";
   document.documentElement.dataset.theme = initialTheme;
   return initialTheme;
+}
+
+function readInitialSourceDisplayMode(): SourceDisplayMode {
+  const storedMode = window.localStorage.getItem("geshi-source-display-mode");
+
+  if (storedMode === "collections" || storedMode === "flat") {
+    return storedMode;
+  }
+
+  return "collections";
 }
 
 function sourceDomainLabel(sourceUrl: string): string {
@@ -1514,9 +1907,6 @@ function normalizeCollectorSettingFormValue(
             Settings
           </button>
         </nav>
-        <button class="ghost-button" type="button" @click="toggleTheme">
-          {{ theme === "dark" ? "Light" : "Dark" }}
-        </button>
       </div>
     </header>
 
@@ -1526,6 +1916,31 @@ function normalizeCollectorSettingFormValue(
     </p>
 
     <section v-if="routeState.kind === 'settings'" class="settings-shell">
+      <div class="settings-shell-header">
+        <div>
+          <p class="eyebrow">Interface</p>
+          <h2>Appearance and Browse Layout</h2>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <label>
+          <span>Theme</span>
+          <select v-model="theme">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
+
+        <label>
+          <span>Source Display Mode</span>
+          <select v-model="sourceDisplayMode">
+            <option value="collections">Folders</option>
+            <option value="flat">Flat</option>
+          </select>
+        </label>
+      </div>
+
       <div class="settings-shell-header">
         <div>
           <p class="eyebrow">Operations</p>
@@ -1643,11 +2058,86 @@ function normalizeCollectorSettingFormValue(
     </section>
 
     <template v-else>
+      <section
+        v-if="collectionDialogMode !== null"
+        class="collection-dialog-backdrop"
+        @click.self="closeCollectionDialog"
+      >
+        <div class="collection-dialog" role="dialog" aria-modal="true">
+          <div class="create-shell-header">
+            <div>
+              <p class="eyebrow">Collection</p>
+              <h2>
+                {{
+                  collectionDialogMode === "create"
+                    ? "Create collection"
+                    : "Rename collection"
+                }}
+              </h2>
+            </div>
+            <button
+              class="ghost-button"
+              type="button"
+              @click="closeCollectionDialog"
+            >
+              Close
+            </button>
+          </div>
+
+          <form
+            class="create-grid"
+            @submit.prevent="void submitCollectionDialog()"
+          >
+            <label class="create-grid-wide">
+              <span>Name</span>
+              <input
+                ref="collectionDialogInput"
+                v-model="collectionDialogTitle"
+                :disabled="isCollectionDialogSubmitting"
+                type="text"
+                maxlength="120"
+                placeholder="Work"
+              />
+            </label>
+
+            <p v-if="errorMessage" class="feedback error create-grid-wide">
+              {{ errorMessage }}
+            </p>
+
+            <div class="actions create-grid-wide">
+              <button
+                type="submit"
+                class="primary-button"
+                :disabled="isCollectionDialogSubmitting"
+              >
+                {{
+                  isCollectionDialogSubmitting
+                    ? collectionDialogMode === "create"
+                      ? "Creating..."
+                      : "Saving..."
+                    : collectionDialogMode === "create"
+                      ? "Create collection"
+                      : "Save changes"
+                }}
+              </button>
+              <button
+                type="button"
+                class="secondary-button"
+                :disabled="isCollectionDialogSubmitting"
+                @click="closeCollectionDialog"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
       <section v-if="isCreateFormVisible" class="create-shell">
         <div class="create-shell-header">
           <div>
-            <p class="eyebrow">Register source</p>
-            <h2>Add source</h2>
+            <p class="eyebrow">Subscribe Source</p>
+            <h2>Add subscription</h2>
           </div>
           <button class="ghost-button" type="button" @click="closeCreateForm">
             Close
@@ -1689,7 +2179,7 @@ function normalizeCollectorSettingFormValue(
           <div class="create-grid-wide settings-shell-header">
             <div>
               <p class="eyebrow">Detected Sources</p>
-              <h3>Select sources to register</h3>
+              <h3>Select sources to subscribe</h3>
             </div>
             <div class="actions">
               <button
@@ -1701,7 +2191,7 @@ function normalizeCollectorSettingFormValue(
                 @click="submitSource"
               >
                 {{
-                  isSubmitting ? "Registering..." : "Register selected sources"
+                  isSubmitting ? "Subscribing..." : "Subscribe selected sources"
                 }}
               </button>
             </div>
@@ -1782,12 +2272,21 @@ function normalizeCollectorSettingFormValue(
         >
           <div class="pane-header">
             <div class="pane-heading">
-              <p class="eyebrow">Feeds</p>
-              <h2>Sources</h2>
-              <p class="pane-caption">Registered feeds and collectors</p>
+              <p class="eyebrow">Subscriptions</p>
+              <h2>Subscribed sources</h2>
+              <p class="pane-caption">Sources you subscribed to and collect</p>
             </div>
             <span class="pane-count">{{ sources.length }}</span>
             <div class="pane-actions">
+              <button
+                type="button"
+                class="ghost-button menu-toggle-button"
+                aria-label="Add collection"
+                title="Add collection"
+                @click="openCreateCollectionDialog"
+              >
+                Folder
+              </button>
               <button
                 type="button"
                 class="ghost-button menu-toggle-button pane-add-button"
@@ -1812,7 +2311,175 @@ function normalizeCollectorSettingFormValue(
             Loading sources...
           </div>
 
+          <ul
+            v-else-if="sourceDisplayMode === 'collections'"
+            class="source-list collection-tree"
+            @dragover.prevent
+            @drop.prevent="void dropSourceIntoCollection(null, 0)"
+          >
+            <li>
+              <button
+                type="button"
+                class="source-row"
+                :class="{ selected: isAllSourcesSelected }"
+                @click="openAllEntries"
+              >
+                <span class="source-row-main">
+                  <span class="source-row-icon" aria-hidden="true">
+                    <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                      <path
+                        d="M4 6h16M4 12h16M4 18h16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </span>
+                  <span class="source-row-title">All</span>
+                </span>
+              </button>
+            </li>
+            <li
+              v-for="source in uncategorizedSources"
+              :key="source.subscriptionId"
+            >
+              <button
+                type="button"
+                class="source-row"
+                :class="{ selected: isSourceSelected(source) }"
+                draggable="true"
+                @click="openFeed(source)"
+                @dragstart="beginSourceDrag(source.id)"
+              >
+                <span class="source-row-main">
+                  <span class="source-row-icon" aria-hidden="true">
+                    <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                      <path
+                        d="M6 17a1.5 1.5 0 1 1 0 .01M5 10a9 9 0 0 1 9 9M5 5a14 14 0 0 1 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </span>
+                  <span class="source-row-title">
+                    {{ source.title ?? source.slug }}
+                  </span>
+                </span>
+              </button>
+            </li>
+
+            <template
+              v-for="collection in sortedSourceCollections"
+              :key="collection.id"
+            >
+              <li
+                class="collection-tree-folder"
+                draggable="true"
+                @dragstart="beginCollectionDrag(collection.id)"
+                @dragover.prevent
+                @drop.prevent="void handleCollectionGroupDrop(collection)"
+              >
+                <div
+                  class="source-row collection-row"
+                  @dragover.prevent
+                  @drop.prevent="
+                    void dropSourceIntoCollection(
+                      collection.id,
+                      sourcesForCollection(collection.id).length,
+                    )
+                  "
+                >
+                  <div class="collection-row-main">
+                    <button
+                      type="button"
+                      class="collection-toggle"
+                      :aria-expanded="isCollectionExpanded(collection.id)"
+                      @click.stop="toggleCollectionExpanded(collection.id)"
+                    >
+                      <svg
+                        aria-hidden="true"
+                        class="collection-toggle-icon"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M9 6l6 6-6 6"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="square"
+                          stroke-width="1.8"
+                        />
+                      </svg>
+                    </button>
+                    <span class="source-row-title">{{ collection.title }}</span>
+                  </div>
+                </div>
+              </li>
+              <li
+                v-for="(source, index) in sourcesForCollection(collection.id)"
+                v-show="isCollectionExpanded(collection.id)"
+                :key="source.subscriptionId"
+                class="collection-tree-child"
+                @dragover.prevent
+                @drop.prevent="
+                  void dropSourceIntoCollection(collection.id, index)
+                "
+              >
+                <button
+                  type="button"
+                  class="source-row source-row-child"
+                  :class="{ selected: isSourceSelected(source) }"
+                  draggable="true"
+                  @click="openFeed(source)"
+                  @dragstart="beginSourceDrag(source.id)"
+                >
+                  <span class="source-row-main">
+                    <span class="source-row-icon" aria-hidden="true">
+                      <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                        <path
+                          d="M6 17a1.5 1.5 0 1 1 0 .01M5 10a9 9 0 0 1 9 9M5 5a14 14 0 0 1 14 14"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-linecap="square"
+                          stroke-width="1.8"
+                        />
+                      </svg>
+                    </span>
+                    <span class="source-row-title">
+                      {{ source.title ?? source.slug }}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            </template>
+          </ul>
+
           <ul v-else-if="sources.length > 0" class="source-list">
+            <li>
+              <button
+                type="button"
+                class="source-row"
+                :class="{ selected: isAllSourcesSelected }"
+                @click="openAllEntries"
+              >
+                <span class="source-row-main">
+                  <span class="source-row-icon" aria-hidden="true">
+                    <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                      <path
+                        d="M4 6h16M4 12h16M4 18h16"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </span>
+                  <span class="source-row-title">All</span>
+                </span>
+              </button>
+            </li>
             <li v-for="source in sources" :key="source.id">
               <button
                 type="button"
@@ -1820,41 +2487,28 @@ function normalizeCollectorSettingFormValue(
                 :class="{ selected: isSourceSelected(source) }"
                 @click="openFeed(source)"
               >
-                <span class="source-row-head">
+                <span class="source-row-main">
+                  <span class="source-row-icon" aria-hidden="true">
+                    <svg class="source-row-icon-svg" viewBox="0 0 24 24">
+                      <path
+                        d="M6 17a1.5 1.5 0 1 1 0 .01M5 10a9 9 0 0 1 9 9M5 5a14 14 0 0 1 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-linecap="square"
+                        stroke-width="1.8"
+                      />
+                    </svg>
+                  </span>
                   <span class="source-row-title">
                     {{ source.title ?? source.slug }}
                   </span>
-                  <span
-                    class="source-row-status"
-                    :class="{
-                      active: source.periodicCrawlEnabled,
-                      idle: !source.periodicCrawlEnabled,
-                    }"
-                  >
-                    {{
-                      source.periodicCrawlEnabled
-                        ? `Auto ${source.periodicCrawlIntervalMinutes}m`
-                        : "Manual"
-                    }}
-                  </span>
-                </span>
-                <span class="source-row-meta-line">
-                  <span class="source-row-domain">
-                    {{ sourceDomainLabel(source.url) }}
-                  </span>
-                  <span class="source-row-meta"
-                    >{{ source.kind }} · {{ source.slug }}</span
-                  >
-                </span>
-                <span v-if="source.description" class="source-row-description">
-                  {{ source.description }}
                 </span>
               </button>
             </li>
           </ul>
 
           <div v-else class="empty-state">
-            No sources registered yet. Add a feed to get started.
+            No subscriptions yet. Add a source to get started.
           </div>
         </aside>
 
@@ -1869,7 +2523,7 @@ function normalizeCollectorSettingFormValue(
               <p class="pane-caption">
                 {{
                   selectedSource === null
-                    ? "Across every registered source"
+                    ? "Across every subscribed source"
                     : sourceDomainLabel(selectedSource.url)
                 }}
               </p>
@@ -2004,6 +2658,20 @@ function normalizeCollectorSettingFormValue(
                     isSourceCrawlSubmitting === selectedSource.id
                       ? "Saving..."
                       : "Save source settings"
+                  }}
+                </button>
+                <button
+                  type="button"
+                  class="ghost-button"
+                  :disabled="
+                    isUnsubscribeSubmitting === selectedSource.subscriptionId
+                  "
+                  @click="unsubscribeSelectedSource"
+                >
+                  {{
+                    isUnsubscribeSubmitting === selectedSource.subscriptionId
+                      ? "Unsubscribing..."
+                      : "Unsubscribe"
                   }}
                 </button>
               </div>

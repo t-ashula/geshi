@@ -29,14 +29,7 @@ schema 差分の適用には `psqldef` を使う．
 
 ## data migration
 
-既存データに対する補完や変換が必要な変更では，schema migration だけで完了扱いにしない．
-
-### 要件
-
-- 既存データに何を追加，更新，変換するかを実装前に決める
-- data migration の手順は，schema migration と分けて明示する
-- data migration が必要な変更では，dry-run の確認だけで完了扱いにしない
-- data migration を実行した後の整合条件を確認する
+既存データに対する補完や変換が必要な変更では，schema migration も行う
 
 ### 手順
 
@@ -47,6 +40,7 @@ schema 差分の適用には `psqldef` を使う．
    - SQL あるいは コードでデータ移行処理を実装する
 5. `make db-schema-apply`
 6. 4 で決めた手順で data migration を実行する
+   - 例: `make db-data-migrate DATA_MIGRATION=db/data-migrations/0014-source-subscriptions.sql`
 7. 移行後データを確認する
 
 ### 確認項目
