@@ -1,8 +1,10 @@
 import type {
   CollectorSettingsVersionConflictError,
+  CreateCollectionInput,
   DuplicateSourceUrlHashError,
   ObserveSourceTarget,
   PeriodicCrawlSourceTarget,
+  SourceCollectionListItem,
   SourceCollectorSettingsRecord,
   SourceListItem,
   SourceRepository,
@@ -55,6 +57,16 @@ export type GetSourceCollectorSettingsError = {
   message: string;
 };
 
+export type SourceCollectionError = {
+  code: "collection_not_found";
+  message: string;
+};
+
+export type SubscriptionError = {
+  code: "subscription_not_found";
+  message: string;
+};
+
 export type SourceCollectorPluginListItem = {
   message: string | null;
   description: string | null;
@@ -79,6 +91,29 @@ export type SourceCollectorSettingsDetail = {
 };
 
 export interface SourceService {
+  assignSourceToCollection(
+    sourceId: string,
+    collectionId: string | null,
+    position: number,
+  ): Promise<
+    Result<SourceListItem, SourceCollectionError | SourceRepositoryError>
+  >;
+  createCollection(
+    title: string,
+    position: number,
+    parentCollectionId?: string | null,
+  ): Promise<Result<SourceCollectionListItem, SourceRepositoryError>>;
+  updateCollection(
+    collectionId: string,
+    title: string,
+    position: number,
+    parentCollectionId?: string | null,
+  ): Promise<
+    Result<
+      SourceCollectionListItem,
+      SourceCollectionError | SourceRepositoryError
+    >
+  >;
   createSource(
     request: CreateSourceRequest,
   ): Promise<Result<SourceListItem, CreateSourceError>>;
@@ -99,10 +134,16 @@ export interface SourceService {
     >
   >;
   listSourceCollectorPlugins(): Result<SourceCollectorPluginListItem[], Error>;
+  listSourceCollections(): Promise<
+    Result<SourceCollectionListItem[], SourceRepositoryError>
+  >;
   listPeriodicCrawlTargets(): Promise<
     Result<PeriodicCrawlSourceTarget[], SourceRepositoryError>
   >;
   listSources(): Promise<Result<SourceListItem[], SourceRepositoryError>>;
+  unsubscribe(
+    subscriptionId: string,
+  ): Promise<Result<void, SubscriptionError | SourceRepositoryError>>;
   updateSourceCollectorSettings(
     sourceId: string,
     settings: SourcePeriodicCrawlSettings,
@@ -122,6 +163,8 @@ export type CreateSourceServiceDependencies = {
   logger?: Logger;
   sourceCollectorRegistry?: SourceCollectorRegistry;
 };
+
+const DEFAULT_SOURCE_USER_SLUG = "default";
 
 export function createSourceService(
   sourceRepository: SourceRepository,
@@ -145,6 +188,81 @@ export function createSourceService(
     dependencies.sourceCollectorRegistry ?? defaultSourceCollectorRegistry;
 
   return {
+    async assignSourceToCollection(
+      sourceId: string,
+      collectionId: string | null,
+      position: number,
+    ): Promise<
+      Result<SourceListItem, SourceCollectionError | SourceRepositoryError>
+    > {
+      const result = await sourceRepository.assignSourceToCollection(
+        DEFAULT_SOURCE_USER_SLUG,
+        sourceId,
+        collectionId,
+        position,
+      );
+
+      if (!result.ok) {
+        return result;
+      }
+
+      if (result.value === null) {
+        return err({
+          code: "collection_not_found",
+          message: "Collection or source not found.",
+        });
+      }
+
+      return ok(result.value);
+    },
+
+    async createCollection(
+      title: string,
+      position: number,
+      parentCollectionId?: string | null,
+    ): Promise<Result<SourceCollectionListItem, SourceRepositoryError>> {
+      return sourceRepository.createCollection({
+        id: crypto.randomUUID(),
+        parentCollectionId,
+        position,
+        title,
+        userSlug: DEFAULT_SOURCE_USER_SLUG,
+      } satisfies CreateCollectionInput);
+    },
+
+    async updateCollection(
+      collectionId: string,
+      title: string,
+      position: number,
+      parentCollectionId?: string | null,
+    ): Promise<
+      Result<
+        SourceCollectionListItem,
+        SourceCollectionError | SourceRepositoryError
+      >
+    > {
+      const result = await sourceRepository.updateCollection({
+        collectionId,
+        parentCollectionId,
+        position,
+        title,
+        userSlug: DEFAULT_SOURCE_USER_SLUG,
+      });
+
+      if (!result.ok) {
+        return result;
+      }
+
+      if (result.value === null) {
+        return err({
+          code: "collection_not_found",
+          message: "Collection not found.",
+        });
+      }
+
+      return ok(result.value);
+    },
+
     async createSource(
       request: CreateSourceRequest,
     ): Promise<Result<SourceListItem, CreateSourceError>> {
@@ -183,9 +301,12 @@ export function createSourceService(
         pluginSlug,
         slug,
         snapshotId: crypto.randomUUID(),
+        subscriptionEventId: crypto.randomUUID(),
+        subscriptionId: crypto.randomUUID(),
         title: normalizeOptionalString(request.title),
         url: normalizedUrl,
         urlHash: createUrlHash(normalizedUrl),
+        userSlug: DEFAULT_SOURCE_USER_SLUG,
       });
 
       if (!result.ok) {
@@ -301,10 +422,38 @@ export function createSourceService(
       return sourceRepository.listPeriodicCrawlTargets();
     },
 
+    async listSourceCollections(): Promise<
+      Result<SourceCollectionListItem[], SourceRepositoryError>
+    > {
+      return sourceRepository.listCollections(DEFAULT_SOURCE_USER_SLUG);
+    },
+
     async listSources(): Promise<
       Result<SourceListItem[], SourceRepositoryError>
     > {
-      return sourceRepository.listSources();
+      return sourceRepository.listSources(DEFAULT_SOURCE_USER_SLUG);
+    },
+
+    async unsubscribe(
+      subscriptionId: string,
+    ): Promise<Result<void, SubscriptionError | SourceRepositoryError>> {
+      const result = await sourceRepository.unsubscribe(
+        DEFAULT_SOURCE_USER_SLUG,
+        subscriptionId,
+      );
+
+      if (!result.ok) {
+        return result;
+      }
+
+      if (!result.value) {
+        return err({
+          code: "subscription_not_found",
+          message: "Subscription not found.",
+        });
+      }
+
+      return ok(undefined);
     },
 
     async updateSourceCollectorSettings(
@@ -342,6 +491,7 @@ export function createSourceService(
         ...Object.fromEntries(items.map((item) => [item.key, item.value])),
       };
       const source = await sourceRepository.updateSourceCollectorSettings(
+        DEFAULT_SOURCE_USER_SLUG,
         sourceId,
         settings,
         baseVersion,

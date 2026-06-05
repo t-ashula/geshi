@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import type { AppDependencies } from "../../../deps.js";
 import type {
+  AssignSourceToCollectionEndpointInput,
   CreateSourceEndpointInput,
   DiscoverSourcesEndpointInput,
   InspectSourceEndpointInput,
@@ -10,6 +11,7 @@ import type {
   PreviewSourceEndpointInput,
 } from "../../../endpoints/api/v1/sources.js";
 import {
+  createAssignSourceToCollectionEndpoint,
   createCreateSourceEndpoint,
   createDiscoverSourcesEndpoint,
   createEnqueueObserveSourceEndpoint,
@@ -46,6 +48,8 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
   const inspectSource = createInspectSourceEndpoint(dependencies);
   const previewSource = createPreviewSourceEndpoint(dependencies);
   const enqueueObserveSource = createEnqueueObserveSourceEndpoint(dependencies);
+  const assignSourceToCollection =
+    createAssignSourceToCollectionEndpoint(dependencies);
   const getSourceCollectorSettings =
     createGetSourceCollectorSettingsEndpoint(dependencies);
   const patchSourceCollectorSettings =
@@ -250,6 +254,35 @@ export function createSourceRoutes(dependencies: AppDependencies): Hono {
 
     return context.json({ data: result.value });
   });
+  router.patch("/:sourceId/collection", async (context) => {
+    const json = await readJsonObject(context);
+
+    if (!json.ok) {
+      return context.json({ error: json.error }, { status: 400 });
+    }
+
+    const input = toAssignSourceToCollectionEndpointInput(json.value);
+
+    if (!input.ok) {
+      return context.json({ error: input.error }, { status: 422 });
+    }
+
+    const result = await assignSourceToCollection(
+      requireRouteParam(context.req.param("sourceId"), "sourceId"),
+      input.value,
+    );
+
+    if (!result.ok) {
+      return context.json(
+        { error: result.error },
+        {
+          status: result.error.code === "collection_not_found" ? 404 : 500,
+        },
+      );
+    }
+
+    return context.json({ data: result.value });
+  });
 
   return router;
 }
@@ -353,12 +386,35 @@ function toPatchSourceCollectorSettingsEndpointInput(
   });
 }
 
+function toAssignSourceToCollectionEndpointInput(
+  value: Record<string, unknown>,
+): Result<
+  AssignSourceToCollectionEndpointInput,
+  { code: "invalid_source_collection_assignment"; message: string }
+> {
+  if (!isNullablePositiveIntegerOrZero(value.position)) {
+    return err({
+      code: "invalid_source_collection_assignment",
+      message: "Source collection assignment requires non-negative position.",
+    });
+  }
+
+  return ok({
+    collectionId: toOptionalString(value.collectionId) ?? null,
+    position: value.position,
+  });
+}
+
 function toOptionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+function isNullablePositiveIntegerOrZero(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
 }
 
 function isCollectorSettingItems(

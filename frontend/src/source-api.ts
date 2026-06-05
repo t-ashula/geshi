@@ -77,6 +77,7 @@ export type ApiError = {
 };
 
 export type SourceListItem = {
+  collectionId: string | null;
   collectorSettingsVersion: number | null;
   periodicCrawlEnabled: boolean;
   periodicCrawlIntervalMinutes: number;
@@ -86,10 +87,21 @@ export type SourceListItem = {
   kind: "feed" | "podcast" | "streaming";
   recordedAt: string | null;
   slug: string;
+  subscriptionId: string;
+  subscriptionPosition: number;
   title: string | null;
   url: string;
   urlHash: string;
   version: number | null;
+};
+
+export type SourceCollectionListItem = {
+  createdAt: string;
+  id: string;
+  parentCollectionId: string | null;
+  position: number;
+  sourceCount: number;
+  title: string;
 };
 
 export type PeriodicCrawlSettings = {
@@ -217,6 +229,10 @@ type ListSourcesResponse = {
   data: SourceListItem[];
 };
 
+type ListSourceCollectionsResponse = {
+  data: SourceCollectionListItem[];
+};
+
 type ListSourceCollectorPluginsResponse = {
   data: SourceCollectorPluginListItem[];
 };
@@ -291,6 +307,124 @@ export async function listSourceCollectorPlugins(): Promise<
   const payload = (await response.json()) as ListSourceCollectorPluginsResponse;
 
   return payload.data;
+}
+
+export async function listSourceCollections(): Promise<
+  SourceCollectionListItem[]
+> {
+  const response = await fetch("/api/v1/collections");
+
+  if (!response.ok) {
+    throw new Error("Failed to load source collections.");
+  }
+
+  const payload = (await response.json()) as ListSourceCollectionsResponse;
+
+  return payload.data;
+}
+
+export async function createSourceCollection(request: {
+  parentCollectionId?: string | null;
+  position: number;
+  title: string;
+}): Promise<SourceCollectionListItem> {
+  const response = await fetch("/api/v1/collections", {
+    body: JSON.stringify(request),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const payload = (await response.json()) as
+    | { data: SourceCollectionListItem }
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Source collection creation failed.");
+}
+
+export async function assignSourceToCollection(
+  sourceId: string,
+  request: {
+    collectionId?: string | null;
+    position: number;
+  },
+): Promise<SourceListItem> {
+  const response = await fetch(`/api/v1/sources/${sourceId}/collection`, {
+    body: JSON.stringify(request),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "PATCH",
+  });
+  const payload = (await response.json()) as
+    | { data: SourceListItem }
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Source collection assignment failed.");
+}
+
+export async function unsubscribeSource(subscriptionId: string): Promise<void> {
+  const response = await fetch(`/api/v1/subscriptions/${subscriptionId}`, {
+    method: "DELETE",
+  });
+
+  if (response.status === 204) {
+    return;
+  }
+
+  const payload = (await response.json()) as ErrorResponse;
+
+  if ("error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  throw new Error("Source unsubscribe failed.");
+}
+
+export async function updateSourceCollection(
+  collectionId: string,
+  request: {
+    parentCollectionId?: string | null;
+    position: number;
+    title: string;
+  },
+): Promise<SourceCollectionListItem> {
+  const response = await fetch(`/api/v1/collections/${collectionId}`, {
+    body: JSON.stringify(request),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "PATCH",
+  });
+  const payload = (await response.json()) as
+    | { data: SourceCollectionListItem }
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Source collection update failed.");
 }
 
 export async function createSource(

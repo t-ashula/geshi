@@ -25,6 +25,36 @@ describe("createApp", () => {
     const app = createApp(dependencies);
 
     expect((await app.request("/api/v1/sources")).status).toBe(200);
+    expect((await app.request("/api/v1/collections")).status).toBe(200);
+    expect(
+      (
+        await app.request("/api/v1/collections", {
+          body: JSON.stringify({
+            position: 0,
+            title: "Work",
+          }),
+          headers: {
+            "content-type": "application/json",
+          },
+          method: "POST",
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await app.request("/api/v1/collections/collection-1", {
+          body: JSON.stringify({
+            parentCollectionId: null,
+            position: 1,
+            title: "Pinned",
+          }),
+          headers: {
+            "content-type": "application/json",
+          },
+          method: "PATCH",
+        })
+      ).status,
+    ).toBe(200);
     expect(
       (
         await app.request("/api/v1/sources/inspect", {
@@ -38,6 +68,27 @@ describe("createApp", () => {
         })
       ).status,
     ).toBe(200);
+    expect(
+      (
+        await app.request("/api/v1/sources/source-1/collection", {
+          body: JSON.stringify({
+            collectionId: "collection-1",
+            position: 0,
+          }),
+          headers: {
+            "content-type": "application/json",
+          },
+          method: "PATCH",
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await app.request("/api/v1/subscriptions/subscription-1", {
+          method: "DELETE",
+        })
+      ).status,
+    ).toBe(204);
     expect((await app.request("/api/v1/contents")).status).toBe(200);
     expect((await app.request("/api/v1/jobs/job-1")).status).toBe(200);
     expect((await app.request("/api/v1/settings/periodic-crawl")).status).toBe(

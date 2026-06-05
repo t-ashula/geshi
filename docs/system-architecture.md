@@ -4,6 +4,9 @@
 
 `geshi` は podcast，streaming，feed を継続的に収集し，保存し，あとから再生・閲覧・検索できる個人用アーカイブである．
 
+利用者モデルとしては，user が source を subscription し，その subscription を collection で整理する前提を採る．
+source 自体は共有可能な収集対象として扱い，購読関係や整理状態は user ごとに分けて持つ．
+
 ## 構成
 
 ### Web UI frontend
@@ -64,7 +67,7 @@
 ### 閲覧・検索するとき
 
 1. `web ui frontend` が利用者入力を受け取る
-2. `api backend` が `storage` から metadata や検索結果を取得する
+2. `api backend` が user の subscription / collection 文脈と `storage` 上の metadata や検索結果を取得する
 3. 必要に応じて transcript や関連情報をまとめる
 4. `web ui frontend` が一覧，詳細，再生画面として表示する
 
@@ -73,6 +76,13 @@
 1. `cli` が管理コマンドを受け取る
 2. `api backend` や `crawler` に必要な操作を渡す
 3. 結果や状態を `cli` に返す
+
+### 登録・購読するとき
+
+1. `web ui frontend` または `cli` が source 登録要求を受け付ける
+2. `api backend` が対象 source を新規作成するか，既存 source を再利用するか判定する
+3. `api backend` が user に対する subscription を作成する
+4. 必要に応じて collection への所属を更新する
 
 ## 設計上の原則
 

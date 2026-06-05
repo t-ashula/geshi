@@ -1,5 +1,8 @@
 import type { JobListItem } from "../../../db/job-repository.js";
-import type { SourceListItem } from "../../../db/source-repository.js";
+import type {
+  SourceCollectionListItem,
+  SourceListItem,
+} from "../../../db/source-repository.js";
 import {
   CollectorSettingsVersionConflictError,
   DuplicateSourceUrlHashError,
@@ -20,10 +23,50 @@ import type {
   SourceCollectorSettingValue,
 } from "../../../service/source-service.js";
 
+export type ListSourceCollectionsEndpointError = {
+  code: "source_collection_list_failed";
+  message: string;
+};
+
+export type CreateSourceCollectionEndpointError = {
+  code: "source_collection_create_failed";
+  message: string;
+};
+
+export type UpdateSourceCollectionEndpointError =
+  | {
+      code: "collection_not_found";
+      message: string;
+    }
+  | {
+      code: "source_collection_update_failed";
+      message: string;
+    };
+
+export type AssignSourceToCollectionEndpointError =
+  | {
+      code: "collection_not_found";
+      message: string;
+    }
+  | {
+      code: "source_collection_assign_failed";
+      message: string;
+    };
+
 export type ListSourcesEndpointError = {
   code: "source_list_failed";
   message: string;
 };
+
+export type UnsubscribeEndpointError =
+  | {
+      code: "subscription_not_found";
+      message: string;
+    }
+  | {
+      code: "subscription_unsubscribe_failed";
+      message: string;
+    };
 
 export type ListSourceCollectorPluginsEndpointError = {
   code: "source_collector_plugin_list_failed";
@@ -107,6 +150,23 @@ export type PatchSourceCollectorSettingsEndpointInput = {
   items: Array<{ key: string; value: SourceCollectorSettingValue }>;
 };
 
+export type CreateSourceCollectionEndpointInput = {
+  parentCollectionId?: string | null;
+  position: number;
+  title?: string;
+};
+
+export type AssignSourceToCollectionEndpointInput = {
+  collectionId?: string | null;
+  position: number;
+};
+
+export type UpdateSourceCollectionEndpointInput = {
+  parentCollectionId?: string | null;
+  position: number;
+  title?: string;
+};
+
 export function createListSourcesEndpoint(dependencies: AppDependencies) {
   return async (): Promise<
     Result<SourceListItem[], ListSourcesEndpointError>
@@ -121,6 +181,47 @@ export function createListSourcesEndpoint(dependencies: AppDependencies) {
     }
 
     return sources;
+  };
+}
+
+export function createUnsubscribeEndpoint(dependencies: AppDependencies) {
+  return async (
+    subscriptionId: string,
+  ): Promise<Result<void, UnsubscribeEndpointError>> => {
+    const result = await dependencies.sourceService.unsubscribe(subscriptionId);
+
+    if (!result.ok) {
+      if (result.error instanceof Error) {
+        return err({
+          code: "subscription_unsubscribe_failed",
+          message: result.error.message,
+        });
+      }
+
+      return err(result.error);
+    }
+
+    return ok(undefined);
+  };
+}
+
+export function createListSourceCollectionsEndpoint(
+  dependencies: AppDependencies,
+) {
+  return async (): Promise<
+    Result<SourceCollectionListItem[], ListSourceCollectionsEndpointError>
+  > => {
+    const collections =
+      await dependencies.sourceService.listSourceCollections();
+
+    if (!collections.ok) {
+      return err({
+        code: "source_collection_list_failed",
+        message: collections.error.message,
+      });
+    }
+
+    return collections;
   };
 }
 
@@ -196,6 +297,90 @@ export function createCreateSourceEndpoint(dependencies: AppDependencies) {
       if (result.error instanceof Error) {
         return err({
           code: "source_create_failed",
+          message: result.error.message,
+        });
+      }
+
+      return err(result.error);
+    }
+
+    return result;
+  };
+}
+
+export function createCreateSourceCollectionEndpoint(
+  dependencies: AppDependencies,
+) {
+  return async (
+    input: CreateSourceCollectionEndpointInput,
+  ): Promise<
+    Result<SourceCollectionListItem, CreateSourceCollectionEndpointError>
+  > => {
+    const result = await dependencies.sourceService.createCollection(
+      input.title ?? "",
+      input.position,
+      input.parentCollectionId,
+    );
+
+    if (!result.ok) {
+      return err({
+        code: "source_collection_create_failed",
+        message: result.error.message,
+      });
+    }
+
+    return result;
+  };
+}
+
+export function createAssignSourceToCollectionEndpoint(
+  dependencies: AppDependencies,
+) {
+  return async (
+    sourceId: string,
+    input: AssignSourceToCollectionEndpointInput,
+  ): Promise<Result<SourceListItem, AssignSourceToCollectionEndpointError>> => {
+    const result = await dependencies.sourceService.assignSourceToCollection(
+      sourceId,
+      input.collectionId ?? null,
+      input.position,
+    );
+
+    if (!result.ok) {
+      if (result.error instanceof Error) {
+        return err({
+          code: "source_collection_assign_failed",
+          message: result.error.message,
+        });
+      }
+
+      return err(result.error);
+    }
+
+    return result;
+  };
+}
+
+export function createUpdateSourceCollectionEndpoint(
+  dependencies: AppDependencies,
+) {
+  return async (
+    collectionId: string,
+    input: UpdateSourceCollectionEndpointInput,
+  ): Promise<
+    Result<SourceCollectionListItem, UpdateSourceCollectionEndpointError>
+  > => {
+    const result = await dependencies.sourceService.updateCollection(
+      collectionId,
+      input.title ?? "",
+      input.position,
+      input.parentCollectionId,
+    );
+
+    if (!result.ok) {
+      if (result.error instanceof Error) {
+        return err({
+          code: "source_collection_update_failed",
           message: result.error.message,
         });
       }

@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { APIRequestContext, Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 const sourceFeedUrl =
@@ -35,7 +35,9 @@ test("detects multiple source candidates from a discovery page and registers the
   await expect(podcastCandidate.getByText("Discovery Episode 1")).toBeVisible();
   await duplicatePodcastCandidate.getByRole("checkbox").uncheck();
 
-  await page.getByRole("button", { name: "Register selected sources" }).click();
+  await page
+    .getByRole("button", { name: "Subscribe selected sources" })
+    .click();
 
   await expect(
     page.getByRole("heading", { level: 2, name: "Add source" }),
@@ -81,7 +83,9 @@ test("registers a source from direct feed discovery and observes contents", asyn
   await expect(selectedCandidate).toBeVisible();
   await expect(selectedCandidate.getByText("Episode 1")).toBeVisible();
   await duplicateCandidate.getByRole("checkbox").uncheck();
-  await page.getByRole("button", { name: "Register selected sources" }).click();
+  await page
+    .getByRole("button", { name: "Subscribe selected sources" })
+    .click();
 
   await expect(
     page.getByRole("heading", { level: 2, name: "Geshi E2E Feed" }),
@@ -124,7 +128,9 @@ test("opens entry detail and exposes playable audio", async ({
   await candidateRow(page, "Geshi E2E Feed", "rss / feed")
     .getByRole("checkbox")
     .uncheck();
-  await page.getByRole("button", { name: "Register selected sources" }).click();
+  await page
+    .getByRole("button", { name: "Subscribe selected sources" })
+    .click();
 
   await expect(
     page.getByRole("heading", { level: 2, name: "Geshi E2E Feed" }),
@@ -236,10 +242,132 @@ test("opens entry detail and exposes playable audio", async ({
   ).toBeVisible();
 });
 
-async function openSourceRegistration(page: Page) {
-  await page.getByRole("button", { name: "Add source" }).click();
+test("organizes a subscription into a collection and back out", async ({
+  page,
+  request,
+}) => {
+  const collectionSourceFeedUrl = `${sourceFeedUrl}?collections=1`;
+
+  await page.goto("/");
+
+  await openSourceRegistration(page);
+  await detectSources(page, collectionSourceFeedUrl);
+  await candidateRow(page, "Geshi E2E Feed", "rss / feed")
+    .getByRole("checkbox")
+    .uncheck();
+  await page
+    .getByRole("button", { name: "Subscribe selected sources" })
+    .click();
+
+  const sourceSlug = await waitForSourceSlugByUrl(
+    request,
+    collectionSourceFeedUrl,
+  );
+
+  page.once("dialog", (dialog) => dialog.accept("Work"));
+  await page.getByRole("button", { name: "Add collection" }).click();
+
+  const uncategorizedGroup = collectionGroup(page, "Uncategorized");
+  const workGroup = collectionGroup(page, "Work");
+  const sourceRow = sourceRowButton(page, sourceSlug);
+
+  await expect(workGroup).toBeVisible();
   await expect(
-    page.getByRole("heading", { level: 2, name: "Add source" }),
+    uncategorizedGroup.getByRole("button", {
+      name: new RegExp(sourceSlug, "u"),
+    }),
+  ).toBeVisible();
+
+  await dragSourceRowToTarget(
+    sourceRow,
+    workGroup.locator(".collection-header"),
+  );
+
+  await expect(
+    workGroup.getByRole("button", { name: new RegExp(sourceSlug, "u") }),
+  ).toBeVisible();
+  await expect(
+    uncategorizedGroup.getByRole("button", {
+      name: new RegExp(sourceSlug, "u"),
+    }),
+  ).toHaveCount(0);
+
+  await page.reload();
+
+  await expect(
+    collectionGroup(page, "Work").getByRole("button", {
+      name: new RegExp(sourceSlug, "u"),
+    }),
+  ).toBeVisible();
+
+  const movedSourcesResponse = await request.get("/api/v1/sources");
+  const movedSourcesPayload = (await movedSourcesResponse.json()) as {
+    data: Array<{
+      collectionId: string | null;
+      title: string | null;
+      url: string;
+    }>;
+  };
+  const movedSource = movedSourcesPayload.data.find(
+    (source) => source.url === collectionSourceFeedUrl,
+  );
+
+  expect(movedSource?.collectionId).not.toBeNull();
+
+  await collectionGroup(page, "Work")
+    .getByRole("button", { name: new RegExp(sourceSlug, "u") })
+    .evaluate((element) => {
+      (element as HTMLElement).scrollIntoView({
+        block: "center",
+      });
+    });
+  await dragSourceRowToTarget(
+    collectionGroup(page, "Work").getByRole("button", {
+      name: new RegExp(sourceSlug, "u"),
+    }),
+    collectionGroup(page, "Uncategorized").locator(".collection-header"),
+  );
+
+  await expect(
+    collectionGroup(page, "Uncategorized").getByRole("button", {
+      name: new RegExp(sourceSlug, "u"),
+    }),
+  ).toBeVisible();
+  await expect(
+    collectionGroup(page, "Work").getByRole("button", {
+      name: new RegExp(sourceSlug, "u"),
+    }),
+  ).toHaveCount(0);
+
+  await page.reload();
+
+  await expect(
+    collectionGroup(page, "Uncategorized").getByRole("button", {
+      name: new RegExp(sourceSlug, "u"),
+    }),
+  ).toBeVisible();
+
+  const restoredSourcesResponse = await request.get("/api/v1/sources");
+  const restoredSourcesPayload = (await restoredSourcesResponse.json()) as {
+    data: Array<{
+      collectionId: string | null;
+      title: string | null;
+      url: string;
+    }>;
+  };
+  const restoredSource = restoredSourcesPayload.data.find(
+    (source) => source.url === collectionSourceFeedUrl,
+  );
+
+  expect(restoredSource?.collectionId).toBeNull();
+});
+
+async function openSourceRegistration(page: Page) {
+  await page.getByRole("button", { name: "Add source" }).evaluate((element) => {
+    (element as HTMLButtonElement).click();
+  });
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Add subscription" }),
   ).toBeVisible();
 }
 
@@ -247,7 +375,10 @@ async function detectSources(page: Page, url: string) {
   await page.getByRole("textbox", { name: "Discovery URL" }).fill(url);
   await page.getByRole("button", { name: "Detect sources" }).click();
   await expect(
-    page.getByRole("heading", { level: 3, name: "Select sources to register" }),
+    page.getByRole("heading", {
+      level: 3,
+      name: "Select sources to subscribe",
+    }),
   ).toBeVisible();
 }
 
@@ -256,4 +387,68 @@ function candidateRow(page: Page, title: string, meta: string) {
     has: page.locator(".candidate-option-title", { hasText: title }),
     hasText: meta,
   });
+}
+
+function collectionGroup(page: Page, title: string) {
+  return page.locator(".collection-group").filter({
+    has: page.getByRole("heading", { level: 3, name: title }),
+  });
+}
+
+function sourceRowButton(page: Page, title: string) {
+  return page.getByRole("button", { name: new RegExp(title, "u") }).first();
+}
+
+async function waitForSourceSlugByUrl(
+  request: APIRequestContext,
+  url: string,
+): Promise<string> {
+  await expect
+    .poll(
+      async () => {
+        const response = await request.get("/api/v1/sources");
+        const payload = (await response.json()) as {
+          data: Array<{
+            slug: string;
+            url: string;
+          }>;
+        };
+
+        return payload.data.find((source) => source.url === url)?.slug ?? null;
+      },
+      {
+        timeout: 30_000,
+      },
+    )
+    .not.toBeNull();
+
+  const response = await request.get("/api/v1/sources");
+  const payload = (await response.json()) as {
+    data: Array<{
+      slug: string;
+      url: string;
+    }>;
+  };
+  const source = payload.data.find((item) => item.url === url);
+
+  if (source === undefined) {
+    throw new Error(`Source not found for URL: ${url}`);
+  }
+
+  return source.slug;
+}
+
+async function dragSourceRowToTarget(
+  source: Locator,
+  target: Locator,
+): Promise<void> {
+  const dataTransfer = await source
+    .page()
+    .evaluateHandle(() => new DataTransfer());
+
+  await source.dispatchEvent("dragstart", { dataTransfer });
+  await target.dispatchEvent("dragenter", { dataTransfer });
+  await target.dispatchEvent("dragover", { dataTransfer });
+  await target.dispatchEvent("drop", { dataTransfer });
+  await source.dispatchEvent("dragend", { dataTransfer });
 }

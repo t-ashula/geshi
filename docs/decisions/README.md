@@ -68,3 +68,5 @@
 - [ADR-0065: pluginSlug 単位の共有設定入力は source 設定と分けて schema 経由で管理する](./0065-plugin-global-settings-input.md)
 - [ADR-0066: source collector plugin に detect / preview 向け登録前 API を追加する](./0066-source-registration-detect-and-preview-plugin-api.md)
 - [ADR-0067: web ui frontend の source 登録フローを detect / preview / register に再構成する](./0067-web-ui-source-registration-detect-preview-flow.md)
+- [ADR-0068: user が source を subscription し，その subscription を collection で整理できるようにする](./0068-source-collections-for-organization.md)
+- [ADR-0069: source 整理機能に先立って user を所有主体として導入する](./0069-user-as-ownership-root.md)

@@ -50,6 +50,7 @@ describe("source service", () => {
     const createSource = vi.fn((input: CreateSourceInput) =>
       Promise.resolve(
         ok({
+          collectionId: null,
           collectorSettingsVersion: 1,
           createdAt: new Date("2026-05-01T00:00:00.000Z"),
           description: input.description ?? null,
@@ -59,6 +60,8 @@ describe("source service", () => {
           periodicCrawlIntervalMinutes: 60,
           recordedAt: null,
           slug: input.slug,
+          subscriptionId: "subscription-1",
+          subscriptionPosition: 0,
           title: input.title ?? null,
           url: input.url,
           urlHash: input.urlHash,
@@ -95,6 +98,7 @@ describe("source service", () => {
       pluginSlug: "podcast-rss",
       title: "Example Feed",
       url: "https://example.com/feed.xml",
+      userSlug: "default",
     });
     expect(createSourceInput?.slug).toMatch(/^example-feed/);
   });
@@ -245,6 +249,44 @@ describe("source service", () => {
     expect(result.value).toEqual(targets);
   });
 
+  it("maps missing subscriptions to subscription_not_found", async () => {
+    const service = createSourceService(
+      {
+        unsubscribe: vi.fn(() => Promise.resolve(ok(false))),
+      } as unknown as SourceRepository,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
+    );
+
+    const result = await service.unsubscribe("subscription-1");
+
+    assertErr(result);
+    expect(result.error).toEqual({
+      code: "subscription_not_found",
+      message: "Subscription not found.",
+    });
+  });
+
+  it("unsubscribes existing subscriptions", async () => {
+    const unsubscribe = vi.fn(() => Promise.resolve(ok(true)));
+    const service = createSourceService(
+      {
+        unsubscribe,
+      } as unknown as SourceRepository,
+      {
+        logger: createNoopLogger(),
+        sourceCollectorRegistry,
+      },
+    );
+
+    const result = await service.unsubscribe("subscription-1");
+
+    assertOk(result);
+    expect(unsubscribe).toHaveBeenCalledWith("default", "subscription-1");
+  });
+
   it("lists source collector plugins from the registry", () => {
     sourceCollectorRegistry.list = vi.fn(() => [
       {
@@ -334,6 +376,7 @@ describe("source service", () => {
   it("lists sources from repository", async () => {
     const sources = [
       {
+        collectionId: null,
         collectorSettingsVersion: 1,
         createdAt: new Date("2026-05-01T00:00:00.000Z"),
         description: null,
@@ -343,18 +386,21 @@ describe("source service", () => {
         periodicCrawlIntervalMinutes: 60,
         recordedAt: null,
         slug: "example-feed",
+        subscriptionId: "subscription-1",
+        subscriptionPosition: 0,
         title: "Example Feed",
         url: "https://example.com/feed.xml",
         urlHash: "hash-1",
         version: 1,
       },
     ] satisfies SourceListItem[];
+    const listSources = vi.fn(() => Promise.resolve(ok(sources)));
     const service = createSourceService(
       {
         createSource: vi.fn(),
         findObserveSourceTarget: vi.fn(),
         listPeriodicCrawlTargets: vi.fn(),
-        listSources: vi.fn(() => Promise.resolve(ok(sources))),
+        listSources,
         updateSourceCollectorSettings: vi.fn(),
       } as unknown as SourceRepository,
       {
@@ -367,6 +413,7 @@ describe("source service", () => {
 
     assertOk(result);
     expect(result.value).toEqual(sources);
+    expect(listSources).toHaveBeenCalledWith("default");
   });
 
   it("maps missing collector settings updates to source_not_found", async () => {
@@ -404,6 +451,7 @@ describe("source service", () => {
   it("returns updated collector settings from repository", async () => {
     const source = {
       collectorSettingsVersion: 2,
+      collectionId: null,
       createdAt: new Date("2026-05-01T00:00:00.000Z"),
       description: null,
       id: "source-1",
@@ -412,6 +460,8 @@ describe("source service", () => {
       periodicCrawlIntervalMinutes: 30,
       recordedAt: null,
       slug: "example-feed",
+      subscriptionId: "subscription-1",
+      subscriptionPosition: 0,
       title: "Example Feed",
       url: "https://example.com/feed.xml",
       urlHash: "hash-1",
@@ -501,6 +551,7 @@ describe("source service", () => {
     const createSource = vi.fn((input: CreateSourceInput) =>
       Promise.resolve(
         ok({
+          collectionId: null,
           collectorSettingsVersion: 1,
           createdAt: new Date("2026-05-01T00:00:00.000Z"),
           description: input.description ?? null,
@@ -510,6 +561,8 @@ describe("source service", () => {
           periodicCrawlIntervalMinutes: 60,
           recordedAt: null,
           slug: input.slug,
+          subscriptionId: "subscription-2",
+          subscriptionPosition: 0,
           title: input.title ?? null,
           url: input.url,
           urlHash: input.urlHash,

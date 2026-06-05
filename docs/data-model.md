@@ -20,9 +20,46 @@
 
 ## 主体テーブル
 
+### user
+
+利用主体を表す．
+
+例:
+
+- `geshi` を利用する個人
+- 将来的な複数利用者の各主体
+
+主な属性:
+
+- `id`
+- `slug`
+- `createdAt`
+
+### subscription
+
+user が source を購読している現在の関係を表す．
+
+例:
+
+- ある user が特定 podcast を購読している状態
+- ある user が特定 RSS / Atom feed を一覧へ出している状態
+
+主な属性:
+
+- `id`
+- `userId`
+- `sourceId`
+- `createdAt`
+
+補足:
+
+- source 登録時には，対応する subscription も同時に発生する前提とする
+- 将来，register 時に既存 source が見つかった場合は，source を再利用して subscription だけを作る形を許容する
+- unsubscribe では現在の subscription 関係を解除し，履歴は event 側へ残す
+
 ### source
 
-継続的に収集する対象を表す．
+継続的に収集する共有対象を表す．
 
 例:
 
@@ -38,6 +75,50 @@
 - `url`
 - `urlHash`
 - `createdAt`
+
+補足:
+
+- source は user 固有資源ではない
+- 複数 user が同じ source を subscription できる
+
+### collection
+
+user が自分の subscription を整理する grouping 単位を表す．
+
+例:
+
+- 日常的に見る購読対象を入れるフォルダ
+- topic / project / environment ごとの購読整理フォルダ
+
+主な属性:
+
+- `id`
+- `userId`
+- `parentCollectionId`
+- `createdAt`
+
+補足:
+
+- 今回の UI / 運用要件は 1 階層でよい
+- ただし data structure は将来の多階層化を妨げない前提にする
+- collection は source ではなく subscription を整理する
+
+### collectionSubscription
+
+collection と subscription の現在の所属関係を表す．
+
+主な属性:
+
+- `id`
+- `collectionId`
+- `subscriptionId`
+- `position`
+- `createdAt`
+
+補足:
+
+- drag and drop の結果を永続化するため，順序を持てるようにする
+- unsubscribe により subscription 関係を解除したときは，現在の所属関係もあわせて解消する前提で考える
 
 ### content
 
@@ -193,6 +274,25 @@ chunk 分割された文字起こしの部分結果を表す．
 - `sourceStartMs` / `sourceEndMs` は元音声内での時間範囲を表す
 
 ## 履歴テーブル
+
+### subscriptionEvent
+
+subscription に対して起きた出来事を表す．
+
+主な属性:
+
+- `id`
+- `subscriptionId`
+- `kind`
+  - `subscribed`
+  - `unsubscribed`
+- `occurredAt`
+
+補足:
+
+- current state と履歴を分けるため，subscribe / unsubscribe の記録は event として保持する
+- 「今購読しているか」は主体側の current relationship を見て判断する
+- 「いつ購読し，いつ解除したか」は event 側を見る
 
 ### sourceSnapshot
 

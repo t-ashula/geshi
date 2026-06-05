@@ -11,6 +11,7 @@
 ## コンテキスト
 
 - `geshi` は podcast，streaming，feed を継続的に収集し，保存し，あとから閲覧・検索・再利用する個人用アーカイブである
+- `geshi` は将来的に複数 user が同じ source を共有しつつ，購読関係や整理状態は user ごとに持てるようにしたい
 - 収集対象には feed のようなテキスト主体のものと，podcast や streaming のようなメディア主体のものが混在する
 - 同じ source から複数の content が発生し，1 つの content が複数の asset や transcript を持ちうる
 - source や content の可変属性には履歴を追いたいものが含まれる
@@ -23,8 +24,14 @@
 
 ### 主体テーブル
 
+- `user`
+  - 利用主体を表す
+- `subscription`
+  - user が source を購読している現在の関係を表す
 - `source`
-  - 継続収集の対象を表す
+  - 継続収集の共有対象を表す
+- `collection`
+  - user が subscription を整理する単位を表す
 - `content`
   - 閲覧・検索の基本単位を表す
 - `asset`
@@ -34,16 +41,33 @@
 
 ### 履歴テーブル
 
+- `subscriptionEvent`
+  - subscribe / unsubscribe の履歴を表す
 - `sourceSnapshot`
   - source の可変属性のある時点の状態を表す
 - `contentSnapshot`
   - content の可変属性のある時点の状態を表す
+
+### user / subscription / source を分ける
+
+- `user` は利用主体とする
+- `source` は共有可能な収集対象とする
+- `subscription` は user が source を購読している現在の関係とする
+- source 登録時には subscription も同時に発生する前提で扱う
+- unsubscribe では current relationship を解除し，履歴は `subscriptionEvent` に残す
+- 1 つの `source` は複数の `subscription` から参照されうる
 
 ### source と content を分ける
 
 - `source` は継続購読・巡回の対象とする
 - `content` は閲覧・再生・検索・保存の基本単位とする
 - 1 つの `source` は複数の `content` を持つ
+
+### collection は subscription を整理する
+
+- `collection` は user に属する
+- `collection` は source ではなく subscription を整理する
+- collection 階層は将来拡張できる形を許容するが，当面の UI 要件は 1 階層とする
 
 ### content を中心に関連情報をぶら下げる
 
@@ -80,6 +104,7 @@
 ## 影響
 
 - crawler は `source` を起点に収集処理を組みやすくなる
+- user ごとの購読関係や整理状態を source 本体から分けて扱いやすくなる
 - source や content の変化を snapshot として保存できる
 - backend は `content` を基準に API と検索結果を設計しやすくなる
 - storage は `asset` を単位にファイル管理しやすくなる
@@ -91,6 +116,8 @@
   - 種別ごとの実装は単純だが，横断検索や共通 UI を作りにくい
 - source と content を分けず，取得物をすべて 1 単位で扱う
   - 初期実装は軽いが，継続収集と個別閲覧の責務が混ざりやすい
+- source と user の関係を直接 source 側へ埋め込む
+  - source 共有や user ごとの整理状態を表しにくいため採らない
 - 可変属性を主体テーブルに上書きし，`updatedAt` だけを持つ
   - 現在値は見やすいが，履歴要件を満たしにくい
 - ファイル本体も metadata ストア側に寄せる

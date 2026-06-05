@@ -1,13 +1,348 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  assignSourceToCollection,
+  createSource,
+  createSourceCollection,
   discoverSources,
   getContentDetail,
   getSourceCollectorSettings,
   inspectSource,
+  listSourceCollections,
   listSourceCollectorPlugins,
+  listSources,
   previewSource,
+  unsubscribeSource,
 } from "../src/source-api.js";
+
+describe("listSources", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns source list data on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  collectorSettingsVersion: 1,
+                  createdAt: "2026-06-02T00:00:00.000Z",
+                  description: "Weekly notes",
+                  id: "source-1",
+                  kind: "podcast",
+                  periodicCrawlEnabled: true,
+                  periodicCrawlIntervalMinutes: 60,
+                  recordedAt: "2026-06-02T00:00:00.000Z",
+                  slug: "example-feed",
+                  title: "Example Feed",
+                  collectionId: null,
+                  subscriptionId: "subscription-1",
+                  subscriptionPosition: 0,
+                  url: "https://example.com/feed.xml",
+                  urlHash: "hash-1",
+                  version: 1,
+                },
+              ],
+            }),
+            {
+              headers: {
+                "content-type": "application/json",
+              },
+              status: 200,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await expect(listSources()).resolves.toEqual([
+      {
+        collectorSettingsVersion: 1,
+        createdAt: "2026-06-02T00:00:00.000Z",
+        description: "Weekly notes",
+        id: "source-1",
+        kind: "podcast",
+        periodicCrawlEnabled: true,
+        periodicCrawlIntervalMinutes: 60,
+        recordedAt: "2026-06-02T00:00:00.000Z",
+        slug: "example-feed",
+        title: "Example Feed",
+        collectionId: null,
+        subscriptionId: "subscription-1",
+        subscriptionPosition: 0,
+        url: "https://example.com/feed.xml",
+        urlHash: "hash-1",
+        version: 1,
+      },
+    ]);
+  });
+});
+
+describe("listSourceCollections", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns collection list data on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  createdAt: "2026-06-02T00:00:00.000Z",
+                  id: "collection-1",
+                  parentCollectionId: null,
+                  position: 0,
+                  sourceCount: 1,
+                  title: "Work",
+                },
+              ],
+            }),
+            {
+              headers: {
+                "content-type": "application/json",
+              },
+              status: 200,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await expect(listSourceCollections()).resolves.toEqual([
+      {
+        createdAt: "2026-06-02T00:00:00.000Z",
+        id: "collection-1",
+        parentCollectionId: null,
+        position: 0,
+        sourceCount: 1,
+        title: "Work",
+      },
+    ]);
+  });
+});
+
+describe("createSource", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns created source data on success", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: {
+              collectorSettingsVersion: 1,
+              createdAt: "2026-06-02T00:00:00.000Z",
+              description: "Weekly notes",
+              id: "source-1",
+              kind: "podcast",
+              periodicCrawlEnabled: true,
+              periodicCrawlIntervalMinutes: 60,
+              recordedAt: "2026-06-02T00:00:00.000Z",
+              slug: "example-feed",
+              title: "Example Feed",
+              collectionId: null,
+              subscriptionId: "subscription-1",
+              subscriptionPosition: 0,
+              url: "https://example.com/feed.xml",
+              urlHash: "hash-1",
+              version: 1,
+            },
+          }),
+          {
+            headers: {
+              "content-type": "application/json",
+            },
+            status: 201,
+          },
+        ),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      createSource({
+        description: "Weekly notes",
+        sourceSlug: "example-feed",
+        title: "Example Feed",
+        url: "https://example.com/feed.xml",
+      }),
+    ).resolves.toEqual({
+      collectorSettingsVersion: 1,
+      createdAt: "2026-06-02T00:00:00.000Z",
+      description: "Weekly notes",
+      id: "source-1",
+      kind: "podcast",
+      periodicCrawlEnabled: true,
+      periodicCrawlIntervalMinutes: 60,
+      recordedAt: "2026-06-02T00:00:00.000Z",
+      slug: "example-feed",
+      title: "Example Feed",
+      collectionId: null,
+      subscriptionId: "subscription-1",
+      subscriptionPosition: 0,
+      url: "https://example.com/feed.xml",
+      urlHash: "hash-1",
+      version: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/sources",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+  });
+});
+
+describe("createSourceCollection", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns created collection data on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                createdAt: "2026-06-02T00:00:00.000Z",
+                id: "collection-1",
+                parentCollectionId: null,
+                position: 0,
+                sourceCount: 0,
+                title: "Work",
+              },
+            }),
+            {
+              headers: {
+                "content-type": "application/json",
+              },
+              status: 201,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await expect(
+      createSourceCollection({
+        position: 0,
+        title: "Work",
+      }),
+    ).resolves.toEqual({
+      createdAt: "2026-06-02T00:00:00.000Z",
+      id: "collection-1",
+      parentCollectionId: null,
+      position: 0,
+      sourceCount: 0,
+      title: "Work",
+    });
+  });
+});
+
+describe("assignSourceToCollection", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns updated source data on success", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                collectorSettingsVersion: 1,
+                createdAt: "2026-06-02T00:00:00.000Z",
+                description: "Weekly notes",
+                id: "source-1",
+                kind: "podcast",
+                periodicCrawlEnabled: true,
+                periodicCrawlIntervalMinutes: 60,
+                recordedAt: "2026-06-02T00:00:00.000Z",
+                slug: "example-feed",
+                title: "Example Feed",
+                collectionId: "collection-1",
+                subscriptionId: "subscription-1",
+                subscriptionPosition: 2,
+                url: "https://example.com/feed.xml",
+                urlHash: "hash-1",
+                version: 1,
+              },
+            }),
+            {
+              headers: {
+                "content-type": "application/json",
+              },
+              status: 200,
+            },
+          ),
+        ),
+      ),
+    );
+
+    await expect(
+      assignSourceToCollection("source-1", {
+        collectionId: "collection-1",
+        position: 2,
+      }),
+    ).resolves.toEqual({
+      collectorSettingsVersion: 1,
+      createdAt: "2026-06-02T00:00:00.000Z",
+      description: "Weekly notes",
+      id: "source-1",
+      kind: "podcast",
+      periodicCrawlEnabled: true,
+      periodicCrawlIntervalMinutes: 60,
+      recordedAt: "2026-06-02T00:00:00.000Z",
+      slug: "example-feed",
+      title: "Example Feed",
+      collectionId: "collection-1",
+      subscriptionId: "subscription-1",
+      subscriptionPosition: 2,
+      url: "https://example.com/feed.xml",
+      urlHash: "hash-1",
+      version: 1,
+    });
+  });
+});
+
+describe("unsubscribeSource", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns on 204 response", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(null, {
+          status: 204,
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(unsubscribeSource("subscription-1")).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/subscriptions/subscription-1",
+      expect.objectContaining({
+        method: "DELETE",
+      }),
+    );
+  });
+});
 
 describe("inspectSource", () => {
   afterEach(() => {

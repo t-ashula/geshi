@@ -28,6 +28,38 @@ export type SourceTable = {
   url_hash: string;
 };
 
+export type UserTable = {
+  created_at: TimestampColumn;
+  id: string;
+  slug: string;
+};
+
+export type SubscriptionTable = {
+  collection_id: string | null;
+  created_at: TimestampColumn;
+  id: string;
+  position: NumberColumn;
+  source_id: string;
+  user_id: string;
+};
+
+export type SubscriptionEventTable = {
+  id: string;
+  kind: "subscribed" | "unsubscribed";
+  occurred_at: TimestampColumn;
+  source_id: string;
+  user_id: string;
+};
+
+export type CollectionTable = {
+  created_at: TimestampColumn;
+  id: string;
+  parent_collection_id: string | null;
+  position: NumberColumn;
+  title: string;
+  user_id: string;
+};
+
 export type SourceSnapshotTable = {
   description: string | null;
   id: string;
@@ -212,14 +244,18 @@ export type GeshiDatabase = {
   collector_plugin_state_snapshots: CollectorPluginStateSnapshotTable;
   collector_setting_snapshots: CollectorSettingSnapshotTable;
   collector_settings: CollectorSettingTable;
+  collections: CollectionTable;
   content_snapshots: ContentSnapshotTable;
   contents: ContentTable;
   detail_bodies: DetailBodyTable;
   jobs: JobTable;
   plugin_global_runtime_states: PluginGlobalRuntimeStateTable;
   plugin_global_runtime_state_snapshots: PluginGlobalRuntimeStateSnapshotTable;
-  transcript_chunks: TranscriptChunkTable;
-  transcripts: TranscriptTable;
   source_snapshots: SourceSnapshotTable;
   sources: SourceTable;
+  subscription_events: SubscriptionEventTable;
+  subscriptions: SubscriptionTable;
+  transcript_chunks: TranscriptChunkTable;
+  transcripts: TranscriptTable;
+  users: UserTable;
 };

@@ -6,15 +6,20 @@ import {
   DuplicateSourceUrlHashError,
 } from "../../src/db/source-repository.js";
 import {
+  createAssignSourceToCollectionEndpoint,
+  createCreateSourceCollectionEndpoint,
   createCreateSourceEndpoint,
   createDiscoverSourcesEndpoint,
   createEnqueueObserveSourceEndpoint,
   createGetSourceCollectorSettingsEndpoint,
   createInspectSourceEndpoint,
+  createListSourceCollectionsEndpoint,
   createListSourceCollectorPluginsEndpoint,
   createListSourcesEndpoint,
   createPatchSourceCollectorSettingsEndpoint,
   createPreviewSourceEndpoint,
+  createUnsubscribeEndpoint,
+  createUpdateSourceCollectionEndpoint,
 } from "../../src/endpoints/api/v1/sources.js";
 import { err, ok } from "../../src/lib/result.js";
 import type { JobService } from "../../src/service/job-service.js";
@@ -34,6 +39,7 @@ describe("source endpoints", () => {
             Promise.resolve(
               ok([
                 {
+                  collectionId: null,
                   collectorSettingsVersion: 1,
                   createdAt: new Date("2026-05-01T00:00:00.000Z"),
                   description: null,
@@ -43,6 +49,8 @@ describe("source endpoints", () => {
                   periodicCrawlIntervalMinutes: 60,
                   recordedAt: null,
                   slug: "example-feed",
+                  subscriptionId: "subscription-1",
+                  subscriptionPosition: 0,
                   title: "Example Feed",
                   url: "https://example.com/feed.xml",
                   urlHash: "hash-1",
@@ -148,9 +156,12 @@ describe("source endpoints", () => {
           inspectSource: vi.fn(),
         },
         sourceService: {
+          assignSourceToCollection: vi.fn(),
+          createCollection: vi.fn(),
           createSource: vi.fn(() =>
             Promise.resolve(
               ok({
+                collectionId: null,
                 collectorSettingsVersion: 1,
                 createdAt: new Date("2026-05-01T00:00:00.000Z"),
                 description: "Weekly notes",
@@ -160,6 +171,8 @@ describe("source endpoints", () => {
                 periodicCrawlIntervalMinutes: 60,
                 recordedAt: null,
                 slug: "example-feed",
+                subscriptionId: "subscription-1",
+                subscriptionPosition: 0,
                 title: "Example Feed",
                 url: "https://example.com/feed.xml",
                 urlHash: "hash-1",
@@ -170,8 +183,11 @@ describe("source endpoints", () => {
           findObserveSourceTarget: vi.fn(),
           getSourceCollectorSettings: vi.fn(),
           listSourceCollectorPlugins: () => ok([]),
+          listSourceCollections: vi.fn(),
           listPeriodicCrawlTargets: vi.fn(),
           listSources: vi.fn(),
+          unsubscribe: vi.fn(),
+          updateCollection: vi.fn(),
           updateSourceCollectorSettings: vi.fn(),
         } satisfies SourceService,
       }),
@@ -190,6 +206,187 @@ describe("source endpoints", () => {
         title: "Example Feed",
       }),
     );
+  });
+
+  it("returns source collections", async () => {
+    const endpoint = createListSourceCollectionsEndpoint(
+      createTestAppDependencies({
+        sourceService: {
+          listSourceCollections: vi.fn(() =>
+            Promise.resolve(
+              ok([
+                {
+                  createdAt: new Date("2026-06-02T00:00:00.000Z"),
+                  id: "collection-1",
+                  parentCollectionId: null,
+                  position: 0,
+                  sourceCount: 1,
+                  title: "Work",
+                },
+              ]),
+            ),
+          ),
+        } as unknown as SourceService,
+      }),
+    );
+
+    await expect(endpoint()).resolves.toEqual(
+      ok([
+        {
+          createdAt: new Date("2026-06-02T00:00:00.000Z"),
+          id: "collection-1",
+          parentCollectionId: null,
+          position: 0,
+          sourceCount: 1,
+          title: "Work",
+        },
+      ]),
+    );
+  });
+
+  it("creates source collections", async () => {
+    const endpoint = createCreateSourceCollectionEndpoint(
+      createTestAppDependencies({
+        sourceService: {
+          createCollection: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+                id: "collection-1",
+                parentCollectionId: null,
+                position: 0,
+                sourceCount: 0,
+                title: "Work",
+              }),
+            ),
+          ),
+        } as unknown as SourceService,
+      }),
+    );
+
+    await expect(
+      endpoint({
+        parentCollectionId: null,
+        position: 0,
+        title: "Work",
+      }),
+    ).resolves.toEqual(
+      ok({
+        createdAt: new Date("2026-06-02T00:00:00.000Z"),
+        id: "collection-1",
+        parentCollectionId: null,
+        position: 0,
+        sourceCount: 0,
+        title: "Work",
+      }),
+    );
+  });
+
+  it("updates source collections", async () => {
+    const endpoint = createUpdateSourceCollectionEndpoint(
+      createTestAppDependencies({
+        sourceService: {
+          updateCollection: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+                id: "collection-1",
+                parentCollectionId: null,
+                position: 1,
+                sourceCount: 2,
+                title: "Pinned",
+              }),
+            ),
+          ),
+        } as unknown as SourceService,
+      }),
+    );
+
+    await expect(
+      endpoint("collection-1", {
+        parentCollectionId: null,
+        position: 1,
+        title: "Pinned",
+      }),
+    ).resolves.toEqual(
+      ok({
+        createdAt: new Date("2026-06-02T00:00:00.000Z"),
+        id: "collection-1",
+        parentCollectionId: null,
+        position: 1,
+        sourceCount: 2,
+        title: "Pinned",
+      }),
+    );
+  });
+
+  it("assigns sources to collections", async () => {
+    const endpoint = createAssignSourceToCollectionEndpoint(
+      createTestAppDependencies({
+        sourceService: {
+          assignSourceToCollection: vi.fn(() =>
+            Promise.resolve(
+              ok({
+                collectionId: "collection-1",
+                collectorSettingsVersion: 1,
+                createdAt: new Date("2026-06-02T00:00:00.000Z"),
+                description: "Weekly notes",
+                id: "source-1",
+                kind: "podcast",
+                periodicCrawlEnabled: true,
+                periodicCrawlIntervalMinutes: 60,
+                recordedAt: new Date("2026-06-02T00:00:00.000Z"),
+                slug: "example-feed",
+                subscriptionId: "subscription-1",
+                subscriptionPosition: 2,
+                title: "Example Feed",
+                url: "https://example.com/feed.xml",
+                urlHash: "hash-1",
+                version: 1,
+              }),
+            ),
+          ),
+        } as unknown as SourceService,
+      }),
+    );
+
+    await expect(
+      endpoint("source-1", {
+        collectionId: "collection-1",
+        position: 2,
+      }),
+    ).resolves.toEqual(
+      ok({
+        collectionId: "collection-1",
+        collectorSettingsVersion: 1,
+        createdAt: new Date("2026-06-02T00:00:00.000Z"),
+        description: "Weekly notes",
+        id: "source-1",
+        kind: "podcast",
+        periodicCrawlEnabled: true,
+        periodicCrawlIntervalMinutes: 60,
+        recordedAt: new Date("2026-06-02T00:00:00.000Z"),
+        slug: "example-feed",
+        subscriptionId: "subscription-1",
+        subscriptionPosition: 2,
+        title: "Example Feed",
+        url: "https://example.com/feed.xml",
+        urlHash: "hash-1",
+        version: 1,
+      }),
+    );
+  });
+
+  it("unsubscribes subscriptions", async () => {
+    const endpoint = createUnsubscribeEndpoint(
+      createTestAppDependencies({
+        sourceService: {
+          unsubscribe: vi.fn(() => Promise.resolve(ok(undefined))),
+        } as unknown as SourceService,
+      }),
+    );
+
+    await expect(endpoint("subscription-1")).resolves.toEqual(ok(undefined));
   });
 
   it("preserves duplicate-source errors", async () => {
