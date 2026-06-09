@@ -112,6 +112,66 @@ create table plugin_global_runtime_state_snapshots (
     )
 );
 
+create table source_detection_targets (
+    id uuid primary key,
+    user_id uuid not null references users (id),
+    plugin_slug varchar(128) not null,
+    source_kind text not null constraint source_detection_targets_source_kind_check check (
+        source_kind = any(array ['podcast'::text, 'feed'::text, 'streaming'::text])
+    ),
+    url text not null,
+    enabled boolean not null default true,
+    interval_minutes integer not null default 60,
+    config jsonb not null default '{}'::jsonb,
+    last_checked_at timestamptz,
+    created_at timestamptz not null default current_timestamp,
+    constraint source_detection_targets_user_plugin_url_key unique (
+        user_id,
+        plugin_slug,
+        url
+    )
+);
+
+create table source_detection_states (
+    id uuid primary key,
+    source_detection_target_id uuid not null references source_detection_targets (id),
+    plugin_slug varchar(128) not null,
+    state jsonb not null default '{}'::jsonb,
+    created_at timestamptz not null default current_timestamp,
+    updated_at timestamptz not null default current_timestamp,
+    constraint source_detection_states_target_id_key unique (source_detection_target_id)
+);
+
+create table detected_source_candidates (
+    id uuid primary key,
+    user_id uuid not null references users (id),
+    source_detection_target_id uuid not null references source_detection_targets (id),
+    plugin_slug varchar(128) not null,
+    source_kind text not null constraint detected_source_candidates_source_kind_check check (
+        source_kind = any(array ['podcast'::text, 'feed'::text, 'streaming'::text])
+    ),
+    normalized_url text not null,
+    source_slug varchar(128) not null,
+    title text,
+    description text,
+    status text not null constraint detected_source_candidates_status_check check (
+        status = any(
+            array [
+                'detected'::text,
+                'previewed'::text,
+                'registered'::text,
+                'dismissed'::text,
+                'duplicate'::text
+            ]
+        )
+    ),
+    fingerprint text not null unique,
+    resolved_source_id uuid references sources (id),
+    first_detected_at timestamptz not null default current_timestamp,
+    last_detected_at timestamptz not null default current_timestamp,
+    created_at timestamptz not null default current_timestamp
+);
+
 create table app_settings (
     id uuid primary key,
     profile_slug varchar(128) not null unique,

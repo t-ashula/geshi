@@ -19,6 +19,7 @@
     "worker:acquire-content": "node --import tsx backend/src/workers/acquire-content/main.ts",
     "worker:observe-source": "node --import tsx backend/src/workers/observe-source/main.ts",
     "worker:periodic-crawl": "node --import tsx backend/src/workers/periodic-crawl/main.ts",
+    "worker:periodic-source-detection": "node --import tsx backend/src/workers/periodic-source-detection/main.ts",
     "worker:record-content": "node --import tsx backend/src/workers/record-content/main.ts",
     "worker:recording-scheduler": "node --import tsx backend/src/workers/recording-scheduler/main.ts",
     "worker:transcript-chunk": "node --import tsx backend/src/workers/transcript-chunk/main.ts",

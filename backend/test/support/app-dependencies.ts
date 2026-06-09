@@ -7,6 +7,7 @@ import type { AssetService } from "../../src/service/asset-service.js";
 import type { ContentService } from "../../src/service/content-service.js";
 import type { JobService } from "../../src/service/job-service.js";
 import type { SourceDiscoveryService } from "../../src/service/source-discovery-service.js";
+import type { SourceDetectionService } from "../../src/service/source-detection-service.js";
 import type { SourceInspectService } from "../../src/service/source-inspect-service.js";
 import type { SourceService } from "../../src/service/source-service.js";
 import type { Storage } from "../../src/storage/types.js";
@@ -160,6 +161,136 @@ export function createTestAppDependencies(
         ),
       ),
     } satisfies SourceDiscoveryService,
+    sourceDetectionService: {
+      createSourceDetectionTarget: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            config: {},
+            enabled: true,
+            id: "target-1",
+            intervalMinutes: 60,
+            lastCheckedAt: null,
+            pluginSlug: "radio-onsen",
+            sourceKind: "podcast" as const,
+            state: undefined,
+            url: "https://www.onsen.ag",
+            userId: "user-1",
+          }),
+        ),
+      ),
+      detectSourceTarget: vi.fn(),
+      dismissDetectedSourceCandidate: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            description: null,
+            firstDetectedAt: new Date("2026-06-10T00:00:00.000Z"),
+            id: "candidate-1",
+            lastDetectedAt: new Date("2026-06-10T00:05:00.000Z"),
+            normalizedUrl: "https://www.onsen.ag/program/example",
+            pluginSlug: "radio-onsen",
+            resolvedSourceId: null,
+            sourceDetectionTargetId: "target-1",
+            sourceKind: "podcast" as const,
+            sourceSlug: "example",
+            status: "dismissed" as const,
+            title: "Example",
+            userId: "user-1",
+          }),
+        ),
+      ),
+      listDetectedSourceCandidates: vi.fn(() =>
+        Promise.resolve(
+          ok([
+            {
+              description: null,
+              firstDetectedAt: new Date("2026-06-10T00:00:00.000Z"),
+              id: "candidate-1",
+              lastDetectedAt: new Date("2026-06-10T00:00:00.000Z"),
+              normalizedUrl: "https://www.onsen.ag/program/example",
+              pluginSlug: "radio-onsen",
+              resolvedSourceId: null,
+              sourceDetectionTargetId: "target-1",
+              sourceKind: "podcast" as const,
+              sourceSlug: "example",
+              status: "detected" as const,
+              title: "Example",
+              userId: "user-1",
+            },
+          ]),
+        ),
+      ),
+      listTargets: vi.fn(() =>
+        Promise.resolve(
+          ok([
+            {
+              config: {},
+              enabled: true,
+              id: "target-1",
+              intervalMinutes: 60,
+              lastCheckedAt: null,
+              pluginSlug: "radio-onsen",
+              sourceKind: "podcast" as const,
+              state: undefined,
+              url: "https://www.onsen.ag",
+              userId: "user-1",
+            },
+          ]),
+        ),
+      ),
+      listEnabledTargets: vi.fn(() =>
+        Promise.resolve(
+          ok([
+            {
+              config: {},
+              enabled: true,
+              id: "target-1",
+              intervalMinutes: 60,
+              lastCheckedAt: null,
+              pluginSlug: "radio-onsen",
+              sourceKind: "podcast" as const,
+              state: undefined,
+              url: "https://www.onsen.ag",
+              userId: "user-1",
+            },
+          ]),
+        ),
+      ),
+      registerDetectedSourceCandidate: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            description: null,
+            firstDetectedAt: new Date("2026-06-10T00:00:00.000Z"),
+            id: "candidate-1",
+            lastDetectedAt: new Date("2026-06-10T00:10:00.000Z"),
+            normalizedUrl: "https://www.onsen.ag/program/example",
+            pluginSlug: "radio-onsen",
+            resolvedSourceId: "source-1",
+            sourceDetectionTargetId: "target-1",
+            sourceKind: "podcast" as const,
+            sourceSlug: "example",
+            status: "registered" as const,
+            title: "Example",
+            userId: "user-1",
+          }),
+        ),
+      ),
+      updateSourceDetectionTarget: vi.fn(() =>
+        Promise.resolve(
+          ok({
+            config: {},
+            enabled: false,
+            id: "target-1",
+            intervalMinutes: 120,
+            lastCheckedAt: null,
+            pluginSlug: "radio-onsen",
+            sourceKind: "podcast" as const,
+            state: undefined,
+            url: "https://www.onsen.ag",
+            userId: "user-1",
+          }),
+        ),
+      ),
+    } satisfies SourceDetectionService,
     sourceInspectService: {
       inspectSource: vi.fn(() =>
         Promise.resolve(

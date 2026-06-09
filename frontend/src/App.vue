@@ -15,10 +15,12 @@ import type {
   ContentDetailItem,
   ContentTranscriptItem,
   ContentListItem,
+  DetectedSourceCandidate,
   DiscoverSourcesResult,
   PeriodicCrawlSettings,
   PluginGlobalSettingsDetail,
   PreviewSourceResult,
+  SourceDetectionTarget,
   SourceCollectionListItem,
   SourceDiscoveryCandidate,
   SourceCollectorPluginListItem,
@@ -28,10 +30,14 @@ import type {
 } from "./source-api.js";
 import {
   assignSourceToCollection,
+  createSourceDetectionTarget,
   createSourceCollection,
   createSource,
+  dismissDetectedSourceCandidate,
   discoverSources,
   getContentDetail,
+  listDetectedSourceCandidates,
+  listSourceDetectionTargets,
   getPeriodicCrawlSettings,
   getPluginGlobalSettings,
   getSourceCollectorSettings,
@@ -41,9 +47,11 @@ import {
   listSources,
   observeSource,
   previewSource,
+  registerDetectedSourceCandidate,
   requestTranscripts,
   retryTranscript,
   unsubscribeSource,
+  updateSourceDetectionTarget,
   updatePeriodicCrawlSettings,
   updatePluginGlobalSettings,
   updateSourceCollection,
@@ -97,7 +105,9 @@ const expandedAssetMenuId = ref<string | null>(null);
 const isTranscriptSubmitting = ref<string | null>(null);
 const isSettingsLoading = ref(true);
 const isPluginGlobalSettingsLoading = ref(false);
+const isSourceDetectionLoading = ref(false);
 const isPluginGlobalSettingsSubmitting = ref<string | null>(null);
+const isSourceDetectionSubmitting = ref<string | null>(null);
 const isSourceSettingsExpanded = ref(false);
 const isSourceCollectorSettingsLoading = ref(false);
 const errorMessage = ref<string | null>(null);
@@ -106,6 +116,7 @@ const inspectErrorMessage = ref<string | null>(null);
 const observeErrorMessage = ref<string | null>(null);
 const settingsErrorMessage = ref<string | null>(null);
 const pluginGlobalSettingsErrorMessage = ref<string | null>(null);
+const sourceDetectionErrorMessage = ref<string | null>(null);
 const sourceCrawlErrorMessage = ref<string | null>(null);
 const transcriptActionErrorMessage = ref<string | null>(null);
 const validationMessage = ref<string | null>(null);
@@ -133,6 +144,21 @@ const pluginGlobalSettings = ref<
   }>
 >([]);
 const pluginGlobalItemsForm = ref<Record<string, Record<string, unknown>>>({});
+const sourceDetectionTargets = ref<SourceDetectionTarget[]>([]);
+const detectedSourceCandidates = ref<DetectedSourceCandidate[]>([]);
+const sourceDetectionTargetForm = ref<{
+  enabled: boolean;
+  intervalMinutes: number;
+  pluginSlug: string;
+  sourceKind: "feed" | "podcast" | "streaming";
+  url: string;
+}>({
+  enabled: true,
+  intervalMinutes: 60,
+  pluginSlug: "radio-onsen",
+  sourceKind: "podcast",
+  url: "https://www.onsen.ag",
+});
 const theme = ref<"light" | "dark">("light");
 const collectionDialogInput = useTemplateRef<HTMLInputElement>(
   "collectionDialogInput",
@@ -172,6 +198,10 @@ const selectedSource = computed(
   () =>
     sources.value.find((source) => source.slug === selectedSourceSlug.value) ??
     null,
+);
+
+const availableSourceDetectionPlugins = computed(() =>
+  sourceCollectorPlugins.value.filter((plugin) => plugin.status === "available"),
 );
 
 const selectedContentId = computed(() =>
@@ -1269,6 +1299,107 @@ async function refreshSettings(): Promise<void> {
   } finally {
     isPluginGlobalSettingsLoading.value = false;
   }
+
+  await refreshSourceDetectionData();
+}
+
+async function refreshSourceDetectionData(): Promise<void> {
+  isSourceDetectionLoading.value = true;
+  sourceDetectionErrorMessage.value = null;
+
+  try {
+    const [targets, candidates] = await Promise.all([
+      listSourceDetectionTargets(),
+      listDetectedSourceCandidates(),
+    ]);
+
+    sourceDetectionTargets.value = targets;
+    detectedSourceCandidates.value = candidates;
+  } catch (error) {
+    sourceDetectionErrorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to load source detection settings.";
+  } finally {
+    isSourceDetectionLoading.value = false;
+  }
+}
+
+async function submitSourceDetectionTarget(): Promise<void> {
+  isSourceDetectionSubmitting.value = "create-target";
+  sourceDetectionErrorMessage.value = null;
+
+  try {
+    await createSourceDetectionTarget(sourceDetectionTargetForm.value);
+    await refreshSourceDetectionData();
+  } catch (error) {
+    sourceDetectionErrorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to create source detection target.";
+  } finally {
+    isSourceDetectionSubmitting.value = null;
+  }
+}
+
+async function toggleSourceDetectionTarget(
+  target: SourceDetectionTarget,
+): Promise<void> {
+  isSourceDetectionSubmitting.value = target.id;
+  sourceDetectionErrorMessage.value = null;
+
+  try {
+    await updateSourceDetectionTarget(target.id, {
+      config: target.config,
+      enabled: !target.enabled,
+      intervalMinutes: target.intervalMinutes,
+      pluginSlug: target.pluginSlug,
+      sourceKind: target.sourceKind,
+      url: target.url,
+    });
+    await refreshSourceDetectionData();
+  } catch (error) {
+    sourceDetectionErrorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to update source detection target.";
+  } finally {
+    isSourceDetectionSubmitting.value = null;
+  }
+}
+
+async function dismissDetectedCandidate(candidateId: string): Promise<void> {
+  isSourceDetectionSubmitting.value = candidateId;
+  sourceDetectionErrorMessage.value = null;
+
+  try {
+    await dismissDetectedSourceCandidate(candidateId);
+    await refreshSourceDetectionData();
+  } catch (error) {
+    sourceDetectionErrorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to dismiss detected source candidate.";
+  } finally {
+    isSourceDetectionSubmitting.value = null;
+  }
+}
+
+async function registerDetectedCandidate(candidateId: string): Promise<void> {
+  isSourceDetectionSubmitting.value = candidateId;
+  sourceDetectionErrorMessage.value = null;
+
+  try {
+    await registerDetectedSourceCandidate(candidateId);
+    await Promise.all([refreshSourceDetectionData(), refreshSources()]);
+  } catch (error) {
+    sourceDetectionErrorMessage.value =
+      error instanceof Error
+        ? error.message
+        : "Failed to register detected source candidate.";
+  } finally {
+    isSourceDetectionSubmitting.value = null;
+  }
 }
 
 async function loadPluginGlobalSettings(): Promise<
@@ -2055,6 +2186,210 @@ function normalizeCollectorSettingFormValue(
           </button>
         </div>
       </form>
+
+      <div class="settings-shell-header">
+        <div>
+          <p class="eyebrow">Discovery</p>
+          <h2>Source Detection</h2>
+        </div>
+      </div>
+
+      <p v-if="sourceDetectionErrorMessage" class="feedback error">
+        {{ sourceDetectionErrorMessage }}
+      </p>
+
+      <div v-if="isSourceDetectionLoading" class="empty-state">
+        Loading source detection settings...
+      </div>
+
+      <template v-else>
+        <form class="settings-grid" @submit.prevent="submitSourceDetectionTarget">
+          <label>
+            <span>Plugin</span>
+            <select v-model="sourceDetectionTargetForm.pluginSlug">
+              <option
+                v-for="plugin in availableSourceDetectionPlugins"
+                :key="plugin.pluginSlug"
+                :value="plugin.pluginSlug"
+              >
+                {{ plugin.displayName }} ({{ plugin.pluginSlug }})
+              </option>
+            </select>
+          </label>
+
+          <label>
+            <span>Source Kind</span>
+            <select v-model="sourceDetectionTargetForm.sourceKind">
+              <option value="feed">feed</option>
+              <option value="podcast">podcast</option>
+              <option value="streaming">streaming</option>
+            </select>
+          </label>
+
+          <label>
+            <span>URL</span>
+            <input
+              v-model="sourceDetectionTargetForm.url"
+              type="url"
+              placeholder="https://example.com"
+            />
+          </label>
+
+          <label>
+            <span>Interval Minutes</span>
+            <input
+              v-model.number="sourceDetectionTargetForm.intervalMinutes"
+              min="1"
+              step="1"
+              type="number"
+            />
+          </label>
+
+          <label class="toggle-field">
+            <span>Enabled</span>
+            <input v-model="sourceDetectionTargetForm.enabled" type="checkbox" />
+          </label>
+
+          <div class="actions">
+            <button
+              type="submit"
+              class="primary-button"
+              :disabled="isSourceDetectionSubmitting === 'create-target'"
+            >
+              {{
+                isSourceDetectionSubmitting === "create-target"
+                  ? "Creating..."
+                  : "Add detection target"
+              }}
+            </button>
+          </div>
+        </form>
+
+        <div class="settings-grid candidate-list-shell">
+          <div class="create-grid-wide settings-shell-header">
+            <div>
+              <p class="eyebrow">Targets</p>
+              <h3>Configured detection targets</h3>
+            </div>
+          </div>
+
+          <div v-if="sourceDetectionTargets.length === 0" class="empty-state">
+            No source detection targets.
+          </div>
+
+          <div v-else class="create-grid-wide candidate-list">
+            <article
+              v-for="target in sourceDetectionTargets"
+              :key="target.id"
+              class="candidate-option"
+            >
+              <strong class="candidate-option-title">
+                {{ target.pluginSlug }} / {{ target.sourceKind }}
+              </strong>
+              <span class="candidate-option-meta">
+                {{ target.enabled ? "enabled" : "disabled" }} · every
+                {{ target.intervalMinutes }} minutes
+              </span>
+              <span class="candidate-option-url">{{ target.url }}</span>
+              <span class="candidate-option-meta">
+                Last checked: {{ formatDate(target.lastCheckedAt) }}
+              </span>
+              <div class="actions">
+                <button
+                  type="button"
+                  class="secondary-button"
+                  :disabled="isSourceDetectionSubmitting === target.id"
+                  @click="toggleSourceDetectionTarget(target)"
+                >
+                  {{
+                    isSourceDetectionSubmitting === target.id
+                      ? "Saving..."
+                      : target.enabled
+                        ? "Disable"
+                        : "Enable"
+                  }}
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="settings-grid candidate-list-shell">
+          <div class="create-grid-wide settings-shell-header">
+            <div>
+              <p class="eyebrow">Candidates</p>
+              <h3>Detected source candidates</h3>
+            </div>
+          </div>
+
+          <div
+            v-if="detectedSourceCandidates.length === 0"
+            class="empty-state"
+          >
+            No detected source candidates.
+          </div>
+
+          <div v-else class="create-grid-wide candidate-list">
+            <article
+              v-for="candidate in detectedSourceCandidates"
+              :key="candidate.id"
+              class="candidate-option"
+            >
+              <strong class="candidate-option-title">
+                {{ candidate.title ?? candidate.sourceSlug }}
+              </strong>
+              <span class="candidate-option-meta">
+                {{ candidate.pluginSlug }} / {{ candidate.sourceKind }} /
+                {{ candidate.status }}
+              </span>
+              <span class="candidate-option-url">
+                {{ candidate.normalizedUrl }}
+              </span>
+              <span
+                v-if="candidate.description !== null"
+                class="candidate-option-preview"
+              >
+                {{ candidate.description }}
+              </span>
+              <span class="candidate-option-meta">
+                First detected: {{ formatDate(candidate.firstDetectedAt) }} · Last
+                detected: {{ formatDate(candidate.lastDetectedAt) }}
+              </span>
+              <div class="actions">
+                <button
+                  v-if="candidate.status === 'detected'"
+                  type="button"
+                  class="primary-button"
+                  :disabled="isSourceDetectionSubmitting === candidate.id"
+                  @click="registerDetectedCandidate(candidate.id)"
+                >
+                  {{
+                    isSourceDetectionSubmitting === candidate.id
+                      ? "Registering..."
+                      : "Register"
+                  }}
+                </button>
+                <button
+                  v-if="
+                    candidate.status !== 'dismissed' &&
+                    candidate.status !== 'registered'
+                  "
+                  type="button"
+                  class="ghost-button"
+                  :disabled="isSourceDetectionSubmitting === candidate.id"
+                  @click="dismissDetectedCandidate(candidate.id)"
+                >
+                  {{
+                    isSourceDetectionSubmitting === candidate.id
+                      ? "Saving..."
+                      : "Dismiss"
+                  }}
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+      </template>
     </section>
 
     <template v-else>

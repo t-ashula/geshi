@@ -3,16 +3,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assignSourceToCollection,
   createSource,
+  createSourceDetectionTarget,
   createSourceCollection,
+  dismissDetectedSourceCandidate,
   discoverSources,
   getContentDetail,
+  listDetectedSourceCandidates,
+  listSourceDetectionTargets,
   getSourceCollectorSettings,
   inspectSource,
+  registerDetectedSourceCandidate,
   listSourceCollections,
   listSourceCollectorPlugins,
   listSources,
   previewSource,
   unsubscribeSource,
+  updateSourceDetectionTarget,
 } from "../src/source-api.js";
 
 describe("listSources", () => {
@@ -315,6 +321,204 @@ describe("assignSourceToCollection", () => {
       url: "https://example.com/feed.xml",
       urlHash: "hash-1",
       version: 1,
+    });
+  });
+});
+
+describe("source detection APIs", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lists source detection targets", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: [
+                {
+                  config: {},
+                  enabled: true,
+                  id: "target-1",
+                  intervalMinutes: 60,
+                  lastCheckedAt: null,
+                  pluginSlug: "radio-onsen",
+                  sourceKind: "podcast",
+                  url: "https://www.onsen.ag",
+                  userId: "user-1",
+                },
+              ],
+            }),
+            { headers: { "content-type": "application/json" }, status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    await expect(listSourceDetectionTargets()).resolves.toEqual([
+      {
+        config: {},
+        enabled: true,
+        id: "target-1",
+        intervalMinutes: 60,
+        lastCheckedAt: null,
+        pluginSlug: "radio-onsen",
+        sourceKind: "podcast",
+        url: "https://www.onsen.ag",
+        userId: "user-1",
+      },
+    ]);
+  });
+
+  it("creates and updates source detection targets", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              config: {},
+              enabled: true,
+              id: "target-1",
+              intervalMinutes: 60,
+              lastCheckedAt: null,
+              pluginSlug: "radio-onsen",
+              sourceKind: "podcast",
+              url: "https://www.onsen.ag",
+              userId: "user-1",
+            },
+          }),
+          { headers: { "content-type": "application/json" }, status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              config: {},
+              enabled: false,
+              id: "target-1",
+              intervalMinutes: 120,
+              lastCheckedAt: null,
+              pluginSlug: "radio-onsen",
+              sourceKind: "podcast",
+              url: "https://www.onsen.ag",
+              userId: "user-1",
+            },
+          }),
+          { headers: { "content-type": "application/json" }, status: 200 },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      createSourceDetectionTarget({
+        pluginSlug: "radio-onsen",
+        sourceKind: "podcast",
+        url: "https://www.onsen.ag",
+      }),
+    ).resolves.toMatchObject({
+      id: "target-1",
+      enabled: true,
+    });
+
+    await expect(
+      updateSourceDetectionTarget("target-1", {
+        enabled: false,
+        intervalMinutes: 120,
+        pluginSlug: "radio-onsen",
+        sourceKind: "podcast",
+        url: "https://www.onsen.ag",
+      }),
+    ).resolves.toMatchObject({
+      id: "target-1",
+      enabled: false,
+      intervalMinutes: 120,
+    });
+  });
+
+  it("lists and updates detected source candidates", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                description: null,
+                firstDetectedAt: "2026-06-10T00:00:00.000Z",
+                id: "candidate-1",
+                lastDetectedAt: "2026-06-10T00:00:00.000Z",
+                normalizedUrl: "https://www.onsen.ag/program/example",
+                pluginSlug: "radio-onsen",
+                resolvedSourceId: null,
+                sourceDetectionTargetId: "target-1",
+                sourceKind: "podcast",
+                sourceSlug: "example",
+                status: "detected",
+                title: "Example",
+                userId: "user-1",
+              },
+            ],
+          }),
+          { headers: { "content-type": "application/json" }, status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              description: null,
+              firstDetectedAt: "2026-06-10T00:00:00.000Z",
+              id: "candidate-1",
+              lastDetectedAt: "2026-06-10T00:05:00.000Z",
+              normalizedUrl: "https://www.onsen.ag/program/example",
+              pluginSlug: "radio-onsen",
+              resolvedSourceId: null,
+              sourceDetectionTargetId: "target-1",
+              sourceKind: "podcast",
+              sourceSlug: "example",
+              status: "dismissed",
+              title: "Example",
+              userId: "user-1",
+            },
+          }),
+          { headers: { "content-type": "application/json" }, status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              description: null,
+              firstDetectedAt: "2026-06-10T00:00:00.000Z",
+              id: "candidate-1",
+              lastDetectedAt: "2026-06-10T00:10:00.000Z",
+              normalizedUrl: "https://www.onsen.ag/program/example",
+              pluginSlug: "radio-onsen",
+              resolvedSourceId: "source-1",
+              sourceDetectionTargetId: "target-1",
+              sourceKind: "podcast",
+              sourceSlug: "example",
+              status: "registered",
+              title: "Example",
+              userId: "user-1",
+            },
+          }),
+          { headers: { "content-type": "application/json" }, status: 200 },
+        ),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listDetectedSourceCandidates()).resolves.toHaveLength(1);
+    await expect(dismissDetectedSourceCandidate("candidate-1")).resolves.toMatchObject({
+      status: "dismissed",
+    });
+    await expect(registerDetectedSourceCandidate("candidate-1")).resolves.toMatchObject({
+      status: "registered",
+      resolvedSourceId: "source-1",
     });
   });
 });
