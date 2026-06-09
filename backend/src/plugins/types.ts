@@ -17,6 +17,8 @@ export type {
   SavePluginGlobalRuntimeStateInput,
   SavePluginGlobalRuntimeStateResult,
   SourceCollectorAcquireInput,
+  SourceCollectorDetectSourcesInput,
+  SourceCollectorDetectSourcesResult,
   SourceCollectorDiscoverInput,
   SourceCollectorDiscoverResult,
   SourceCollectorExecutionContext,

@@ -36,7 +36,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/geshi-sdk/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-go-jp-rss/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-sample-streaming/tsconfig.json && vue-tsc --noEmit -p frontend/tsconfig.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/geshi-sdk/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-go-jp-rss/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-onsen/tsconfig.json && tsc --noEmit -p packages/geshi-plugin-sample-streaming/tsconfig.json && vue-tsc --noEmit -p frontend/tsconfig.json",
     "precommit": "npm run format && npm run lint -- --fix && npm run typecheck && npm run test"
   },
   "engines": {
@@ -65,6 +65,7 @@
   },
   "dependencies": {
     "@geshi/plugin-go-jp-rss": "file:packages/geshi-plugin-go-jp-rss",
+    "@geshi/plugin-onsen": "file:packages/geshi-plugin-onsen",
     "@geshi/plugin-sample-streaming": "file:packages/geshi-plugin-sample-streaming",
     "@geshi/sdk": "file:packages/geshi-sdk",
     "@hono/node-server": "^2.0.4",
