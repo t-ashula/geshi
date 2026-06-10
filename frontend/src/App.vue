@@ -2958,13 +2958,6 @@ function normalizeCollectorSettingFormValue(
                 <p class="eyebrow">Source settings</p>
                 <h3>{{ selectedSource.title ?? selectedSource.slug }}</h3>
               </div>
-              <p class="source-settings-summary">
-                {{
-                  selectedSource.periodicCrawlEnabled
-                    ? `Auto crawl every ${selectedSource.periodicCrawlIntervalMinutes} minutes`
-                    : "Auto crawl disabled"
-                }}
-              </p>
             </div>
 
             <p v-if="sourceCrawlErrorMessage" class="feedback error">
