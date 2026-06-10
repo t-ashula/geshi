@@ -201,7 +201,9 @@ const selectedSource = computed(
 );
 
 const availableSourceDetectionPlugins = computed(() =>
-  sourceCollectorPlugins.value.filter((plugin) => plugin.status === "available"),
+  sourceCollectorPlugins.value.filter(
+    (plugin) => plugin.status === "available",
+  ),
 );
 
 const selectedContentId = computed(() =>
@@ -2203,7 +2205,10 @@ function normalizeCollectorSettingFormValue(
       </div>
 
       <template v-else>
-        <form class="settings-grid" @submit.prevent="submitSourceDetectionTarget">
+        <form
+          class="settings-grid"
+          @submit.prevent="submitSourceDetectionTarget"
+        >
           <label>
             <span>Plugin</span>
             <select v-model="sourceDetectionTargetForm.pluginSlug">
@@ -2247,7 +2252,10 @@ function normalizeCollectorSettingFormValue(
 
           <label class="toggle-field">
             <span>Enabled</span>
-            <input v-model="sourceDetectionTargetForm.enabled" type="checkbox" />
+            <input
+              v-model="sourceDetectionTargetForm.enabled"
+              type="checkbox"
+            />
           </label>
 
           <div class="actions">
@@ -2322,10 +2330,7 @@ function normalizeCollectorSettingFormValue(
             </div>
           </div>
 
-          <div
-            v-if="detectedSourceCandidates.length === 0"
-            class="empty-state"
-          >
+          <div v-if="detectedSourceCandidates.length === 0" class="empty-state">
             No detected source candidates.
           </div>
 
@@ -2352,8 +2357,8 @@ function normalizeCollectorSettingFormValue(
                 {{ candidate.description }}
               </span>
               <span class="candidate-option-meta">
-                First detected: {{ formatDate(candidate.firstDetectedAt) }} · Last
-                detected: {{ formatDate(candidate.lastDetectedAt) }}
+                First detected: {{ formatDate(candidate.firstDetectedAt) }} ·
+                Last detected: {{ formatDate(candidate.lastDetectedAt) }}
               </span>
               <div class="actions">
                 <button

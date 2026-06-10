@@ -6,8 +6,8 @@ import type { AppSettingService } from "../../src/service/app-setting-service.js
 import type { AssetService } from "../../src/service/asset-service.js";
 import type { ContentService } from "../../src/service/content-service.js";
 import type { JobService } from "../../src/service/job-service.js";
-import type { SourceDiscoveryService } from "../../src/service/source-discovery-service.js";
 import type { SourceDetectionService } from "../../src/service/source-detection-service.js";
+import type { SourceDiscoveryService } from "../../src/service/source-discovery-service.js";
 import type { SourceInspectService } from "../../src/service/source-inspect-service.js";
 import type { SourceService } from "../../src/service/source-service.js";
 import type { Storage } from "../../src/storage/types.js";

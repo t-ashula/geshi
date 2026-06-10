@@ -3,20 +3,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   assignSourceToCollection,
   createSource,
-  createSourceDetectionTarget,
   createSourceCollection,
-  dismissDetectedSourceCandidate,
+  createSourceDetectionTarget,
   discoverSources,
+  dismissDetectedSourceCandidate,
   getContentDetail,
-  listDetectedSourceCandidates,
-  listSourceDetectionTargets,
   getSourceCollectorSettings,
   inspectSource,
-  registerDetectedSourceCandidate,
+  listDetectedSourceCandidates,
   listSourceCollections,
   listSourceCollectorPlugins,
+  listSourceDetectionTargets,
   listSources,
   previewSource,
+  registerDetectedSourceCandidate,
   unsubscribeSource,
   updateSourceDetectionTarget,
 } from "../src/source-api.js";
@@ -513,10 +513,14 @@ describe("source detection APIs", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(listDetectedSourceCandidates()).resolves.toHaveLength(1);
-    await expect(dismissDetectedSourceCandidate("candidate-1")).resolves.toMatchObject({
+    await expect(
+      dismissDetectedSourceCandidate("candidate-1"),
+    ).resolves.toMatchObject({
       status: "dismissed",
     });
-    await expect(registerDetectedSourceCandidate("candidate-1")).resolves.toMatchObject({
+    await expect(
+      registerDetectedSourceCandidate("candidate-1"),
+    ).resolves.toMatchObject({
       status: "registered",
       resolvedSourceId: "source-1",
     });

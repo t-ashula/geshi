@@ -1,9 +1,9 @@
 import { Pool } from "pg";
 import { v7 as uuidv7 } from "uuid";
 
+import { createDatabaseFromPool } from "../../db/database.js";
 import { JobRepository } from "../../db/job-repository.js";
 import { PluginGlobalRuntimeStateRepository } from "../../db/plugin-global-runtime-state-repository.js";
-import { createDatabaseFromPool } from "../../db/database.js";
 import { SourceDetectionRepository } from "../../db/source-detection-repository.js";
 import {
   createPgBoss,
@@ -108,11 +108,10 @@ async function seedPeriodicSourceDetectionJob(
     PERIODIC_SOURCE_DETECTION_JOB_NAME,
     queuePayload,
   );
-  const attachQueueJobIdResult =
-    await currentJobRepository.attachQueueJobId(
-      createJobResult.value.id,
-      queueJobId,
-    );
+  const attachQueueJobIdResult = await currentJobRepository.attachQueueJobId(
+    createJobResult.value.id,
+    queueJobId,
+  );
 
   if (!attachQueueJobIdResult.ok) {
     throw attachQueueJobIdResult.error;

@@ -2,11 +2,13 @@ import type { Insertable, Kysely, Selectable } from "kysely";
 
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
-import type { JsonObject, SourceCollectorSourceKind } from "../plugins/types.js";
+import type {
+  JsonObject,
+  SourceCollectorSourceKind,
+} from "../plugins/types.js";
 import type {
   DetectedSourceCandidateTable,
   GeshiDatabase,
-  SourceDetectionStateTable,
   SourceDetectionTargetTable,
 } from "./types.js";
 
@@ -150,53 +152,57 @@ export class SourceDetectionRepository {
 
   public async updateSourceDetectionTarget(
     input: UpdateSourceDetectionTargetInput,
-  ): Promise<Result<SourceDetectionTarget | null, SourceDetectionRepositoryError>> {
+  ): Promise<
+    Result<SourceDetectionTarget | null, SourceDetectionRepositoryError>
+  > {
     try {
-      const updatedTarget = await this.database.transaction().execute(async (trx) => {
-        const existingTarget = await trx
-          .selectFrom("source_detection_targets")
-          .selectAll()
-          .where("id", "=", input.id)
-          .executeTakeFirst();
+      const updatedTarget = await this.database
+        .transaction()
+        .execute(async (trx) => {
+          const existingTarget = await trx
+            .selectFrom("source_detection_targets")
+            .selectAll()
+            .where("id", "=", input.id)
+            .executeTakeFirst();
 
-        if (existingTarget === undefined) {
-          return null;
-        }
+          if (existingTarget === undefined) {
+            return null;
+          }
 
-        await trx
-          .updateTable("source_detection_targets")
-          .set({
-            config: input.config ?? existingTarget.config,
-            enabled: input.enabled ?? existingTarget.enabled,
-            interval_minutes:
-              input.intervalMinutes ?? existingTarget.interval_minutes,
-          })
-          .where("id", "=", input.id)
-          .executeTakeFirstOrThrow();
+          await trx
+            .updateTable("source_detection_targets")
+            .set({
+              config: input.config ?? existingTarget.config,
+              enabled: input.enabled ?? existingTarget.enabled,
+              interval_minutes:
+                input.intervalMinutes ?? existingTarget.interval_minutes,
+            })
+            .where("id", "=", input.id)
+            .executeTakeFirstOrThrow();
 
-        const targetWithState = await trx
-          .selectFrom("source_detection_targets")
-          .leftJoin(
-            "source_detection_states",
-            "source_detection_states.source_detection_target_id",
-            "source_detection_targets.id",
-          )
-          .selectAll("source_detection_targets")
-          .select([
-            "source_detection_states.state as state",
-            "source_detection_states.updated_at as state_updated_at",
-          ])
-          .where("source_detection_targets.id", "=", input.id)
-          .executeTakeFirstOrThrow();
+          const targetWithState = await trx
+            .selectFrom("source_detection_targets")
+            .leftJoin(
+              "source_detection_states",
+              "source_detection_states.source_detection_target_id",
+              "source_detection_targets.id",
+            )
+            .selectAll("source_detection_targets")
+            .select([
+              "source_detection_states.state as state",
+              "source_detection_states.updated_at as state_updated_at",
+            ])
+            .where("source_detection_targets.id", "=", input.id)
+            .executeTakeFirstOrThrow();
 
-        return toSourceDetectionTarget(targetWithState, {
-          state:
-            targetWithState.state === undefined
-              ? undefined
-              : (targetWithState.state as JsonObject),
-          updated_at: targetWithState.state_updated_at,
+          return toSourceDetectionTarget(targetWithState, {
+            state:
+              targetWithState.state === undefined
+                ? undefined
+                : (targetWithState.state as JsonObject),
+            updated_at: targetWithState.state_updated_at,
+          });
         });
-      });
 
       return ok(updatedTarget);
     } catch (error) {
@@ -210,7 +216,9 @@ export class SourceDetectionRepository {
 
   public async findDetectedSourceCandidateById(
     candidateId: string,
-  ): Promise<Result<DetectedSourceCandidate | null, SourceDetectionRepositoryError>> {
+  ): Promise<
+    Result<DetectedSourceCandidate | null, SourceDetectionRepositoryError>
+  > {
     try {
       const candidate = await this.database
         .selectFrom("detected_source_candidates")
@@ -218,7 +226,9 @@ export class SourceDetectionRepository {
         .where("id", "=", candidateId)
         .executeTakeFirst();
 
-      return ok(candidate === undefined ? null : toDetectedSourceCandidate(candidate));
+      return ok(
+        candidate === undefined ? null : toDetectedSourceCandidate(candidate),
+      );
     } catch (error) {
       return err(
         error instanceof Error
@@ -232,7 +242,9 @@ export class SourceDetectionRepository {
     candidateId: string,
     status: DetectedSourceCandidateStatus,
     resolvedSourceId?: string | null,
-  ): Promise<Result<DetectedSourceCandidate | null, SourceDetectionRepositoryError>> {
+  ): Promise<
+    Result<DetectedSourceCandidate | null, SourceDetectionRepositoryError>
+  > {
     try {
       const updatedCandidate = await this.database
         .updateTable("detected_source_candidates")
@@ -352,8 +364,9 @@ export class SourceDetectionRepository {
     Result<SavedDetectedSourceCandidate, SourceDetectionRepositoryError>
   > {
     try {
-      const savedCandidate = await this.database.transaction().execute(
-        async (trx) => {
+      const savedCandidate = await this.database
+        .transaction()
+        .execute(async (trx) => {
           const existingCandidate = await trx
             .selectFrom("detected_source_candidates")
             .selectAll()
@@ -397,8 +410,7 @@ export class SourceDetectionRepository {
             id: updatedCandidate.id,
             status: updatedCandidate.status,
           };
-        },
-      );
+        });
 
       return ok(savedCandidate);
     } catch (error) {
@@ -492,7 +504,7 @@ function toSourceDetectionTarget(
     lastCheckedAt: target.last_checked_at,
     pluginSlug: target.plugin_slug,
     sourceKind: target.source_kind,
-    state: (state?.state as JsonObject | undefined) ?? undefined,
+    state: state?.state ?? undefined,
     url: target.url,
     userId: target.user_id,
   };

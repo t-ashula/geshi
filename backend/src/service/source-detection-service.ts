@@ -52,7 +52,9 @@ export interface SourceDetectionService {
   detectSourceTarget(
     target: SourceDetectionTarget,
   ): Promise<Result<DetectSourceTargetResult, Error>>;
-  listDetectedSourceCandidates(): Promise<Result<DetectedSourceCandidate[], Error>>;
+  listDetectedSourceCandidates(): Promise<
+    Result<DetectedSourceCandidate[], Error>
+  >;
   listTargets(): Promise<Result<SourceDetectionTarget[], Error>>;
   registerDetectedSourceCandidate(
     candidateId: string,
@@ -74,16 +76,17 @@ export function createSourceDetectionService(
   sourceDetectionRepository: SourceDetectionRepository,
   sourceServiceOrDependencies:
     | SourceService
-    | (CreateSourceDetectionServiceDependencies & { sourceService?: SourceService }) = {},
+    | (CreateSourceDetectionServiceDependencies & {
+        sourceService?: SourceService;
+      }) = {},
   maybeDependencies: CreateSourceDetectionServiceDependencies = {},
 ): SourceDetectionService {
-  const dependencies =
-    isSourceService(sourceServiceOrDependencies)
-      ? {
-          ...maybeDependencies,
-          sourceService: sourceServiceOrDependencies,
-        }
-      : sourceServiceOrDependencies;
+  const dependencies = isSourceService(sourceServiceOrDependencies)
+    ? {
+        ...maybeDependencies,
+        sourceService: sourceServiceOrDependencies,
+      }
+    : sourceServiceOrDependencies;
   const logger =
     dependencies.logger ??
     createLogger({
@@ -132,12 +135,13 @@ export function createSourceDetectionService(
     async updateSourceDetectionTarget(
       request: UpdateSourceDetectionTargetRequest,
     ): Promise<Result<SourceDetectionTarget, Error>> {
-      const result = await sourceDetectionRepository.updateSourceDetectionTarget({
-        config: request.config,
-        enabled: request.enabled,
-        id: request.id,
-        intervalMinutes: request.intervalMinutes,
-      } satisfies UpdateSourceDetectionTargetInput);
+      const result =
+        await sourceDetectionRepository.updateSourceDetectionTarget({
+          config: request.config,
+          enabled: request.enabled,
+          id: request.id,
+          intervalMinutes: request.intervalMinutes,
+        } satisfies UpdateSourceDetectionTargetInput);
 
       if (!result.ok) {
         return result;
@@ -164,7 +168,9 @@ export function createSourceDetectionService(
       candidateId: string,
     ): Promise<Result<DetectedSourceCandidate, Error>> {
       if (sourceService === undefined) {
-        return err(new Error("Source service is required to register candidates."));
+        return err(
+          new Error("Source service is required to register candidates."),
+        );
       }
 
       const candidateResult =
@@ -241,7 +247,9 @@ export function createSourceDetectionService(
       const plugin = sourceCollectorRegistry.get(target.pluginSlug);
 
       if (plugin.detectSources === undefined) {
-        detectionLogger.warn("source detection skipped for plugin without API.");
+        detectionLogger.warn(
+          "source detection skipped for plugin without API.",
+        );
         return ok({
           detectedCount: 0,
           duplicateCount: 0,
@@ -401,7 +409,9 @@ async function updateCandidateStatus(
   return ok(result.value);
 }
 
-function toCreateSourceRequest(candidate: DetectedSourceCandidate): CreateSourceRequest {
+function toCreateSourceRequest(
+  candidate: DetectedSourceCandidate,
+): CreateSourceRequest {
   return {
     description: candidate.description ?? undefined,
     pluginSlug: candidate.pluginSlug,

@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createDismissDetectedSourceCandidateEndpoint,
   createCreateSourceDetectionTargetEndpoint,
+  createDismissDetectedSourceCandidateEndpoint,
   createGetPeriodicCrawlSettingsEndpoint,
   createGetPluginGlobalSettingsEndpoint,
   createListDetectedSourceCandidatesEndpoint,
   createListSourceDetectionTargetsEndpoint,
-  createPatchSourceDetectionTargetEndpoint,
   createPatchPeriodicCrawlSettingsEndpoint,
   createPatchPluginGlobalSettingsEndpoint,
+  createPatchSourceDetectionTargetEndpoint,
   createRegisterDetectedSourceCandidateEndpoint,
 } from "../../src/endpoints/api/v1/settings.js";
 import { ok } from "../../src/lib/result.js";

@@ -8,16 +8,16 @@ import type {
   PatchPluginGlobalSettingsInput,
 } from "../../../endpoints/api/v1/settings.js";
 import {
-  createDismissDetectedSourceCandidateEndpoint,
   createCreateSourceDetectionTargetEndpoint,
-  createListDetectedSourceCandidatesEndpoint,
-  createListSourceDetectionTargetsEndpoint,
-  createPatchSourceDetectionTargetEndpoint,
-  createRegisterDetectedSourceCandidateEndpoint,
+  createDismissDetectedSourceCandidateEndpoint,
   createGetPeriodicCrawlSettingsEndpoint,
   createGetPluginGlobalSettingsEndpoint,
+  createListDetectedSourceCandidatesEndpoint,
+  createListSourceDetectionTargetsEndpoint,
   createPatchPeriodicCrawlSettingsEndpoint,
   createPatchPluginGlobalSettingsEndpoint,
+  createPatchSourceDetectionTargetEndpoint,
+  createRegisterDetectedSourceCandidateEndpoint,
 } from "../../../endpoints/api/v1/settings.js";
 import type { Result } from "../../../lib/result.js";
 import { err, ok } from "../../../lib/result.js";
@@ -409,6 +409,8 @@ function isJsonObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function isSourceKind(value: unknown): value is "feed" | "podcast" | "streaming" {
+function isSourceKind(
+  value: unknown,
+): value is "feed" | "podcast" | "streaming" {
   return value === "feed" || value === "podcast" || value === "streaming";
 }

@@ -37,7 +37,8 @@ export async function handlePeriodicSourceDetectionJob(
 
   logger.info("periodic source detection job started.");
 
-  const targetsResult = await dependencies.sourceDetectionService.listEnabledTargets();
+  const targetsResult =
+    await dependencies.sourceDetectionService.listEnabledTargets();
 
   if (!targetsResult.ok) {
     return failPeriodicSourceDetectionJob(

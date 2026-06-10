@@ -1,12 +1,12 @@
 import { PluginGlobalRuntimeStateVersionConflictError } from "../../../db/plugin-global-runtime-state-repository.js";
-import type { AppDependencies } from "../../../deps.js";
-import type { Result } from "../../../lib/result.js";
-import { err } from "../../../lib/result.js";
-import type { JsonObject } from "../../../plugins/types.js";
 import type {
   DetectedSourceCandidate,
   SourceDetectionTarget,
 } from "../../../db/source-detection-repository.js";
+import type { AppDependencies } from "../../../deps.js";
+import type { Result } from "../../../lib/result.js";
+import { err } from "../../../lib/result.js";
+import type { JsonObject } from "../../../plugins/types.js";
 import type { PeriodicCrawlAppSettings } from "../../../service/periodic-crawl-settings.js";
 import type { PluginGlobalSettingsDetail } from "../../../service/plugin-global-settings-service.js";
 import type { SourceCollectorSettingValue } from "../../../service/source-service.js";
@@ -179,7 +179,8 @@ export function createListSourceDetectionTargetsEndpoint(
   return async (): Promise<
     Result<SourceDetectionTarget[], SourceDetectionTargetEndpointError>
   > => {
-    const result = await dependencies.sourceDetectionService.listEnabledTargets();
+    const result =
+      await dependencies.sourceDetectionService.listEnabledTargets();
 
     if (!result.ok) {
       return err({
@@ -221,7 +222,9 @@ export function createPatchSourceDetectionTargetEndpoint(
 ) {
   return async (
     input: CreateSourceDetectionTargetInput & { id: string },
-  ): Promise<Result<SourceDetectionTarget, SourceDetectionTargetEndpointError>> => {
+  ): Promise<
+    Result<SourceDetectionTarget, SourceDetectionTargetEndpointError>
+  > => {
     const result =
       await dependencies.sourceDetectionService.updateSourceDetectionTarget(
         input,
@@ -263,7 +266,9 @@ export function createDismissDetectedSourceCandidateEndpoint(
 ) {
   return async (
     candidateId: string,
-  ): Promise<Result<DetectedSourceCandidate, SourceDetectionTargetEndpointError>> => {
+  ): Promise<
+    Result<DetectedSourceCandidate, SourceDetectionTargetEndpointError>
+  > => {
     const result =
       await dependencies.sourceDetectionService.dismissDetectedSourceCandidate(
         candidateId,
@@ -285,7 +290,9 @@ export function createRegisterDetectedSourceCandidateEndpoint(
 ) {
   return async (
     candidateId: string,
-  ): Promise<Result<DetectedSourceCandidate, SourceDetectionTargetEndpointError>> => {
+  ): Promise<
+    Result<DetectedSourceCandidate, SourceDetectionTargetEndpointError>
+  > => {
     const result =
       await dependencies.sourceDetectionService.registerDetectedSourceCandidate(
         candidateId,

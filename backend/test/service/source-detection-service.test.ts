@@ -7,32 +7,41 @@ import { assertOk } from "../support/result.js";
 
 describe("source detection service", () => {
   it("detects, deduplicates, and stores source candidates", async () => {
-    const detectSources = vi.fn(() =>
-      Promise.resolve({
-        candidates: [
-          {
-            description: "Description 1",
-            sourceSlug: "show-1",
-            title: "Show 1",
-            url: "https://example.com/program/show-1",
-          },
-          {
-            description: "Description 1 duplicate",
-            sourceSlug: "show-1",
-            title: "Show 1",
-            url: "https://example.com/program/show-1",
-          },
-          {
-            description: "Description 2",
-            sourceSlug: "show-2",
-            title: "Show 2",
-            url: "https://example.com/program/show-2",
-          },
-        ],
-        detectorState: {
-          cursor: "next-page",
+    const detectSources = vi.fn(
+      (
+        _input: {
+          abortSignal: AbortSignal;
+          config: Record<string, unknown>;
+          detectorState?: Record<string, unknown>;
+          inputUrl: string;
         },
-      }),
+        _runtime: unknown,
+      ) =>
+        Promise.resolve({
+          candidates: [
+            {
+              description: "Description 1",
+              sourceSlug: "show-1",
+              title: "Show 1",
+              url: "https://example.com/program/show-1",
+            },
+            {
+              description: "Description 1 duplicate",
+              sourceSlug: "show-1",
+              title: "Show 1",
+              url: "https://example.com/program/show-1",
+            },
+            {
+              description: "Description 2",
+              sourceSlug: "show-2",
+              title: "Show 2",
+              url: "https://example.com/program/show-2",
+            },
+          ],
+          detectorState: {
+            cursor: "next-page",
+          },
+        }),
     );
     const findExistingSourceIdByUrl = vi
       .fn()
@@ -98,17 +107,18 @@ describe("source detection service", () => {
       duplicateCount: 1,
       processedCount: 2,
     });
-    expect(detectSources).toHaveBeenCalledWith(
-      {
-        abortSignal: expect.any(AbortSignal),
-        config: {},
-        detectorState: {
-          cursor: "current-page",
-        },
-        inputUrl: "https://www.onsen.ag",
+    expect(detectSources).toHaveBeenCalledTimes(1);
+    const [detectInput] = detectSources.mock.calls[0] ?? [];
+
+    expect(detectInput).toBeDefined();
+    expect(detectInput?.abortSignal).toBeInstanceOf(AbortSignal);
+    expect(detectInput).toMatchObject({
+      config: {},
+      detectorState: {
+        cursor: "current-page",
       },
-      expect.any(Object),
-    );
+      inputUrl: "https://www.onsen.ag",
+    });
     expect(saveDetectedSourceCandidate).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
