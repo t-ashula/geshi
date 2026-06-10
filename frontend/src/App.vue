@@ -2972,6 +2972,11 @@ function normalizeCollectorSettingFormValue(
             </p>
 
             <div class="source-settings-grid">
+              <label class="source-settings-wide">
+                <span>Source URL</span>
+                <input :value="selectedSource.url" readonly type="url" />
+              </label>
+
               <label class="toggle-field">
                 <span>Enabled</span>
                 <input v-model="sourceCrawlForm.enabled" type="checkbox" />

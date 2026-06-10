@@ -667,6 +667,10 @@ h3 {
   align-items: end;
 }
 
+.source-settings-wide {
+  grid-column: 1 / -1;
+}
+
 .detail-card {
   display: grid;
   align-content: start;
