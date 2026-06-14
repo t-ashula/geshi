@@ -309,7 +309,7 @@ export class JobRepository {
           sql<boolean>`exists (
             select 1
             from pgboss.job as queue_job
-            where queue_job.id = jobs.queue_job_id
+            where queue_job.id::text = jobs.queue_job_id
               and queue_job.state in ('created', 'retry', 'active')
           )`.as("queue_job_is_active"),
           sql<string | null>`jobs.payload -> 'source' ->> 'id'`.as("source_id"),
@@ -388,7 +388,7 @@ export class JobRepository {
             sql<boolean>`not exists (
               select 1
               from pgboss.job as queue_job
-              where queue_job.id = jobs.queue_job_id
+              where queue_job.id::text = jobs.queue_job_id
                 and queue_job.state in ('created', 'retry', 'active')
             )`,
             "=",
