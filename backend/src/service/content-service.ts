@@ -1,7 +1,7 @@
 import type {
   AcquireTargetContent,
-  ContentListPage,
   ContentDetailItem,
+  ContentListPage,
   ContentRepository,
   ContentRepositoryError,
   CreateObservedContentResult,

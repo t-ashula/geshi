@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 
-import type { AppDependencies } from "../../../deps.js";
 import type { ListContentsInput } from "../../../db/content-repository.js";
+import type { AppDependencies } from "../../../deps.js";
 import {
   createGetContentDetailEndpoint,
   createListContentsEndpoint,

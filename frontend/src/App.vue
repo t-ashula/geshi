@@ -1868,7 +1868,8 @@ function compareContentListItems(
   }
 
   const collectedAtDifference =
-    new Date(right.collectedAt).getTime() - new Date(left.collectedAt).getTime();
+    new Date(right.collectedAt).getTime() -
+    new Date(left.collectedAt).getTime();
 
   if (collectedAtDifference !== 0) {
     return collectedAtDifference;
@@ -3126,10 +3127,7 @@ function normalizeCollectorSettingFormValue(
               </li>
             </ul>
 
-            <div
-              v-if="nextContentsCursor !== null"
-              class="load-more-actions"
-            >
+            <div v-if="nextContentsCursor !== null" class="load-more-actions">
               <button
                 type="button"
                 class="secondary-button"
