@@ -224,6 +224,17 @@ const visibleContents = computed(() => {
   return [...filteredContents].sort(compareContentListItems);
 });
 
+const visibleContentCount = computed(() => {
+  if (selectedSource.value !== null) {
+    return selectedSource.value.contentCount;
+  }
+
+  return sources.value.reduce(
+    (total, source) => total + source.contentCount,
+    0,
+  );
+});
+
 const sortedSourceCollections = computed(() =>
   [...sourceCollections.value].sort((left, right) => {
     if (left.position !== right.position) {
@@ -2040,7 +2051,7 @@ function normalizeCollectorSettingFormValue(
           }}
         </h1>
         <p class="workspace-summary">
-          {{ sources.length }} sources · {{ contents.length }} entries
+          {{ sources.length }} sources · {{ visibleContentCount }} entries
           <template v-if="selectedSource !== null">
             · focused on {{ selectedSource.title ?? selectedSource.slug }}
           </template>
@@ -2893,7 +2904,7 @@ function normalizeCollectorSettingFormValue(
                 }}
               </p>
             </div>
-            <span class="pane-count">{{ visibleContents.length }}</span>
+            <span class="pane-count">{{ visibleContentCount }}</span>
             <div class="pane-actions">
               <button
                 type="button"

@@ -79,6 +79,7 @@ export type ApiError = {
 export type SourceListItem = {
   collectionId: string | null;
   collectorSettingsVersion: number | null;
+  contentCount: number;
   periodicCrawlEnabled: boolean;
   periodicCrawlIntervalMinutes: number;
   createdAt: string;

@@ -37,6 +37,7 @@ describe("listSources", () => {
               data: [
                 {
                   collectorSettingsVersion: 1,
+                  contentCount: 12,
                   createdAt: "2026-06-02T00:00:00.000Z",
                   description: "Weekly notes",
                   id: "source-1",
@@ -69,6 +70,7 @@ describe("listSources", () => {
     await expect(listSources()).resolves.toEqual([
       {
         collectorSettingsVersion: 1,
+        contentCount: 12,
         createdAt: "2026-06-02T00:00:00.000Z",
         description: "Weekly notes",
         id: "source-1",
@@ -229,6 +231,7 @@ describe("createSource", () => {
           JSON.stringify({
             data: {
               collectorSettingsVersion: 1,
+              contentCount: 0,
               createdAt: "2026-06-02T00:00:00.000Z",
               description: "Weekly notes",
               id: "source-1",
@@ -266,6 +269,7 @@ describe("createSource", () => {
       }),
     ).resolves.toEqual({
       collectorSettingsVersion: 1,
+      contentCount: 0,
       createdAt: "2026-06-02T00:00:00.000Z",
       description: "Weekly notes",
       id: "source-1",
@@ -353,6 +357,7 @@ describe("assignSourceToCollection", () => {
             JSON.stringify({
               data: {
                 collectorSettingsVersion: 1,
+                contentCount: 0,
                 createdAt: "2026-06-02T00:00:00.000Z",
                 description: "Weekly notes",
                 id: "source-1",
@@ -388,6 +393,7 @@ describe("assignSourceToCollection", () => {
       }),
     ).resolves.toEqual({
       collectorSettingsVersion: 1,
+      contentCount: 0,
       createdAt: "2026-06-02T00:00:00.000Z",
       description: "Weekly notes",
       id: "source-1",
