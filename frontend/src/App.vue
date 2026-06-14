@@ -378,6 +378,10 @@ watch(
   { immediate: true },
 );
 
+watch(selectedSourceSlug, () => {
+  void refreshContents();
+});
+
 watch(
   [selectedSourceSlug, selectedContentId, activeBrowsePane],
   async () => {
@@ -1263,6 +1267,7 @@ async function refreshContents(): Promise<void> {
   try {
     const page = await listContents({
       limit: CONTENTS_PAGE_SIZE,
+      sourceSlug: selectedSourceSlug.value ?? undefined,
     });
 
     contents.value = page.items;
@@ -1286,6 +1291,7 @@ async function loadMoreContents(): Promise<void> {
     const page = await listContents({
       cursor: nextContentsCursor.value,
       limit: CONTENTS_PAGE_SIZE,
+      sourceSlug: selectedSourceSlug.value ?? undefined,
     });
 
     contents.value = [...contents.value, ...page.items];

@@ -175,7 +175,11 @@ describe("listContents", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(
-      listContents({ cursor: "cursor-0", limit: 25 }),
+      listContents({
+        cursor: "cursor-0",
+        limit: 25,
+        sourceSlug: "example-feed",
+      }),
     ).resolves.toEqual({
       items: [
         {
@@ -193,7 +197,7 @@ describe("listContents", () => {
       nextCursor: "cursor-1",
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/v1/contents?cursor=cursor-0&limit=25",
+      "/api/v1/contents?cursor=cursor-0&limit=25&sourceSlug=example-feed",
     );
   });
 

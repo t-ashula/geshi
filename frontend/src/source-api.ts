@@ -620,6 +620,7 @@ export async function getJob(jobId: string): Promise<JobListItem> {
 export async function listContents(request?: {
   cursor?: string;
   limit?: number;
+  sourceSlug?: string;
 }): Promise<ContentListPage> {
   const params = new URLSearchParams();
 
@@ -629,6 +630,10 @@ export async function listContents(request?: {
 
   if (request?.limit !== undefined) {
     params.set("limit", String(request.limit));
+  }
+
+  if (request?.sourceSlug !== undefined) {
+    params.set("sourceSlug", request.sourceSlug);
   }
 
   const query = params.toString();

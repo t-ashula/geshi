@@ -117,4 +117,31 @@ describe("createApp", () => {
       },
     });
   });
+
+  it("passes source slug filters to the content list endpoint", async () => {
+    const listContents = vi.fn(() =>
+      Promise.resolve({
+        items: [],
+        nextCursor: null,
+      }),
+    );
+    const app = createApp(
+      createTestAppDependencies({
+        contentService: {
+          findContentDetail: vi.fn(),
+          listContents,
+        } as never,
+      }),
+    );
+
+    const response = await app.request(
+      "/api/v1/contents?limit=5&sourceSlug=example-feed",
+    );
+
+    expect(response.status).toBe(200);
+    expect(listContents).toHaveBeenCalledWith({
+      limit: 5,
+      sourceSlug: "example-feed",
+    });
+  });
 });

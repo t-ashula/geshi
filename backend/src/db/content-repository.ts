@@ -57,6 +57,7 @@ export type ContentListPage = {
 export type ListContentsInput = {
   cursor?: string;
   limit: number;
+  sourceSlug?: string;
 };
 
 export type ContentDetailItem = {
@@ -286,6 +287,7 @@ export class ContentRepository {
   public async listContents({
     cursor,
     limit,
+    sourceSlug,
   }: ListContentsInput): Promise<ContentListPage> {
     const latestContentSnapshots = latestContentSnapshotsQuery(this.database);
     const cursorKey =
@@ -310,6 +312,10 @@ export class ContentRepository {
         "latest_content_snapshots.title",
         "sources.slug as source_slug",
       ]);
+
+    if (sourceSlug !== undefined) {
+      query = query.where("sources.slug", "=", sourceSlug);
+    }
 
     if (cursorKey !== null) {
       query = query.where(

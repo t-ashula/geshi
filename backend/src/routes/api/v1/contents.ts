@@ -20,6 +20,7 @@ export function createContentRoutes(dependencies: AppDependencies): Hono {
     const input = toListContentsInput(
       context.req.query("cursor"),
       context.req.query("limit"),
+      context.req.query("sourceSlug"),
     );
 
     if (!input.ok) {
@@ -134,6 +135,7 @@ const MAX_CONTENTS_LIMIT = 100;
 function toListContentsInput(
   cursor: string | undefined,
   limit: string | undefined,
+  sourceSlug: string | undefined,
 ):
   | { ok: true; value: ListContentsInput }
   | {
@@ -146,6 +148,7 @@ function toListContentsInput(
       value: {
         cursor,
         limit: DEFAULT_CONTENTS_LIMIT,
+        sourceSlug,
       },
     };
   }
@@ -181,6 +184,7 @@ function toListContentsInput(
     value: {
       cursor,
       limit: parsedLimit,
+      sourceSlug,
     },
   };
 }
