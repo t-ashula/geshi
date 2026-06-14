@@ -1060,7 +1060,7 @@ function toJoinedSourceListItem(source: {
   created_at: Date;
   description: string | null;
   enabled: boolean | null;
-  content_count: number;
+  content_count: number | string;
   id: string;
   kind: SourceCollectorSourceKind;
   periodical_interval_minutes: number | null;
@@ -1077,7 +1077,7 @@ function toJoinedSourceListItem(source: {
   return {
     collectionId: source.collection_id,
     collectorSettingsVersion: source.collector_settings_version,
-    contentCount: source.content_count,
+    contentCount: toCountNumber(source.content_count),
     periodicCrawlEnabled: source.enabled ?? false,
     periodicCrawlIntervalMinutes:
       source.periodical_interval_minutes ??
@@ -1106,9 +1106,19 @@ function toCollectionListItem(
     id: collection.id,
     parentCollectionId: collection.parent_collection_id,
     position: collection.position,
-    sourceCount,
+    sourceCount: toCountNumber(sourceCount),
     title: collection.title,
   };
+}
+
+function toCountNumber(value: number | string): number {
+  const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return parsed;
 }
 
 async function findSourceListItemBySubscriptionId(

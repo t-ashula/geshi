@@ -226,11 +226,11 @@ const visibleContents = computed(() => {
 
 const visibleContentCount = computed(() => {
   if (selectedSource.value !== null) {
-    return selectedSource.value.contentCount;
+    return Number(selectedSource.value.contentCount) || 0;
   }
 
   return sources.value.reduce(
-    (total, source) => total + source.contentCount,
+    (total, source) => total + (Number(source.contentCount) || 0),
     0,
   );
 });
