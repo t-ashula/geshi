@@ -72,3 +72,5 @@
 - [ADR-0069: source 整理機能に先立って user を所有主体として導入する](./0069-user-as-ownership-root.md)
 - [ADR-0070: source collector plugin に継続的な source 検知 API を追加する](./0070-source-collector-source-detection-api.md)
 - [ADR-0071: 新規 source 候補を定期検知する worker を導入する](./0071-periodic-source-detection-worker.md)
+- [ADR-0072: 途中で停止した source crawl を検知して回復する](./0072-missing-queue-job-reconciliation.md)
+- [ADR-0073: entry 一覧 API は cursor ベースのページングを持つ](./0073-entry-list-pagination.md)
