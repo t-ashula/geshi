@@ -649,15 +649,7 @@ h3 {
 .source-settings-panel-header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 16px;
-}
-
-.source-settings-summary {
-  margin: 0;
-  color: var(--color-text-soft);
-  font-size: 0.82rem;
-  text-align: right;
 }
 
 .source-settings-grid {
@@ -665,6 +657,10 @@ h3 {
   grid-template-columns: minmax(180px, 220px) minmax(180px, 220px) 1fr;
   gap: 12px;
   align-items: end;
+}
+
+.source-settings-wide {
+  grid-column: 1 / -1;
 }
 
 .detail-card {

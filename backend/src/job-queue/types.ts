@@ -3,6 +3,7 @@ import type { SourceCollectorSourceKind } from "../plugins/types.js";
 export const OBSERVE_SOURCE_JOB_NAME = "observe-source";
 export const ACQUIRE_CONTENT_JOB_NAME = "acquire-content";
 export const PERIODIC_CRAWL_JOB_NAME = "periodic-crawl";
+export const PERIODIC_SOURCE_DETECTION_JOB_NAME = "periodic-source-detection";
 export const RECORDING_SCHEDULER_JOB_NAME = "recording-scheduler";
 export const RECORD_CONTENT_JOB_NAME = "record-content";
 export const TRANSCRIPT_SPLIT_JOB_NAME = "transcript-split";
@@ -58,6 +59,10 @@ export type PeriodicCrawlJobPayload = {
   jobId: string;
 };
 
+export type PeriodicSourceDetectionJobPayload = {
+  jobId: string;
+};
+
 export type RecordingSchedulerJobPayload = {
   jobId: string;
 };
@@ -110,6 +115,7 @@ export type JobPayload =
   | ObserveSourceJobPayload
   | AcquireContentJobPayload
   | PeriodicCrawlJobPayload
+  | PeriodicSourceDetectionJobPayload
   | RecordingSchedulerJobPayload
   | RecordContentJobPayload
   | TranscriptChunkJobPayload

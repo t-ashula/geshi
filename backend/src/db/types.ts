@@ -116,6 +116,46 @@ export type PluginGlobalRuntimeStateSnapshotTable = {
   version: number;
 };
 
+export type SourceDetectionTargetTable = {
+  config: JsonColumn;
+  created_at: TimestampColumn;
+  enabled: GeneratedBooleanColumn;
+  id: string;
+  interval_minutes: NumberColumn;
+  last_checked_at: NullableTimestampColumn;
+  plugin_slug: string;
+  source_kind: "feed" | "podcast" | "streaming";
+  url: string;
+  user_id: string;
+};
+
+export type SourceDetectionStateTable = {
+  created_at: TimestampColumn;
+  id: string;
+  plugin_slug: string;
+  source_detection_target_id: string;
+  state: JsonColumn;
+  updated_at: TimestampColumn;
+};
+
+export type DetectedSourceCandidateTable = {
+  created_at: TimestampColumn;
+  description: string | null;
+  fingerprint: string;
+  first_detected_at: TimestampColumn;
+  id: string;
+  last_detected_at: TimestampColumn;
+  normalized_url: string;
+  plugin_slug: string;
+  resolved_source_id: string | null;
+  source_detection_target_id: string;
+  source_kind: "feed" | "podcast" | "streaming";
+  source_slug: string;
+  status: "detected" | "previewed" | "registered" | "dismissed" | "duplicate";
+  title: string | null;
+  user_id: string;
+};
+
 export type AppSettingTable = {
   created_at: TimestampColumn;
   id: string;
@@ -247,10 +287,13 @@ export type GeshiDatabase = {
   collections: CollectionTable;
   content_snapshots: ContentSnapshotTable;
   contents: ContentTable;
+  detected_source_candidates: DetectedSourceCandidateTable;
   detail_bodies: DetailBodyTable;
   jobs: JobTable;
   plugin_global_runtime_states: PluginGlobalRuntimeStateTable;
   plugin_global_runtime_state_snapshots: PluginGlobalRuntimeStateSnapshotTable;
+  source_detection_states: SourceDetectionStateTable;
+  source_detection_targets: SourceDetectionTargetTable;
   source_snapshots: SourceSnapshotTable;
   sources: SourceTable;
   subscription_events: SubscriptionEventTable;

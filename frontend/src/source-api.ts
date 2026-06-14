@@ -109,6 +109,44 @@ export type PeriodicCrawlSettings = {
   intervalMinutes: number;
 };
 
+export type SourceDetectionTarget = {
+  config: Record<string, unknown>;
+  enabled: boolean;
+  id: string;
+  intervalMinutes: number;
+  lastCheckedAt: string | null;
+  pluginSlug: string;
+  sourceKind: "feed" | "podcast" | "streaming";
+  state?: Record<string, unknown>;
+  url: string;
+  userId: string;
+};
+
+export type CreateSourceDetectionTargetRequest = {
+  config?: Record<string, unknown>;
+  enabled?: boolean;
+  intervalMinutes?: number;
+  pluginSlug: string;
+  sourceKind: "feed" | "podcast" | "streaming";
+  url: string;
+};
+
+export type DetectedSourceCandidate = {
+  description: string | null;
+  firstDetectedAt: string;
+  id: string;
+  lastDetectedAt: string;
+  normalizedUrl: string;
+  pluginSlug: string;
+  resolvedSourceId: string | null;
+  sourceDetectionTargetId: string;
+  sourceKind: "feed" | "podcast" | "streaming";
+  sourceSlug: string;
+  status: "detected" | "previewed" | "registered" | "dismissed" | "duplicate";
+  title: string | null;
+  userId: string;
+};
+
 export type SourceCollectorSettingsUpdate = PeriodicCrawlSettings & {
   baseVersion: number;
   items?: Array<{
@@ -257,6 +295,18 @@ type TranscriptRequestResponse = {
 
 type JobResponse = {
   data: JobListItem;
+};
+
+type SourceDetectionTargetsResponse = {
+  data: SourceDetectionTarget[];
+};
+
+type SourceDetectionTargetResponse = {
+  data: SourceDetectionTarget;
+};
+
+type DetectedSourceCandidatesResponse = {
+  data: DetectedSourceCandidate[];
 };
 
 type InspectSourceResponse = {
@@ -771,4 +821,144 @@ export async function updatePluginGlobalSettings(
   }
 
   throw new Error("Failed to update plugin global settings.");
+}
+
+export async function listSourceDetectionTargets(): Promise<
+  SourceDetectionTarget[]
+> {
+  const response = await fetch("/api/v1/settings/source-detection/targets");
+  const payload = (await response.json()) as
+    | SourceDetectionTargetsResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to load source detection targets.");
+}
+
+export async function createSourceDetectionTarget(
+  request: CreateSourceDetectionTargetRequest,
+): Promise<SourceDetectionTarget> {
+  const response = await fetch("/api/v1/settings/source-detection/targets", {
+    body: JSON.stringify(request),
+    headers: {
+      "content-type": "application/json",
+    },
+    method: "POST",
+  });
+  const payload = (await response.json()) as
+    | SourceDetectionTargetResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to create source detection target.");
+}
+
+export async function updateSourceDetectionTarget(
+  targetId: string,
+  request: CreateSourceDetectionTargetRequest,
+): Promise<SourceDetectionTarget> {
+  const response = await fetch(
+    `/api/v1/settings/source-detection/targets/${targetId}`,
+    {
+      body: JSON.stringify(request),
+      headers: {
+        "content-type": "application/json",
+      },
+      method: "PATCH",
+    },
+  );
+  const payload = (await response.json()) as
+    | SourceDetectionTargetResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to update source detection target.");
+}
+
+export async function listDetectedSourceCandidates(): Promise<
+  DetectedSourceCandidate[]
+> {
+  const response = await fetch("/api/v1/settings/source-detection/candidates");
+  const payload = (await response.json()) as
+    | DetectedSourceCandidatesResponse
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to load detected source candidates.");
+}
+
+export async function dismissDetectedSourceCandidate(
+  candidateId: string,
+): Promise<DetectedSourceCandidate> {
+  const response = await fetch(
+    `/api/v1/settings/source-detection/candidates/${candidateId}/dismiss`,
+    {
+      method: "POST",
+    },
+  );
+  const payload = (await response.json()) as
+    | { data: DetectedSourceCandidate }
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to dismiss detected source candidate.");
+}
+
+export async function registerDetectedSourceCandidate(
+  candidateId: string,
+): Promise<DetectedSourceCandidate> {
+  const response = await fetch(
+    `/api/v1/settings/source-detection/candidates/${candidateId}/register`,
+    {
+      method: "POST",
+    },
+  );
+  const payload = (await response.json()) as
+    | { data: DetectedSourceCandidate }
+    | ErrorResponse;
+
+  if (!response.ok && "error" in payload) {
+    throw new Error(payload.error.message);
+  }
+
+  if ("data" in payload) {
+    return payload.data;
+  }
+
+  throw new Error("Failed to register detected source candidate.");
 }

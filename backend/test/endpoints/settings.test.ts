@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createCreateSourceDetectionTargetEndpoint,
+  createDismissDetectedSourceCandidateEndpoint,
   createGetPeriodicCrawlSettingsEndpoint,
   createGetPluginGlobalSettingsEndpoint,
+  createListDetectedSourceCandidatesEndpoint,
+  createListSourceDetectionTargetsEndpoint,
   createPatchPeriodicCrawlSettingsEndpoint,
   createPatchPluginGlobalSettingsEndpoint,
+  createPatchSourceDetectionTargetEndpoint,
+  createRegisterDetectedSourceCandidateEndpoint,
 } from "../../src/endpoints/api/v1/settings.js";
 import { ok } from "../../src/lib/result.js";
 import type { AppSettingService } from "../../src/service/app-setting-service.js";
@@ -151,6 +157,160 @@ describe("settings endpoints", () => {
           },
         ],
         pluginSlug: "go-jp-rss",
+      }),
+    );
+  });
+
+  it("returns source detection targets", async () => {
+    const endpoint = createListSourceDetectionTargetsEndpoint(
+      createTestAppDependencies(),
+    );
+
+    await expect(endpoint()).resolves.toEqual(
+      ok([
+        {
+          config: {},
+          enabled: true,
+          id: "target-1",
+          intervalMinutes: 60,
+          lastCheckedAt: null,
+          pluginSlug: "radio-onsen",
+          sourceKind: "podcast",
+          state: undefined,
+          url: "https://www.onsen.ag",
+          userId: "user-1",
+        },
+      ]),
+    );
+  });
+
+  it("creates a source detection target", async () => {
+    const endpoint = createCreateSourceDetectionTargetEndpoint(
+      createTestAppDependencies(),
+    );
+
+    await expect(
+      endpoint({
+        pluginSlug: "radio-onsen",
+        sourceKind: "podcast",
+        url: "https://www.onsen.ag",
+      }),
+    ).resolves.toEqual(
+      ok({
+        config: {},
+        enabled: true,
+        id: "target-1",
+        intervalMinutes: 60,
+        lastCheckedAt: null,
+        pluginSlug: "radio-onsen",
+        sourceKind: "podcast",
+        state: undefined,
+        url: "https://www.onsen.ag",
+        userId: "user-1",
+      }),
+    );
+  });
+
+  it("returns detected source candidates", async () => {
+    const endpoint = createListDetectedSourceCandidatesEndpoint(
+      createTestAppDependencies(),
+    );
+
+    await expect(endpoint()).resolves.toEqual(
+      ok([
+        {
+          description: null,
+          firstDetectedAt: new Date("2026-06-10T00:00:00.000Z"),
+          id: "candidate-1",
+          lastDetectedAt: new Date("2026-06-10T00:00:00.000Z"),
+          normalizedUrl: "https://www.onsen.ag/program/example",
+          pluginSlug: "radio-onsen",
+          resolvedSourceId: null,
+          sourceDetectionTargetId: "target-1",
+          sourceKind: "podcast",
+          sourceSlug: "example",
+          status: "detected",
+          title: "Example",
+          userId: "user-1",
+        },
+      ]),
+    );
+  });
+
+  it("updates a source detection target", async () => {
+    const endpoint = createPatchSourceDetectionTargetEndpoint(
+      createTestAppDependencies(),
+    );
+
+    await expect(
+      endpoint({
+        enabled: false,
+        id: "target-1",
+        intervalMinutes: 120,
+        pluginSlug: "radio-onsen",
+        sourceKind: "podcast",
+        url: "https://www.onsen.ag",
+      }),
+    ).resolves.toEqual(
+      ok({
+        config: {},
+        enabled: false,
+        id: "target-1",
+        intervalMinutes: 120,
+        lastCheckedAt: null,
+        pluginSlug: "radio-onsen",
+        sourceKind: "podcast",
+        state: undefined,
+        url: "https://www.onsen.ag",
+        userId: "user-1",
+      }),
+    );
+  });
+
+  it("dismisses a detected source candidate", async () => {
+    const endpoint = createDismissDetectedSourceCandidateEndpoint(
+      createTestAppDependencies(),
+    );
+
+    await expect(endpoint("candidate-1")).resolves.toEqual(
+      ok({
+        description: null,
+        firstDetectedAt: new Date("2026-06-10T00:00:00.000Z"),
+        id: "candidate-1",
+        lastDetectedAt: new Date("2026-06-10T00:05:00.000Z"),
+        normalizedUrl: "https://www.onsen.ag/program/example",
+        pluginSlug: "radio-onsen",
+        resolvedSourceId: null,
+        sourceDetectionTargetId: "target-1",
+        sourceKind: "podcast",
+        sourceSlug: "example",
+        status: "dismissed",
+        title: "Example",
+        userId: "user-1",
+      }),
+    );
+  });
+
+  it("registers a detected source candidate", async () => {
+    const endpoint = createRegisterDetectedSourceCandidateEndpoint(
+      createTestAppDependencies(),
+    );
+
+    await expect(endpoint("candidate-1")).resolves.toEqual(
+      ok({
+        description: null,
+        firstDetectedAt: new Date("2026-06-10T00:00:00.000Z"),
+        id: "candidate-1",
+        lastDetectedAt: new Date("2026-06-10T00:10:00.000Z"),
+        normalizedUrl: "https://www.onsen.ag/program/example",
+        pluginSlug: "radio-onsen",
+        resolvedSourceId: "source-1",
+        sourceDetectionTargetId: "target-1",
+        sourceKind: "podcast",
+        sourceSlug: "example",
+        status: "registered",
+        title: "Example",
+        userId: "user-1",
       }),
     );
   });

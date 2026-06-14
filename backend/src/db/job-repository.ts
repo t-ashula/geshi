@@ -40,6 +40,15 @@ export type LatestObserveJob = {
   sourceId: string;
 };
 
+export type StaleObserveSourceRecoveryTarget = {
+  crawlIntervalMinutes: number;
+  sourceId: string;
+};
+
+export type RecoveredInfo = {
+  failedJobIds: string[];
+};
+
 export type JobRepositoryError = Error;
 
 export class JobRepository {
@@ -271,6 +280,141 @@ export class JobRepository {
     }
   }
 
+  public async recoverStaleObserveSourceJobs(input: {
+    detectedBy: string;
+    now: Date;
+    targets: StaleObserveSourceRecoveryTarget[];
+  }): Promise<Result<RecoveredInfo, JobRepositoryError>> {
+    const targetBySourceId = new Map(
+      input.targets.map((target) => [target.sourceId, target]),
+    );
+    const sourceIds = [...targetBySourceId.keys()];
+
+    if (sourceIds.length === 0) {
+      return ok({
+        failedJobIds: [],
+      });
+    }
+
+    try {
+      const jobs = await this.database
+        .selectFrom("jobs")
+        .select([
+          "created_at",
+          "id",
+          "metadata",
+          "queue_job_id",
+          "started_at",
+          "status",
+          sql<boolean>`exists (
+            select 1
+            from pgboss.job as queue_job
+            where queue_job.id = jobs.queue_job_id
+              and queue_job.state in ('created', 'retry', 'active')
+          )`.as("queue_job_is_active"),
+          sql<string | null>`jobs.payload -> 'source' ->> 'id'`.as("source_id"),
+        ])
+        .where("kind", "=", "observe-source")
+        .where("status", "in", [
+          "planned",
+          "queued",
+          "running",
+          "succeeded",
+          "failed",
+        ])
+        .where(
+          sql<string | null>`jobs.payload -> 'source' ->> 'id'`,
+          "in",
+          sourceIds,
+        )
+        .orderBy(sql<string | null>`jobs.payload -> 'source' ->> 'id'`, "asc")
+        .orderBy("created_at", "desc")
+        .execute();
+      const latestJobsBySourceId = new Map<string, (typeof jobs)[number]>();
+
+      for (const job of jobs) {
+        if (job.source_id === null || latestJobsBySourceId.has(job.source_id)) {
+          continue;
+        }
+
+        latestJobsBySourceId.set(job.source_id, job);
+      }
+
+      const failedJobIds: string[] = [];
+
+      for (const [sourceId, job] of latestJobsBySourceId) {
+        const target = targetBySourceId.get(sourceId);
+
+        if (
+          target === undefined ||
+          job.status !== "running" ||
+          job.queue_job_id === null ||
+          job.started_at === null ||
+          job.queue_job_is_active
+        ) {
+          continue;
+        }
+
+        const staleCutoff = new Date(
+          input.now.getTime() -
+            Math.max(
+              24 * 60 * 60 * 1_000,
+              target.crawlIntervalMinutes * 3 * 60 * 1_000,
+            ),
+        );
+
+        if (job.started_at >= staleCutoff) {
+          continue;
+        }
+
+        const failedJob = await this.database
+          .updateTable("jobs")
+          .set({
+            failure_message:
+              "Source crawl was recovered because the latest observe job remained running after its queue job disappeared.",
+            finished_at: input.now,
+            metadata: withCleanupMetadata(job.metadata, {
+              cleanedUpAt: input.now,
+              detectedBy: input.detectedBy,
+              queueJobId: job.queue_job_id,
+              sourceId,
+            }),
+            retryable: false,
+            status: "failed",
+          })
+          .where("id", "=", job.id)
+          .where("status", "=", "running")
+          .where(
+            sql<boolean>`not exists (
+              select 1
+              from pgboss.job as queue_job
+              where queue_job.id = jobs.queue_job_id
+                and queue_job.state in ('created', 'retry', 'active')
+            )`,
+            "=",
+            true,
+          )
+          .returning("id")
+          .executeTakeFirst();
+
+        if (failedJob !== undefined) {
+          failedJobIds.push(failedJob.id);
+        }
+      }
+
+      return ok({
+        failedJobIds,
+      });
+    } catch (error) {
+      return err(
+        toRepositoryError(
+          error,
+          "Failed to recover stale observe-source jobs.",
+        ),
+      );
+    }
+  }
+
   public async findIncompleteJobByKind(
     kind: string,
   ): Promise<JobListItem | null> {
@@ -372,6 +516,38 @@ function toJobListItem(job: Selectable<JobTable>): JobListItem {
     retryable: job.retryable,
     startedAt: job.started_at,
     status: job.status,
+  };
+}
+
+function withCleanupMetadata(
+  metadata: Record<string, unknown>,
+  cleanup: {
+    cleanedUpAt: Date;
+    detectedBy: string;
+    queueJobId: string;
+    sourceId: string;
+  },
+): Record<string, unknown> {
+  const coreMetadata = metadata.core;
+  const core =
+    typeof coreMetadata === "object" &&
+    coreMetadata !== null &&
+    !Array.isArray(coreMetadata)
+      ? coreMetadata
+      : {};
+
+  return {
+    ...metadata,
+    core: {
+      ...core,
+      cleanup: {
+        cleanedUpAt: cleanup.cleanedUpAt.toISOString(),
+        detectedBy: cleanup.detectedBy,
+        queueJobId: cleanup.queueJobId,
+        reason: "stale-observe-source-job",
+        sourceId: cleanup.sourceId,
+      },
+    },
   };
 }
 

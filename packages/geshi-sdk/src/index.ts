@@ -193,6 +193,18 @@ export type SourceCollectorDiscoverResult = {
   candidates: SourceDiscoveryCandidate[];
 };
 
+export type SourceCollectorDetectSourcesInput = {
+  abortSignal: AbortSignal;
+  config: Record<string, unknown>;
+  detectorState?: JsonObject;
+  inputUrl: string;
+};
+
+export type SourceCollectorDetectSourcesResult = {
+  candidates: SourceDiscoveryCandidate[];
+  detectorState?: JsonObject;
+};
+
 export type SourceCollectorPreviewInput = {
   abortSignal: AbortSignal;
   config: Record<string, unknown>;
@@ -305,6 +317,10 @@ export interface SourceCollectorPlugin {
     input: SourceCollectorDiscoverInput,
     context: SourceCollectorExecutionContext,
   ): Promise<SourceCollectorDiscoverResult>;
+  detectSources?(
+    input: SourceCollectorDetectSourcesInput,
+    context: SourceCollectorExecutionContext,
+  ): Promise<SourceCollectorDetectSourcesResult>;
   inspect(
     input: SourceCollectorInspectInput,
     context: SourceCollectorExecutionContext,

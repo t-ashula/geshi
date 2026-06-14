@@ -3,14 +3,21 @@ import { Hono } from "hono";
 
 import type { AppDependencies } from "../../../deps.js";
 import type {
+  CreateSourceDetectionTargetInput,
   PatchPeriodicCrawlSettingsInput,
   PatchPluginGlobalSettingsInput,
 } from "../../../endpoints/api/v1/settings.js";
 import {
+  createCreateSourceDetectionTargetEndpoint,
+  createDismissDetectedSourceCandidateEndpoint,
   createGetPeriodicCrawlSettingsEndpoint,
   createGetPluginGlobalSettingsEndpoint,
+  createListDetectedSourceCandidatesEndpoint,
+  createListSourceDetectionTargetsEndpoint,
   createPatchPeriodicCrawlSettingsEndpoint,
   createPatchPluginGlobalSettingsEndpoint,
+  createPatchSourceDetectionTargetEndpoint,
+  createRegisterDetectedSourceCandidateEndpoint,
 } from "../../../endpoints/api/v1/settings.js";
 import type { Result } from "../../../lib/result.js";
 import { err, ok } from "../../../lib/result.js";
@@ -21,6 +28,18 @@ export function createSettingRoutes(dependencies: AppDependencies): Hono {
     createGetPeriodicCrawlSettingsEndpoint(dependencies);
   const getPluginGlobalSettings =
     createGetPluginGlobalSettingsEndpoint(dependencies);
+  const listSourceDetectionTargets =
+    createListSourceDetectionTargetsEndpoint(dependencies);
+  const createSourceDetectionTarget =
+    createCreateSourceDetectionTargetEndpoint(dependencies);
+  const patchSourceDetectionTarget =
+    createPatchSourceDetectionTargetEndpoint(dependencies);
+  const dismissDetectedSourceCandidate =
+    createDismissDetectedSourceCandidateEndpoint(dependencies);
+  const listDetectedSourceCandidates =
+    createListDetectedSourceCandidatesEndpoint(dependencies);
+  const registerDetectedSourceCandidate =
+    createRegisterDetectedSourceCandidateEndpoint(dependencies);
   const patchPeriodicCrawlSettings =
     createPatchPeriodicCrawlSettingsEndpoint(dependencies);
   const patchPluginGlobalSettings =
@@ -132,6 +151,97 @@ export function createSettingRoutes(dependencies: AppDependencies): Hono {
 
     return context.json({ data: result.value });
   });
+  router.get("/source-detection/targets", async (context) => {
+    const result = await listSourceDetectionTargets();
+
+    if (!result.ok) {
+      return context.json({ error: result.error }, { status: 500 });
+    }
+
+    return context.json({ data: result.value });
+  });
+  router.post("/source-detection/targets", async (context) => {
+    const json = await readJsonObject(context);
+
+    if (!json.ok) {
+      return context.json({ error: json.error }, { status: 400 });
+    }
+
+    const input = toCreateSourceDetectionTargetInput(json.value);
+
+    if (!input.ok) {
+      return context.json({ error: input.error }, { status: 422 });
+    }
+
+    const result = await createSourceDetectionTarget(input.value);
+
+    if (!result.ok) {
+      return context.json({ error: result.error }, { status: 500 });
+    }
+
+    return context.json({ data: result.value }, { status: 201 });
+  });
+  router.get("/source-detection/candidates", async (context) => {
+    const result = await listDetectedSourceCandidates();
+
+    if (!result.ok) {
+      return context.json({ error: result.error }, { status: 500 });
+    }
+
+    return context.json({ data: result.value });
+  });
+  router.patch("/source-detection/targets/:targetId", async (context) => {
+    const json = await readJsonObject(context);
+
+    if (!json.ok) {
+      return context.json({ error: json.error }, { status: 400 });
+    }
+
+    const input = toCreateSourceDetectionTargetInput(json.value);
+
+    if (!input.ok) {
+      return context.json({ error: input.error }, { status: 422 });
+    }
+
+    const result = await patchSourceDetectionTarget({
+      ...input.value,
+      id: requireRouteParam(context.req.param("targetId"), "targetId"),
+    });
+
+    if (!result.ok) {
+      return context.json({ error: result.error }, { status: 500 });
+    }
+
+    return context.json({ data: result.value });
+  });
+  router.post(
+    "/source-detection/candidates/:candidateId/dismiss",
+    async (context) => {
+      const result = await dismissDetectedSourceCandidate(
+        requireRouteParam(context.req.param("candidateId"), "candidateId"),
+      );
+
+      if (!result.ok) {
+        return context.json({ error: result.error }, { status: 500 });
+      }
+
+      return context.json({ data: result.value });
+    },
+  );
+  router.post(
+    "/source-detection/candidates/:candidateId/register",
+    async (context) => {
+      const result = await registerDetectedSourceCandidate(
+        requireRouteParam(context.req.param("candidateId"), "candidateId"),
+      );
+
+      if (!result.ok) {
+        return context.json({ error: result.error }, { status: 500 });
+      }
+
+      return context.json({ data: result.value });
+    },
+  );
 
   return router;
 }
@@ -217,6 +327,37 @@ function toPatchPluginGlobalSettingsInput(
   });
 }
 
+function toCreateSourceDetectionTargetInput(
+  value: Record<string, unknown>,
+): Result<
+  CreateSourceDetectionTargetInput,
+  { code: "invalid_source_detection_target"; message: string }
+> {
+  if (
+    typeof value.pluginSlug !== "string" ||
+    !isSourceKind(value.sourceKind) ||
+    typeof value.url !== "string" ||
+    ("enabled" in value && typeof value.enabled !== "boolean") ||
+    ("intervalMinutes" in value && !isPositiveInteger(value.intervalMinutes)) ||
+    ("config" in value && !isJsonObject(value.config))
+  ) {
+    return err({
+      code: "invalid_source_detection_target",
+      message:
+        "Source detection target requires pluginSlug, sourceKind, url, and optional enabled, intervalMinutes, config.",
+    });
+  }
+
+  return ok({
+    config: value.config as CreateSourceDetectionTargetInput["config"],
+    enabled: value.enabled as boolean | undefined,
+    intervalMinutes: value.intervalMinutes as number | undefined,
+    pluginSlug: value.pluginSlug,
+    sourceKind: value.sourceKind,
+    url: value.url,
+  });
+}
+
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
 }
@@ -262,4 +403,14 @@ function isJsonValue(value: unknown): boolean {
   }
 
   return Object.values(value).every((entry) => isJsonValue(entry));
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isSourceKind(
+  value: unknown,
+): value is "feed" | "podcast" | "streaming" {
+  return value === "feed" || value === "podcast" || value === "streaming";
 }

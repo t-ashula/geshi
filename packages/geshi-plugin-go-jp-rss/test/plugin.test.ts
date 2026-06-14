@@ -330,6 +330,90 @@ describe("goJpRss plugin", () => {
     vi.useRealTimers();
   });
 
+  it("deduplicates entries by canonicalized article url", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(
+            `<html>
+              <body>
+                <ul class="p-newsList">
+                  <li class="p-newsList__item">
+                    <div class="p-newsList__meta">
+                      <span class="p-newsList__categoryLabel">デジタル庁</span>
+                      <time class="p-newsList__date" datetime="2099-05-23">2099年5月23日</time>
+                    </div>
+                    <a
+                      class="p-newsList__link"
+                      href="https://example.go.jp/news/1?utm_source=gov-online#top"
+                    >
+                      <span class="p-newsList__title">記事1</span>
+                    </a>
+                  </li>
+                </ul>
+                <div class="p-pagination__next">
+                  <a href="/info/index.html?_filter=ministry_news&amp;offset=20">次へ</a>
+                </div>
+              </body>
+            </html>`,
+            { status: 200 },
+          ),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            `<html>
+              <body>
+                <ul class="p-newsList">
+                  <li class="p-newsList__item">
+                    <div class="p-newsList__meta">
+                      <span class="p-newsList__categoryLabel">デジタル庁</span>
+                      <time class="p-newsList__date" datetime="2099-05-23">2099年5月23日</time>
+                    </div>
+                    <a class="p-newsList__link" href="https://example.go.jp/news/1">
+                      <span class="p-newsList__title">記事1</span>
+                    </a>
+                  </li>
+                </ul>
+              </body>
+            </html>`,
+            { status: 200 },
+          ),
+        ),
+    );
+
+    const observed = await plugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://www.gov-online.go.jp/info/index.html",
+      },
+      createPluginContext(),
+    );
+
+    expect(observed.collectorPluginState).toEqual({
+      lastProcessedUrl: "https://example.go.jp/news/1",
+    });
+    expect(observed.contents).toHaveLength(1);
+    expect(observed.contents[0]?.externalId).toBe(
+      "https://example.go.jp/news/1",
+    );
+    expect(observed.contents[0]?.contentFingerprints).toEqual([
+      expect.stringMatching(VERSIONED_FINGERPRINT_PATTERN),
+      "content-url:https://example.go.jp/news/1",
+    ]);
+    expect(observed.contents[0]?.assets).toEqual([
+      expect.objectContaining({
+        observedFingerprints: [
+          expect.stringMatching(VERSIONED_FINGERPRINT_PATTERN),
+          "observed-html-url:https://example.go.jp/news/1",
+        ],
+        sourceUrl: "https://example.go.jp/news/1",
+      }),
+    ]);
+  });
+
   it("acquires HTML assets", async () => {
     vi.stubGlobal(
       "fetch",

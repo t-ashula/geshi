@@ -45,6 +45,7 @@ class SourceCollectorInspectPluginError extends Error {
 }
 
 type GovOnlineEntry = {
+  canonicalUrl: string;
   category: string | null;
   publishedAt: Date | null;
   publishedAtText: string | null;
@@ -114,12 +115,12 @@ export const plugin: SourceCollectorPlugin = {
       let reachedOldEntry = false;
 
       for (const entry of page.entries) {
-        if (entry.url === lastProcessedUrl) {
+        if (entry.canonicalUrl === lastProcessedUrl) {
           reachedLastProcessedUrl = true;
           break;
         }
 
-        if (seenUrls.has(entry.url)) {
+        if (seenUrls.has(entry.canonicalUrl)) {
           continue;
         }
 
@@ -131,7 +132,7 @@ export const plugin: SourceCollectorPlugin = {
           break;
         }
 
-        seenUrls.add(entry.url);
+        seenUrls.add(entry.canonicalUrl);
         observedContents.push(toObservedContent(entry));
 
         if (observedContents.length >= MAX_ITEMS) {
@@ -382,6 +383,7 @@ function parseGovOnlineEntries(
     );
 
     entries.push({
+      canonicalUrl: canonicalizeEntryUrl(resolvedUrl),
       category,
       publishedAt: parsePublishedAt(publishedAtValue),
       publishedAtText,
@@ -427,13 +429,15 @@ function toObservedContent(entry: GovOnlineEntry): ObservedContent {
         nextAction: {
           actionKind: "acquire",
         },
-        observedFingerprints: createObservedAssetFingerprints(entry.url),
+        observedFingerprints: createObservedAssetFingerprints(
+          entry.canonicalUrl,
+        ),
         primary: true,
-        sourceUrl: entry.url,
+        sourceUrl: entry.canonicalUrl,
       },
     ],
     contentFingerprints: createContentFingerprints(entry),
-    externalId: entry.url,
+    externalId: entry.canonicalUrl,
     kind: "article",
     publishedAt: entry.publishedAt,
     status: "discovered",
@@ -491,6 +495,33 @@ function safeResolveUrl(url: string, sourceUrl: string): string | null {
   } catch {
     return null;
   }
+}
+
+function canonicalizeEntryUrl(url: string): string {
+  const parsedUrl = new URL(url);
+
+  parsedUrl.hash = "";
+
+  for (const key of [...parsedUrl.searchParams.keys()]) {
+    if (isKnownTrackingQueryParam(key)) {
+      parsedUrl.searchParams.delete(key);
+    }
+  }
+
+  const normalizedSearch = parsedUrl.searchParams.toString();
+  parsedUrl.search = normalizedSearch.length > 0 ? `?${normalizedSearch}` : "";
+
+  return parsedUrl.toString();
+}
+
+function isKnownTrackingQueryParam(key: string): boolean {
+  const normalizedKey = key.toLowerCase();
+
+  return (
+    normalizedKey.startsWith("utm_") ||
+    normalizedKey === "fbclid" ||
+    normalizedKey === "gclid"
+  );
 }
 
 function joinNonEmptyParts(parts: Array<string | null>): string | null {
@@ -595,7 +626,10 @@ function normalizeEncodingLabel(value: string | null): string | null {
 }
 
 function createContentFingerprints(entry: GovOnlineEntry): string[] {
-  const legacyValue = createLegacyFingerprint("content-url", entry.url);
+  const legacyValue = createLegacyFingerprint(
+    "content-url",
+    entry.canonicalUrl,
+  );
 
   return [createVersionedFingerprint(legacyValue), legacyValue];
 }

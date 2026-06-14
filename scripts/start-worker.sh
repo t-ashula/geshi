@@ -24,6 +24,10 @@ case "$worker_name" in
     process_name="worker-periodic-crawl"
     worker_entrypoint="backend/src/workers/periodic-crawl/main.ts"
     ;;
+  periodic-source-detection)
+    process_name="worker-periodic-source-detection"
+    worker_entrypoint="backend/src/workers/periodic-source-detection/main.ts"
+    ;;
   recording-scheduler)
     process_name="worker-recording-scheduler"
     worker_entrypoint="backend/src/workers/recording-scheduler/main.ts"

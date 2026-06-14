@@ -9,6 +9,7 @@ for worker_name in \
   acquire-content \
   observe-source \
   periodic-crawl \
+  periodic-source-detection \
   recording-scheduler \
   transcript-split \
   transcript-chunk

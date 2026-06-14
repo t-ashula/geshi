@@ -175,6 +175,89 @@ source collector plugin の継続実行に必要な内部状態を表す．
 - `pluginSlug`
 - `createdAt`
 
+### sourceDetectionTarget
+
+listing / catalog / frontier のような source 検知対象を表す．
+
+例:
+
+- 音泉の `program` 一覧ページ
+- feed directory の index page
+- 特定 plugin が source 候補列挙の入口として扱う catalog URL
+
+主な属性:
+
+- `id`
+- `userId`
+- `pluginSlug`
+- `sourceKind`
+- `url`
+- `enabled`
+- `createdAt`
+
+補足:
+
+- 既知 `source` をクロールするための `collectorSetting` とは別主体とする
+- `sourceDetectionTarget` はまだ `source` になっていない候補を見つけるための走査対象である
+
+### sourceDetectionState
+
+source 検知対象ごとの継続状態を表す．
+
+例:
+
+- 前回までに見た listing page の continuation
+- 最後に見た item marker
+- plugin 固有の detector cursor
+
+主な属性:
+
+- `id`
+- `sourceDetectionTargetId`
+- `pluginSlug`
+- `createdAt`
+
+補足:
+
+- 既知 `source` にひもづく `collectorPluginState` とは別 ownership で扱う
+- state の意味は plugin が所有し，backend は受け渡しと保存だけを担う
+
+### detectedSourceCandidate
+
+定期検知で見つかった未登録 source 候補を表す．
+
+例:
+
+- 音泉の新しい `program`
+- directory page から見つかった未登録 feed
+
+主な属性:
+
+- `id`
+- `userId`
+- `sourceDetectionTargetId`
+- `pluginSlug`
+- `sourceKind`
+- `normalizedUrl`
+- `sourceSlug`
+- `title`
+- `description`
+- `status`
+  - `detected`
+  - `previewed`
+  - `registered`
+  - `dismissed`
+  - `duplicate`
+- `fingerprint`
+- `resolvedSourceId`
+- `createdAt`
+
+補足:
+
+- `detectedSourceCandidate` は `source` 本体とは別主体とする
+- 不採用，重複，承認待ちのような状態を正規状態として保持する
+- candidate から `source` を作るときは，candidate を `registered` に遷移させ，必要なら `resolvedSourceId` に解決先を持つ
+
 ### asset
 
 content にひもづく実ファイルや派生ファイルを表す．
