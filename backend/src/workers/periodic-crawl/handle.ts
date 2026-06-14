@@ -111,6 +111,26 @@ async function enqueueObserveJobs(
     return targets;
   }
 
+  const recoveredInfo =
+    await dependencies.jobRepository.recoverStaleObserveSourceJobs({
+      detectedBy: PERIODIC_CRAWL_JOB_NAME,
+      now: new Date(),
+      targets: targets.value.map((target) => ({
+        crawlIntervalMinutes: target.crawlIntervalMinutes,
+        sourceId: target.sourceId,
+      })),
+    });
+
+  if (!recoveredInfo.ok) {
+    return recoveredInfo;
+  }
+
+  if (recoveredInfo.value.failedJobIds.length > 0) {
+    dependencies.logger.warn("stale observe-source jobs recovered.", {
+      failedJobIds: recoveredInfo.value.failedJobIds,
+    });
+  }
+
   const activeSourceIds =
     await dependencies.jobRepository.listIncompleteObserveSourceIds();
 
