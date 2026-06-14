@@ -187,6 +187,11 @@ export type ContentListItem = {
   title: string | null;
 };
 
+export type ContentListPage = {
+  items: ContentListItem[];
+  nextCursor: string | null;
+};
+
 export type ContentDetailAsset = {
   byteSize: number | null;
   id: string;
@@ -277,6 +282,9 @@ type ListSourceCollectorPluginsResponse = {
 
 type ListContentsResponse = {
   data: ContentListItem[];
+  page: {
+    nextCursor: string | null;
+  };
 };
 
 type ContentDetailResponse = {
@@ -609,8 +617,24 @@ export async function getJob(jobId: string): Promise<JobListItem> {
   throw new Error("Failed to load job.");
 }
 
-export async function listContents(): Promise<ContentListItem[]> {
-  const response = await fetch("/api/v1/contents");
+export async function listContents(request?: {
+  cursor?: string;
+  limit?: number;
+}): Promise<ContentListPage> {
+  const params = new URLSearchParams();
+
+  if (request?.cursor !== undefined) {
+    params.set("cursor", request.cursor);
+  }
+
+  if (request?.limit !== undefined) {
+    params.set("limit", String(request.limit));
+  }
+
+  const query = params.toString();
+  const response = await fetch(
+    query.length > 0 ? `/api/v1/contents?${query}` : "/api/v1/contents",
+  );
 
   if (!response.ok) {
     throw new Error("Failed to load contents.");
@@ -618,7 +642,10 @@ export async function listContents(): Promise<ContentListItem[]> {
 
   const payload = (await response.json()) as ListContentsResponse;
 
-  return payload.data;
+  return {
+    items: payload.data,
+    nextCursor: payload.page.nextCursor,
+  };
 }
 
 export async function getContentDetail(

@@ -1,11 +1,12 @@
 import type {
   AcquireTargetContent,
+  ContentListPage,
   ContentDetailItem,
-  ContentListItem,
   ContentRepository,
   ContentRepositoryError,
   CreateObservedContentResult,
   ImportObservedContentInput,
+  ListContentsInput,
 } from "../db/content-repository.js";
 import type { Result } from "../lib/result.js";
 import { err, ok } from "../lib/result.js";
@@ -30,7 +31,7 @@ export interface ContentService {
   importObservedContents(
     inputs: ImportObservedContentInput[],
   ): Promise<Result<void, ContentServiceError>>;
-  listContents(): Promise<ContentListItem[]>;
+  listContents(input: ListContentsInput): Promise<ContentListPage>;
   markContentStatus(
     contentId: string,
     status: "discovered" | "stored" | "failed",
@@ -74,8 +75,8 @@ export function createContentService(
       return contentRepository.importObservedContents(inputs);
     },
 
-    async listContents(): Promise<ContentListItem[]> {
-      return contentRepository.listContents();
+    async listContents(input: ListContentsInput): Promise<ContentListPage> {
+      return contentRepository.listContents(input);
     },
 
     async markContentStatus(

@@ -6,6 +6,7 @@ import {
   createRequestTranscriptsEndpoint,
   createRetryTranscriptEndpoint,
 } from "../../src/endpoints/api/v1/contents.js";
+import { InvalidContentListCursorError } from "../../src/db/content-repository.js";
 import { err, ok } from "../../src/lib/result.js";
 import type { AssetService } from "../../src/service/asset-service.js";
 import type { ContentService } from "../../src/service/content-service.js";
@@ -20,15 +21,41 @@ describe("content endpoints", () => {
         assetService: {} as unknown as AssetService,
         contentService: {
           listContents: vi.fn(() =>
-            Promise.resolve([{ id: "content-1", title: "Episode 1" }]),
+            Promise.resolve({
+              items: [{ id: "content-1", title: "Episode 1" }],
+              nextCursor: "cursor-1",
+            }),
           ),
         } as unknown as ContentService,
       }),
     );
 
-    await expect(endpoint()).resolves.toEqual([
-      { id: "content-1", title: "Episode 1" },
-    ]);
+    await expect(endpoint({ limit: 10 })).resolves.toEqual(
+      ok({
+        items: [{ id: "content-1", title: "Episode 1" }],
+        nextCursor: "cursor-1",
+      }),
+    );
+  });
+
+  it("returns invalid cursor errors without converting them to 500s", async () => {
+    const endpoint = createListContentsEndpoint(
+      createTestAppDependencies({
+        assetService: {} as unknown as AssetService,
+        contentService: {
+          listContents: vi.fn(() =>
+            Promise.reject(new InvalidContentListCursorError()),
+          ),
+        } as unknown as ContentService,
+      }),
+    );
+
+    await expect(endpoint({ cursor: "bad", limit: 10 })).resolves.toEqual(
+      err({
+        code: "invalid_cursor",
+        message: "Content list cursor is invalid.",
+      }),
+    );
   });
 
   it("returns content detail with media asset urls", async () => {

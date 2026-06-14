@@ -1,13 +1,17 @@
 import type { ContentDetailAsset } from "../../../db/asset-repository.js";
+import {
+  InvalidContentListCursorError,
+} from "../../../db/content-repository.js";
 import type {
+  ContentListPage,
   ContentDetailItem,
-  ContentListItem,
+  ListContentsInput,
 } from "../../../db/content-repository.js";
 import type { TranscriptListItem } from "../../../db/transcript-repository.js";
 import type { AppDependencies } from "../../../deps.js";
 import { contentTypeToExtension } from "../../../lib/content-type-extension.js";
 import type { Result } from "../../../lib/result.js";
-import { ok } from "../../../lib/result.js";
+import { err, ok } from "../../../lib/result.js";
 import type { FindContentDetailError } from "../../../service/content-service.js";
 import type {
   EnqueueTranscriptResult,
@@ -16,6 +20,10 @@ import type {
 } from "../../../service/transcript-service.js";
 
 export type GetContentDetailEndpointError = FindContentDetailError;
+export type ListContentsEndpointError = {
+  code: "invalid_cursor" | "list_contents_failed";
+  message: string;
+};
 
 export type ContentDetailEndpointValue = ContentDetailItem & {
   assets: Array<
@@ -27,8 +35,25 @@ export type ContentDetailEndpointValue = ContentDetailItem & {
 };
 
 export function createListContentsEndpoint(dependencies: AppDependencies) {
-  return async (): Promise<ContentListItem[]> =>
-    dependencies.contentService.listContents();
+  return async (
+    input: ListContentsInput,
+  ): Promise<Result<ContentListPage, ListContentsEndpointError>> => {
+    try {
+      return ok(await dependencies.contentService.listContents(input));
+    } catch (error) {
+      if (error instanceof InvalidContentListCursorError) {
+        return err({
+          code: "invalid_cursor",
+          message: "Content list cursor is invalid.",
+        });
+      }
+
+      return err({
+        code: "list_contents_failed",
+        message: "Failed to list contents.",
+      });
+    }
+  };
 }
 
 export function createGetContentDetailEndpoint(dependencies: AppDependencies) {

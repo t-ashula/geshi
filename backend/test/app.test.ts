@@ -89,11 +89,32 @@ describe("createApp", () => {
         })
       ).status,
     ).toBe(204);
-    expect((await app.request("/api/v1/contents")).status).toBe(200);
+    const contentsResponse = await app.request("/api/v1/contents?limit=5");
+    expect(contentsResponse.status).toBe(200);
+    await expect(contentsResponse.json()).resolves.toMatchObject({
+      data: [],
+      page: {
+        nextCursor: null,
+      },
+    });
     expect((await app.request("/api/v1/jobs/job-1")).status).toBe(200);
     expect((await app.request("/api/v1/settings/periodic-crawl")).status).toBe(
       200,
     );
     expect((await app.request("/media/assets/asset-1.mp3")).status).toBe(200);
+  });
+
+  it("rejects invalid content list limits", async () => {
+    const app = createApp(createTestAppDependencies());
+
+    const response = await app.request("/api/v1/contents?limit=0");
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: "invalid_limit",
+        message: "Content list limit must be between 1 and 100.",
+      },
+    });
   });
 });

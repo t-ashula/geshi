@@ -67,7 +67,12 @@ export function createTestAppDependencies(
           }),
         ),
       ),
-      listContents: vi.fn(() => Promise.resolve([])),
+      listContents: vi.fn(() =>
+        Promise.resolve({
+          items: [],
+          nextCursor: null,
+        }),
+      ),
     } as unknown as ContentService,
     detailBodyService: {
       findOrCreateDetailBodyByContentId: vi.fn(() => Promise.resolve(ok(null))),

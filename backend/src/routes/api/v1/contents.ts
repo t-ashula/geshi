@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import type { AppDependencies } from "../../../deps.js";
+import type { ListContentsInput } from "../../../db/content-repository.js";
 import {
   createGetContentDetailEndpoint,
   createListContentsEndpoint,
@@ -16,9 +17,35 @@ export function createContentRoutes(dependencies: AppDependencies): Hono {
   const retryTranscript = createRetryTranscriptEndpoint(dependencies);
 
   router.get("/", async (context) => {
-    const data = await listContents();
+    const input = toListContentsInput(
+      context.req.query("cursor"),
+      context.req.query("limit"),
+    );
 
-    return context.json({ data });
+    if (!input.ok) {
+      return context.json({ error: input.error }, { status: 400 });
+    }
+
+    const data = await listContents(input.value);
+
+    if (!data.ok) {
+      return context.json(
+        {
+          error: {
+            code: data.error.code,
+            message: data.error.message,
+          },
+        },
+        { status: data.error.code === "invalid_cursor" ? 400 : 500 },
+      );
+    }
+
+    return context.json({
+      data: data.value.items,
+      page: {
+        nextCursor: data.value.nextCursor,
+      },
+    });
   });
   router.get("/:contentId", async (context) => {
     const result = await getContentDetail(
@@ -99,6 +126,63 @@ export function createContentRoutes(dependencies: AppDependencies): Hono {
   );
 
   return router;
+}
+
+const DEFAULT_CONTENTS_LIMIT = 50;
+const MAX_CONTENTS_LIMIT = 100;
+
+function toListContentsInput(
+  cursor: string | undefined,
+  limit: string | undefined,
+):
+  | { ok: true; value: ListContentsInput }
+  | {
+      ok: false;
+      error: { code: "invalid_limit"; message: string };
+    } {
+  if (limit === undefined) {
+    return {
+      ok: true,
+      value: {
+        cursor,
+        limit: DEFAULT_CONTENTS_LIMIT,
+      },
+    };
+  }
+
+  if (!/^\d+$/u.test(limit)) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_limit",
+        message: `Content list limit must be between 1 and ${MAX_CONTENTS_LIMIT}.`,
+      },
+    };
+  }
+
+  const parsedLimit = Number.parseInt(limit, 10);
+
+  if (
+    !Number.isSafeInteger(parsedLimit) ||
+    parsedLimit < 1 ||
+    parsedLimit > MAX_CONTENTS_LIMIT
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "invalid_limit",
+        message: `Content list limit must be between 1 and ${MAX_CONTENTS_LIMIT}.`,
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      cursor,
+      limit: parsedLimit,
+    },
+  };
 }
 
 function requireRouteParam(value: string | undefined, name: string): string {

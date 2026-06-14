@@ -10,6 +10,7 @@ import {
   getContentDetail,
   getSourceCollectorSettings,
   inspectSource,
+  listContents,
   listDetectedSourceCandidates,
   listSourceCollections,
   listSourceCollectorPlugins,
@@ -132,6 +133,83 @@ describe("listSourceCollections", () => {
         title: "Work",
       },
     ]);
+  });
+});
+
+describe("listContents", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns content items with the next cursor", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                collectedAt: "2026-06-02T00:00:00.000Z",
+                id: "content-1",
+                kind: "podcast-episode",
+                publishedAt: "2026-06-01T00:00:00.000Z",
+                sourceId: "source-1",
+                sourceSlug: "example-feed",
+                status: "stored",
+                summary: "Episode summary",
+                title: "Episode 1",
+              },
+            ],
+            page: {
+              nextCursor: "cursor-1",
+            },
+          }),
+          {
+            headers: {
+              "content-type": "application/json",
+            },
+            status: 200,
+          },
+        ),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listContents({ cursor: "cursor-0", limit: 25 })).resolves.toEqual(
+      {
+        items: [
+          {
+            collectedAt: "2026-06-02T00:00:00.000Z",
+            id: "content-1",
+            kind: "podcast-episode",
+            publishedAt: "2026-06-01T00:00:00.000Z",
+            sourceId: "source-1",
+            sourceSlug: "example-feed",
+            status: "stored",
+            summary: "Episode summary",
+            title: "Episode 1",
+          },
+        ],
+        nextCursor: "cursor-1",
+      },
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/contents?cursor=cursor-0&limit=25",
+    );
+  });
+
+  it("throws when content loading fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response("{}", {
+            status: 400,
+          }),
+        ),
+      ),
+    );
+
+    await expect(listContents()).rejects.toThrow("Failed to load contents.");
   });
 });
 
