@@ -67,7 +67,12 @@ export function createTestAppDependencies(
           }),
         ),
       ),
-      listContents: vi.fn(() => Promise.resolve([])),
+      listContents: vi.fn(() =>
+        Promise.resolve({
+          items: [],
+          nextCursor: null,
+        }),
+      ),
     } as unknown as ContentService,
     detailBodyService: {
       findOrCreateDetailBodyByContentId: vi.fn(() => Promise.resolve(ok(null))),
@@ -309,6 +314,7 @@ export function createTestAppDependencies(
           ok({
             collectionId: null,
             collectorSettingsVersion: 1,
+            contentCount: 0,
             createdAt: new Date("2026-05-01T00:00:00.000Z"),
             description: null,
             id: "source-1",
@@ -355,6 +361,7 @@ export function createTestAppDependencies(
           ok({
             collectionId: null,
             collectorSettingsVersion: 1,
+            contentCount: 0,
             createdAt: new Date("2026-05-01T00:00:00.000Z"),
             description: null,
             id: "source-1",
@@ -404,6 +411,7 @@ export function createTestAppDependencies(
           ok({
             collectionId: null,
             collectorSettingsVersion: 1,
+            contentCount: 0,
             createdAt: new Date("2026-05-01T00:00:00.000Z"),
             description: null,
             id: "source-1",

@@ -13,8 +13,8 @@ import PlaybackDock from "./components/PlaybackDock.vue";
 import type {
   ContentDetailAsset,
   ContentDetailItem,
-  ContentTranscriptItem,
   ContentListItem,
+  ContentTranscriptItem,
   DetectedSourceCandidate,
   DiscoverSourcesResult,
   PeriodicCrawlSettings,
@@ -79,6 +79,7 @@ type SourceDisplayMode = "collections" | "flat";
 type CollectionDialogMode = "create" | "rename";
 
 const contents = ref<ContentListItem[]>([]);
+const nextContentsCursor = ref<string | null>(null);
 const contentDetail = ref<ContentDetailItem | null>(null);
 const sourceCollectorPlugins = ref<SourceCollectorPluginListItem[]>([]);
 const sourceCollections = ref<SourceCollectionListItem[]>([]);
@@ -98,6 +99,7 @@ const isSourceCrawlSubmitting = ref<string | null>(null);
 const isSettingsSubmitting = ref(false);
 const isSourcesLoading = ref(true);
 const isContentsLoading = ref(true);
+const isContentsLoadingMore = ref(false);
 const isContentActionsExpanded = ref(false);
 const isDetailLoading = ref(false);
 const collapsedCollectionIds = ref<Set<string>>(new Set());
@@ -176,6 +178,7 @@ const expandedTranscriptIds = ref<Set<string>>(new Set());
 const activeBrowsePane = ref<BrowsePane>("sources");
 const draggedCollectionId = ref<string | null>(null);
 const draggedSourceId = ref<string | null>(null);
+const CONTENTS_PAGE_SIZE = 50;
 
 const selectedSourceSlug = computed(() => {
   const route = routeState.value;
@@ -219,6 +222,17 @@ const visibleContents = computed(() => {
         );
 
   return [...filteredContents].sort(compareContentListItems);
+});
+
+const visibleContentCount = computed(() => {
+  if (selectedSource.value !== null) {
+    return Number(selectedSource.value.contentCount) || 0;
+  }
+
+  return sources.value.reduce(
+    (total, source) => total + (Number(source.contentCount) || 0),
+    0,
+  );
 });
 
 const sortedSourceCollections = computed(() =>
@@ -374,6 +388,10 @@ watch(
   },
   { immediate: true },
 );
+
+watch(selectedSourceSlug, () => {
+  void refreshContents();
+});
 
 watch(
   [selectedSourceSlug, selectedContentId, activeBrowsePane],
@@ -1254,15 +1272,46 @@ async function refreshSelectedSourceCollectorSettings(
 
 async function refreshContents(): Promise<void> {
   isContentsLoading.value = true;
+  nextContentsCursor.value = null;
   closeContentActions();
 
   try {
-    contents.value = await listContents();
+    const page = await listContents({
+      limit: CONTENTS_PAGE_SIZE,
+      sourceSlug: selectedSourceSlug.value ?? undefined,
+    });
+
+    contents.value = page.items;
+    nextContentsCursor.value = page.nextCursor;
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : "Failed to load contents.";
   } finally {
     isContentsLoading.value = false;
+  }
+}
+
+async function loadMoreContents(): Promise<void> {
+  if (nextContentsCursor.value === null) {
+    return;
+  }
+
+  isContentsLoadingMore.value = true;
+
+  try {
+    const page = await listContents({
+      cursor: nextContentsCursor.value,
+      limit: CONTENTS_PAGE_SIZE,
+      sourceSlug: selectedSourceSlug.value ?? undefined,
+    });
+
+    contents.value = [...contents.value, ...page.items];
+    nextContentsCursor.value = page.nextCursor;
+  } catch (error) {
+    errorMessage.value =
+      error instanceof Error ? error.message : "Failed to load more contents.";
+  } finally {
+    isContentsLoadingMore.value = false;
   }
 }
 
@@ -1827,13 +1876,6 @@ function compareContentListItems(
   left: ContentListItem,
   right: ContentListItem,
 ): number {
-  const statusDifference =
-    contentStatusRank(left.status) - contentStatusRank(right.status);
-
-  if (statusDifference !== 0) {
-    return statusDifference;
-  }
-
   const publishedAtDifference =
     new Date(right.publishedAt ?? 0).getTime() -
     new Date(left.publishedAt ?? 0).getTime();
@@ -1842,21 +1884,15 @@ function compareContentListItems(
     return publishedAtDifference;
   }
 
-  return left.id.localeCompare(right.id);
-}
+  const collectedAtDifference =
+    new Date(right.collectedAt).getTime() -
+    new Date(left.collectedAt).getTime();
 
-function contentStatusRank(status: ContentListItem["status"]): number {
-  switch (status) {
-    case "stored": {
-      return 0;
-    }
-    case "failed": {
-      return 1;
-    }
-    case "discovered": {
-      return 2;
-    }
+  if (collectedAtDifference !== 0) {
+    return collectedAtDifference;
   }
+
+  return right.id.localeCompare(left.id);
 }
 
 function readInitialTheme(): "light" | "dark" {
@@ -2015,7 +2051,7 @@ function normalizeCollectorSettingFormValue(
           }}
         </h1>
         <p class="workspace-summary">
-          {{ sources.length }} sources · {{ contents.length }} entries
+          {{ sources.length }} sources · {{ visibleContentCount }} entries
           <template v-if="selectedSource !== null">
             · focused on {{ selectedSource.title ?? selectedSource.slug }}
           </template>
@@ -2868,7 +2904,7 @@ function normalizeCollectorSettingFormValue(
                 }}
               </p>
             </div>
-            <span class="pane-count">{{ visibleContents.length }}</span>
+            <span class="pane-count">{{ visibleContentCount }}</span>
             <div class="pane-actions">
               <button
                 type="button"
@@ -3073,39 +3109,52 @@ function normalizeCollectorSettingFormValue(
             Loading contents...
           </div>
 
-          <ul v-else-if="visibleContents.length > 0" class="content-list">
-            <li v-for="content in visibleContents" :key="content.id">
+          <template v-else-if="visibleContents.length > 0">
+            <ul class="content-list">
+              <li v-for="content in visibleContents" :key="content.id">
+                <button
+                  type="button"
+                  class="content-row"
+                  :class="{ selected: isContentSelected(content) }"
+                  @click="openEntry(content)"
+                >
+                  <span class="content-row-thumb" aria-hidden="true"></span>
+                  <span class="content-row-body">
+                    <span class="content-row-head">
+                      <span class="content-row-title">
+                        {{ content.title ?? "Untitled entry" }}
+                      </span>
+                      <span class="content-row-status" :class="content.status">
+                        {{ content.status }}
+                      </span>
+                    </span>
+                    <span class="content-row-meta">
+                      <span>{{ formatDate(content.publishedAt) }}</span>
+                      <span>{{
+                        selectedSource === null
+                          ? content.sourceSlug
+                          : content.kind
+                      }}</span>
+                    </span>
+                    <span v-if="content.summary" class="content-row-summary">
+                      {{ renderContentSummaryPreview(content.summary) }}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+
+            <div v-if="nextContentsCursor !== null" class="load-more-actions">
               <button
                 type="button"
-                class="content-row"
-                :class="{ selected: isContentSelected(content) }"
-                @click="openEntry(content)"
+                class="secondary-button"
+                :disabled="isContentsLoadingMore"
+                @click="loadMoreContents"
               >
-                <span class="content-row-thumb" aria-hidden="true"></span>
-                <span class="content-row-body">
-                  <span class="content-row-head">
-                    <span class="content-row-title">
-                      {{ content.title ?? "Untitled entry" }}
-                    </span>
-                    <span class="content-row-status" :class="content.status">
-                      {{ content.status }}
-                    </span>
-                  </span>
-                  <span class="content-row-meta">
-                    <span>{{ formatDate(content.publishedAt) }}</span>
-                    <span>{{
-                      selectedSource === null
-                        ? content.sourceSlug
-                        : content.kind
-                    }}</span>
-                  </span>
-                  <span v-if="content.summary" class="content-row-summary">
-                    {{ renderContentSummaryPreview(content.summary) }}
-                  </span>
-                </span>
+                {{ isContentsLoadingMore ? "Loading more..." : "Load more" }}
               </button>
-            </li>
-          </ul>
+            </div>
+          </template>
 
           <div v-else class="empty-state">No contents yet.</div>
         </section>

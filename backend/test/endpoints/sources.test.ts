@@ -163,6 +163,7 @@ describe("source endpoints", () => {
               ok({
                 collectionId: null,
                 collectorSettingsVersion: 1,
+                contentCount: 0,
                 createdAt: new Date("2026-05-01T00:00:00.000Z"),
                 description: "Weekly notes",
                 id: "source-1",
@@ -329,6 +330,7 @@ describe("source endpoints", () => {
               ok({
                 collectionId: "collection-1",
                 collectorSettingsVersion: 1,
+                contentCount: 0,
                 createdAt: new Date("2026-06-02T00:00:00.000Z"),
                 description: "Weekly notes",
                 id: "source-1",
@@ -359,6 +361,7 @@ describe("source endpoints", () => {
       ok({
         collectionId: "collection-1",
         collectorSettingsVersion: 1,
+        contentCount: 0,
         createdAt: new Date("2026-06-02T00:00:00.000Z"),
         description: "Weekly notes",
         id: "source-1",

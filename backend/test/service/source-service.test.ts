@@ -52,6 +52,7 @@ describe("source service", () => {
         ok({
           collectionId: null,
           collectorSettingsVersion: 1,
+          contentCount: 0,
           createdAt: new Date("2026-05-01T00:00:00.000Z"),
           description: input.description ?? null,
           id: "source-1",
@@ -378,6 +379,7 @@ describe("source service", () => {
       {
         collectionId: null,
         collectorSettingsVersion: 1,
+        contentCount: 0,
         createdAt: new Date("2026-05-01T00:00:00.000Z"),
         description: null,
         id: "source-1",
@@ -452,6 +454,7 @@ describe("source service", () => {
     const source = {
       collectorSettingsVersion: 2,
       collectionId: null,
+      contentCount: 0,
       createdAt: new Date("2026-05-01T00:00:00.000Z"),
       description: null,
       id: "source-1",
@@ -553,6 +556,7 @@ describe("source service", () => {
         ok({
           collectionId: null,
           collectorSettingsVersion: 1,
+          contentCount: 0,
           createdAt: new Date("2026-05-01T00:00:00.000Z"),
           description: input.description ?? null,
           id: "source-2",

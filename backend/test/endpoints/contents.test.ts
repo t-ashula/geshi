@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { InvalidContentListCursorError } from "../../src/db/content-repository.js";
 import {
   createGetContentDetailEndpoint,
   createListContentsEndpoint,
@@ -15,20 +16,53 @@ import { createTestAppDependencies } from "../support/app-dependencies.js";
 
 describe("content endpoints", () => {
   it("returns current content list shape", async () => {
+    const listContents = vi.fn(() =>
+      Promise.resolve({
+        items: [{ id: "content-1", title: "Episode 1" }],
+        nextCursor: "cursor-1",
+      }),
+    );
+    const endpoint = createListContentsEndpoint(
+      createTestAppDependencies({
+        assetService: {} as unknown as AssetService,
+        contentService: {
+          listContents,
+        } as unknown as ContentService,
+      }),
+    );
+
+    await expect(
+      endpoint({ limit: 10, sourceSlug: "example-feed" }),
+    ).resolves.toEqual(
+      ok({
+        items: [{ id: "content-1", title: "Episode 1" }],
+        nextCursor: "cursor-1",
+      }),
+    );
+    expect(listContents).toHaveBeenCalledWith({
+      limit: 10,
+      sourceSlug: "example-feed",
+    });
+  });
+
+  it("returns invalid cursor errors without converting them to 500s", async () => {
     const endpoint = createListContentsEndpoint(
       createTestAppDependencies({
         assetService: {} as unknown as AssetService,
         contentService: {
           listContents: vi.fn(() =>
-            Promise.resolve([{ id: "content-1", title: "Episode 1" }]),
+            Promise.reject(new InvalidContentListCursorError()),
           ),
         } as unknown as ContentService,
       }),
     );
 
-    await expect(endpoint()).resolves.toEqual([
-      { id: "content-1", title: "Episode 1" },
-    ]);
+    await expect(endpoint({ cursor: "bad", limit: 10 })).resolves.toEqual(
+      err({
+        code: "invalid_cursor",
+        message: "Content list cursor is invalid.",
+      }),
+    );
   });
 
   it("returns content detail with media asset urls", async () => {

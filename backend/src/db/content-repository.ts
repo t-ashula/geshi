@@ -49,6 +49,17 @@ export type ContentListItem = {
   title: string | null;
 };
 
+export type ContentListPage = {
+  items: ContentListItem[];
+  nextCursor: string | null;
+};
+
+export type ListContentsInput = {
+  cursor?: string;
+  limit: number;
+  sourceSlug?: string;
+};
+
 export type ContentDetailItem = {
   collectedAt: Date;
   detailBody: {
@@ -69,6 +80,33 @@ export type ContentDetailItem = {
 };
 
 export type ContentRepositoryError = Error;
+
+type ContentListCursor = {
+  createdAt: string;
+  id: string;
+  publishedAt: string | null;
+};
+
+type ContentListRow = {
+  collected_at: Date;
+  created_at: Date;
+  id: string;
+  kind: string;
+  published_at: Date | null;
+  source_id: string;
+  source_slug: string;
+  status: "discovered" | "stored" | "failed";
+  summary: string | null;
+  title: string | null;
+};
+
+const CONTENT_LIST_CURSOR_VERSION = 1;
+
+export class InvalidContentListCursorError extends Error {
+  public constructor() {
+    super("Content list cursor is invalid.");
+  }
+}
 
 export class ContentRepository {
   public constructor(private readonly database: Kysely<GeshiDatabase>) {}
@@ -246,9 +284,15 @@ export class ContentRepository {
     };
   }
 
-  public async listContents(): Promise<ContentListItem[]> {
+  public async listContents({
+    cursor,
+    limit,
+    sourceSlug,
+  }: ListContentsInput): Promise<ContentListPage> {
     const latestContentSnapshots = latestContentSnapshotsQuery(this.database);
-    const contents = await this.database
+    const cursorKey =
+      cursor === undefined ? null : decodeContentListCursor(cursor);
+    let query = this.database
       .selectFrom("contents")
       .innerJoin("sources", "sources.id", "contents.source_id")
       .leftJoin(
@@ -267,12 +311,41 @@ export class ContentRepository {
         "latest_content_snapshots.summary",
         "latest_content_snapshots.title",
         "sources.slug as source_slug",
-      ])
-      .orderBy("contents.published_at", "desc")
+      ]);
+
+    if (sourceSlug !== undefined) {
+      query = query.where("sources.slug", "=", sourceSlug);
+    }
+
+    if (cursorKey !== null) {
+      query = query.where(
+        sql<boolean>`
+          (
+            ${contentListPublishedAtExpression()} < ${toContentCursorPublishedAt(cursorKey)}
+          )
+          or (
+            ${contentListPublishedAtExpression()} = ${toContentCursorPublishedAt(cursorKey)}
+            and contents.created_at < ${new Date(cursorKey.createdAt)}
+          )
+          or (
+            ${contentListPublishedAtExpression()} = ${toContentCursorPublishedAt(cursorKey)}
+            and contents.created_at = ${new Date(cursorKey.createdAt)}
+            and contents.id < ${cursorKey.id}
+          )
+        `,
+      );
+    }
+
+    const rows = await query
+      .orderBy(contentListPublishedAtExpression(), "desc")
       .orderBy("contents.created_at", "desc")
+      .orderBy("contents.id", "desc")
+      .limit(limit + 1)
       .execute();
 
-    return contents.map((content) => ({
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const items = pageRows.map((content) => ({
       collectedAt: content.collected_at,
       id: content.id,
       kind: content.kind,
@@ -283,6 +356,16 @@ export class ContentRepository {
       summary: content.summary,
       title: content.title,
     }));
+
+    return {
+      items,
+      nextCursor:
+        hasMore && pageRows.length > 0
+          ? encodeContentListCursor(
+              toContentListCursor(pageRows[pageRows.length - 1]),
+            )
+          : null,
+    };
   }
 
   public async findContentDetail(
@@ -336,6 +419,76 @@ export class ContentRepository {
       title: contentSnapshot?.title ?? null,
     };
   }
+}
+
+function contentListPublishedAtExpression() {
+  return sql<Date>`coalesce(contents.published_at, 'epoch'::timestamptz)`;
+}
+
+function decodeContentListCursor(cursor: string): ContentListCursor {
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(cursor, "base64url").toString("utf8"),
+    ) as Record<string, unknown>;
+
+    if (
+      parsed.version !== CONTENT_LIST_CURSOR_VERSION ||
+      typeof parsed.id !== "string" ||
+      typeof parsed.createdAt !== "string" ||
+      !(parsed.publishedAt === null || typeof parsed.publishedAt === "string")
+    ) {
+      throw new InvalidContentListCursorError();
+    }
+
+    assertValidContentCursorDate(parsed.createdAt);
+
+    if (parsed.publishedAt !== null) {
+      assertValidContentCursorDate(parsed.publishedAt);
+    }
+
+    return {
+      createdAt: parsed.createdAt,
+      id: parsed.id,
+      publishedAt: parsed.publishedAt,
+    };
+  } catch (error) {
+    if (error instanceof InvalidContentListCursorError) {
+      throw error;
+    }
+
+    throw new InvalidContentListCursorError();
+  }
+}
+
+function assertValidContentCursorDate(value: string): void {
+  if (Number.isNaN(new Date(value).getTime())) {
+    throw new InvalidContentListCursorError();
+  }
+}
+
+function encodeContentListCursor(cursor: ContentListCursor): string {
+  return Buffer.from(
+    JSON.stringify({
+      createdAt: cursor.createdAt,
+      id: cursor.id,
+      publishedAt: cursor.publishedAt,
+      version: CONTENT_LIST_CURSOR_VERSION,
+    }),
+  ).toString("base64url");
+}
+
+function toContentCursorPublishedAt(cursor: ContentListCursor): Date {
+  return cursor.publishedAt === null
+    ? new Date(0)
+    : new Date(cursor.publishedAt);
+}
+
+function toContentListCursor(row: ContentListRow): ContentListCursor {
+  return {
+    createdAt: row.created_at.toISOString(),
+    id: row.id,
+    publishedAt: row.published_at?.toISOString() ?? null,
+  };
 }
 
 export function mergeObservedContentStatus(

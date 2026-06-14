@@ -67,6 +67,7 @@ export type ObserveSourceTarget = {
 export type SourceListItem = {
   collectionId: string | null;
   collectorSettingsVersion: number | null;
+  contentCount: number;
   periodicCrawlEnabled: boolean;
   periodicCrawlIntervalMinutes: number;
   createdAt: Date;
@@ -232,6 +233,14 @@ export class SourceRepository {
       const latestSourceSnapshots = latestSourceSnapshotsQuery(this.database);
       const latestCollectorSettingSnapshots =
         latestCollectorSettingSnapshotsQuery(this.database);
+      const contentCounts = this.database
+        .selectFrom("contents")
+        .select([
+          "contents.source_id",
+          sql<number>`count(contents.id)`.as("content_count"),
+        ])
+        .groupBy("contents.source_id")
+        .as("content_counts");
 
       const sources = await this.database
         .selectFrom("subscriptions")
@@ -254,6 +263,7 @@ export class SourceRepository {
           "latest_collector_setting_snapshots.collector_setting_id",
           "collector_settings.id",
         )
+        .leftJoin(contentCounts, "content_counts.source_id", "sources.id")
         .select([
           "subscriptions.collection_id",
           "subscriptions.id as subscription_id",
@@ -272,6 +282,9 @@ export class SourceRepository {
           "latest_collector_setting_snapshots.enabled",
           "latest_collector_setting_snapshots.periodical_interval_minutes",
           "latest_collector_setting_snapshots.version as collector_settings_version",
+          sql<number>`coalesce(content_counts.content_count, 0)`.as(
+            "content_count",
+          ),
         ])
         .where("users.slug", "=", userSlug)
         .orderBy("subscriptions.collection_id", "asc")
@@ -1002,6 +1015,7 @@ function toSourceListItem(
   return {
     collectionId: null,
     collectorSettingsVersion: collectorSettingSnapshot?.version ?? null,
+    contentCount: 0,
     periodicCrawlEnabled: collectorSettingSnapshot?.periodical ?? false,
     periodicCrawlIntervalMinutes:
       collectorSettingSnapshot?.periodical_interval_minutes ??
@@ -1046,6 +1060,7 @@ function toJoinedSourceListItem(source: {
   created_at: Date;
   description: string | null;
   enabled: boolean | null;
+  content_count: number | string;
   id: string;
   kind: SourceCollectorSourceKind;
   periodical_interval_minutes: number | null;
@@ -1062,6 +1077,7 @@ function toJoinedSourceListItem(source: {
   return {
     collectionId: source.collection_id,
     collectorSettingsVersion: source.collector_settings_version,
+    contentCount: toCountNumber(source.content_count),
     periodicCrawlEnabled: source.enabled ?? false,
     periodicCrawlIntervalMinutes:
       source.periodical_interval_minutes ??
@@ -1090,9 +1106,19 @@ function toCollectionListItem(
     id: collection.id,
     parentCollectionId: collection.parent_collection_id,
     position: collection.position,
-    sourceCount,
+    sourceCount: toCountNumber(sourceCount),
     title: collection.title,
   };
+}
+
+function toCountNumber(value: number | string): number {
+  const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsed)) {
+    return 0;
+  }
+
+  return parsed;
 }
 
 async function findSourceListItemBySubscriptionId(
@@ -1114,6 +1140,18 @@ async function findSourceListItemBySubscriptionId(
     .leftJoin(
       "collector_settings",
       "collector_settings.source_id",
+      "sources.id",
+    )
+    .leftJoin(
+      database
+        .selectFrom("contents")
+        .select([
+          "contents.source_id",
+          sql<number>`count(contents.id)`.as("content_count"),
+        ])
+        .groupBy("contents.source_id")
+        .as("content_counts"),
+      "content_counts.source_id",
       "sources.id",
     )
     .leftJoin(
@@ -1139,6 +1177,9 @@ async function findSourceListItemBySubscriptionId(
       "latest_collector_setting_snapshots.enabled",
       "latest_collector_setting_snapshots.periodical_interval_minutes",
       "latest_collector_setting_snapshots.version as collector_settings_version",
+      sql<number>`coalesce(content_counts.content_count, 0)`.as(
+        "content_count",
+      ),
     ])
     .where("subscriptions.id", "=", subscriptionId)
     .executeTakeFirst();
