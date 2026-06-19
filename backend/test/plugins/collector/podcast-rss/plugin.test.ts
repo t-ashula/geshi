@@ -286,6 +286,68 @@ describe("podcastRssPlugin.observe", () => {
     expect(contents[0]?.publishedAt).toBeNull();
   });
 
+  it("builds podcast episodes from Atom entries with audio enclosures", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Example Podcast</title>
+              <subtitle>Weekly notes</subtitle>
+              <entry>
+                <id>tag:example.com,2026:episode-1</id>
+                <title> Episode 1 </title>
+                <summary> Hello from Atom </summary>
+                <link href="https://example.com/episodes/1" />
+                <link
+                  rel="enclosure"
+                  type="audio/mpeg"
+                  href="https://cdn.example.com/audio/1.mp3"
+                />
+                <updated>2024-01-01T00:00:00Z</updated>
+              </entry>
+            </feed>`,
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    const result = await podcastRssPlugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
+    const contents = result.contents;
+
+    expect(contents).toHaveLength(1);
+    expect(contents[0]).toMatchObject({
+      externalId: "tag:example.com,2026:episode-1",
+      kind: "podcast-episode",
+      publishedAt: new Date("2024-01-01T00:00:00.000Z"),
+      status: "discovered",
+      summary: "Hello from Atom",
+      title: "Episode 1",
+    });
+    expect(contents[0]?.assets).toEqual([
+      expect.objectContaining({
+        kind: "html",
+        primary: true,
+        sourceUrl: "https://example.com/episodes/1",
+      }),
+      expect.objectContaining({
+        kind: "audio",
+        primary: false,
+        sourceUrl: "https://cdn.example.com/audio/1.mp3",
+      }),
+    ]);
+  });
+
   it("fails when RSS fetch returns a non-success status", async () => {
     vi.stubGlobal(
       "fetch",
@@ -343,6 +405,48 @@ describe("podcastRssPlugin.inspect", () => {
     });
   });
 
+  it("returns source metadata from Atom podcast feed metadata", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title> Example Podcast </title>
+              <subtitle> Weekly notes </subtitle>
+              <entry>
+                <id>tag:example.com,2026:episode-1</id>
+                <link href="https://example.com/episodes/1" />
+                <link
+                  rel="enclosure"
+                  type="audio/mpeg"
+                  href="https://cdn.example.com/audio/1.mp3"
+                />
+              </entry>
+            </feed>`,
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    const result = await podcastRssPlugin.inspect(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
+
+    expect(result).toMatchObject({
+      description: "Weekly notes",
+      title: "Example Podcast",
+      url: "https://example.com/feed.xml",
+    });
+  });
+
   it("returns an unrecognized error for non-rss responses", async () => {
     vi.stubGlobal(
       "fetch",
@@ -362,7 +466,7 @@ describe("podcastRssPlugin.inspect", () => {
       ),
     ).rejects.toMatchObject({
       code: "source_inspect_unrecognized",
-      message: "The given URL is not a supported RSS feed.",
+      message: "The given URL is not a supported RSS or Atom feed.",
     });
   });
 });

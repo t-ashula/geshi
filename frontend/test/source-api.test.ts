@@ -699,7 +699,7 @@ describe("inspectSource", () => {
             JSON.stringify({
               error: {
                 code: "source_inspect_unrecognized",
-                message: "The given URL is not a supported RSS feed.",
+                message: "The given URL is not a supported RSS or Atom feed.",
               },
             }),
             {
@@ -717,7 +717,7 @@ describe("inspectSource", () => {
       inspectSource({
         url: "https://example.com/feed.xml",
       }),
-    ).rejects.toThrow("The given URL is not a supported RSS feed.");
+    ).rejects.toThrow("The given URL is not a supported RSS or Atom feed.");
   });
 });
 

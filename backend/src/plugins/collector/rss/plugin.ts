@@ -22,6 +22,7 @@ import type {
   SourceMetadata,
 } from "../../types.js";
 import { WebClient } from "../../types.js";
+import { parseAtomFeed } from "../atom-feed.js";
 import { extractDiscoveredFeedUrls } from "../feed-discovery-html.js";
 import type {
   AcquiredAssetFingerprintInput,
@@ -149,7 +150,7 @@ export const plugin: SourceCollectorPlugin = {
     if (metadata === null) {
       throw new SourceCollectorInspectPluginError(
         "source_inspect_unrecognized",
-        "The given URL is not a supported RSS feed.",
+        "The given URL is not a supported RSS or Atom feed.",
       );
     }
 
@@ -557,17 +558,17 @@ function parseRssFeed(value: string): ParsedRssFeed | null {
   const parsedFeed = parser.parse(value) as RssFeed;
   const channel = parsedFeed.rss?.channel ?? parsedFeed["rdf:RDF"]?.channel;
 
-  if (channel === undefined) {
-    return null;
+  if (channel !== undefined) {
+    return {
+      items: toArray(channel.item ?? parsedFeed["rdf:RDF"]?.item),
+      metadata: {
+        description: normalizeString(channel.description),
+        title: normalizeString(channel.title),
+      },
+    };
   }
 
-  return {
-    items: toArray(channel.item ?? parsedFeed["rdf:RDF"]?.item),
-    metadata: {
-      description: normalizeString(channel.description),
-      title: normalizeString(channel.title),
-    },
-  };
+  return parseAtomFeed(value);
 }
 
 function toArray<T>(value: T | T[] | undefined): T[] {

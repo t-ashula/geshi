@@ -144,6 +144,67 @@ describe("rssPlugin.observe", () => {
       }),
     ]);
   });
+
+  it("builds feed entries from Atom entries", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Example Atom Feed</title>
+              <subtitle>Atom notes</subtitle>
+              <entry>
+                <id>tag:example.com,2026:entry-1</id>
+                <title> Entry 1 </title>
+                <summary> Hello from Atom </summary>
+                <link href="https://example.com/posts/1" />
+                <link
+                  rel="enclosure"
+                  type="audio/mpeg"
+                  href="https://cdn.example.com/audio/1.mp3"
+                />
+                <updated>2024-01-01T00:00:00Z</updated>
+              </entry>
+            </feed>`,
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    const result = await rssPlugin.observe(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
+
+    expect(result.contents).toHaveLength(1);
+    expect(result.contents[0]).toMatchObject({
+      externalId: "tag:example.com,2026:entry-1",
+      kind: "feed-entry",
+      publishedAt: new Date("2024-01-01T00:00:00.000Z"),
+      status: "discovered",
+      summary: "Hello from Atom",
+      title: "Entry 1",
+    });
+    expect(result.contents[0]?.assets).toEqual([
+      expect.objectContaining({
+        kind: "html",
+        primary: true,
+        sourceUrl: "https://example.com/posts/1",
+      }),
+      expect.objectContaining({
+        kind: "audio",
+        primary: false,
+        sourceUrl: "https://cdn.example.com/audio/1.mp3",
+      }),
+    ]);
+  });
 });
 
 describe("rssPlugin.inspect", () => {
@@ -218,6 +279,43 @@ describe("rssPlugin.inspect", () => {
       description: "RDF notes",
       title: "Example RDF Feed",
       url: "https://example.com/feed.rdf",
+    });
+  });
+
+  it("returns source metadata from Atom feed fields", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title> Example Atom Feed </title>
+              <subtitle> Atom notes </subtitle>
+              <entry>
+                <id>tag:example.com,2026:entry-1</id>
+                <link href="https://example.com/posts/1" />
+              </entry>
+            </feed>`,
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    const result = await rssPlugin.inspect(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext(),
+    );
+
+    expect(result).toMatchObject({
+      description: "Atom notes",
+      title: "Example Atom Feed",
+      url: "https://example.com/feed.xml",
     });
   });
 });
