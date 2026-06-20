@@ -91,6 +91,44 @@ describe("rssPlugin.discover", () => {
     });
   });
 
+  it("returns a direct Atom feed as a single candidate", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Example Atom Feed</title>
+              <subtitle>Atom notes</subtitle>
+              <entry>
+                <id>tag:example.com,2026:entry-1</id>
+                <link href="https://example.com/posts/1" />
+              </entry>
+            </feed>`,
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    const result = await rssPlugin.discover?.(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        inputUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext() as never,
+    );
+
+    expect(result?.candidates).toHaveLength(1);
+    expect(result?.candidates[0]).toMatchObject({
+      description: "Atom notes",
+      title: "Example Atom Feed",
+      url: "https://example.com/feed.xml",
+    });
+  });
+
   it("discovers multiple feed candidates from an html feed listing page", async () => {
     vi.stubGlobal(
       "fetch",
@@ -212,6 +250,45 @@ describe("rssPlugin.preview", () => {
 
     expect(result?.items).toHaveLength(2);
     expect(result?.items[0]).toMatchObject({
+      title: "Entry 1",
+    });
+  });
+
+  it("returns preview data from Atom entries", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            `<?xml version="1.0"?>
+            <feed xmlns="http://www.w3.org/2005/Atom">
+              <title>Example Atom Feed</title>
+              <entry>
+                <id>tag:example.com,2026:entry-1</id>
+                <title>Entry 1</title>
+                <summary>Summary 1</summary>
+                <updated>2024-01-01T00:00:00Z</updated>
+              </entry>
+            </feed>`,
+            { status: 200 },
+          ),
+        ),
+      ),
+    );
+
+    const result = await rssPlugin.preview?.(
+      {
+        abortSignal: new AbortController().signal,
+        config: {},
+        sourceUrl: "https://example.com/feed.xml",
+      },
+      createPluginContext() as never,
+    );
+
+    expect(result?.items).toHaveLength(1);
+    expect(result?.items[0]).toMatchObject({
+      publishedAt: new Date("2024-01-01T00:00:00.000Z"),
+      summary: "Summary 1",
       title: "Entry 1",
     });
   });

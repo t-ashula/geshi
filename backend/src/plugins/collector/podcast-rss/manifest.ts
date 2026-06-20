@@ -8,7 +8,7 @@ export const manifest: PluginManifest = {
       sourceKind: "podcast",
     },
   ],
-  description: "Collect podcast episodes from RSS feeds.",
+  description: "Collect podcast RSS and Atom feeds.",
   displayName: "Podcast RSS",
   pluginSlug: "podcast-rss",
 };

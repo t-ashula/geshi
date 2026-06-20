@@ -74,3 +74,4 @@
 - [ADR-0071: 新規 source 候補を定期検知する worker を導入する](./0071-periodic-source-detection-worker.md)
 - [ADR-0072: 途中で停止した source crawl を検知して回復する](./0072-missing-queue-job-reconciliation.md)
 - [ADR-0073: entry 一覧 API は cursor ベースのページングを持つ](./0073-entry-list-pagination.md)
+- [ADR-0075: built-in `rss` / `podcast-rss` plugin は Atom feed を扱えるようにする](./0075-atom-feed-support.md)

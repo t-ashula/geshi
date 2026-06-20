@@ -9,7 +9,7 @@ export const manifest: PluginManifest = {
     },
   ],
   description:
-    "Collect standard RSS feed entries as HTML pages and enclosures.",
+    "Collect RSS, RDF, and Atom feed entries as HTML pages and enclosures.",
   displayName: "RSS",
   pluginSlug: "rss",
 };
