@@ -244,6 +244,7 @@ npm run test:e2e:transcript
 
 - 検収要件を満たすことを確認する
 - PR を作成し，CI による検証を通す
+  - PULL_REQUEST_TEMPLATE.md をもとにする
 - 問題がなければマージする
 
 ### 7. 次のタスクへ進む
