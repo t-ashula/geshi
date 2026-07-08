@@ -14,11 +14,7 @@ export type CreateJobInput = {
 };
 
 export type JobStatus =
-  | "planned"
-  | "queued"
-  | "running"
-  | "succeeded"
-  | "failed";
+  "planned" | "queued" | "running" | "succeeded" | "failed";
 
 export type JobListItem = {
   attemptCount: number;

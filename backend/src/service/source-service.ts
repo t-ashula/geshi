@@ -38,9 +38,7 @@ export type SourceUrlError = {
   message: string;
 };
 export type CreateSourceError =
-  | SourceUrlError
-  | DuplicateSourceUrlHashError
-  | SourceRepositoryError;
+  SourceUrlError | DuplicateSourceUrlHashError | SourceRepositoryError;
 
 export type UpdateSourceCollectorSettingsError = {
   code: "source_not_found";
@@ -169,8 +167,7 @@ const DEFAULT_SOURCE_USER_SLUG = "default";
 export function createSourceService(
   sourceRepository: SourceRepository,
   sourceCollectorRegistryOrDependencies:
-    | SourceCollectorRegistry
-    | CreateSourceServiceDependencies = {},
+    SourceCollectorRegistry | CreateSourceServiceDependencies = {},
 ): SourceService {
   const dependencies = isSourceCollectorRegistry(
     sourceCollectorRegistryOrDependencies,

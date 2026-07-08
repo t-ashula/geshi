@@ -11,11 +11,7 @@ import type {
 
 export type TranscriptStatus = "queued" | "running" | "succeeded" | "failed";
 export type TranscriptChunkStatus =
-  | "queued"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "timed_out";
+  "queued" | "running" | "succeeded" | "failed" | "timed_out";
 
 export type CreateTranscriptInput = {
   contentId: string;

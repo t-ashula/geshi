@@ -102,9 +102,7 @@ export type SourceCollectorSettingsRecord = {
   pluginSlug: string;
 };
 export type SourceRepositoryError =
-  | CollectorSettingsVersionConflictError
-  | DuplicateSourceUrlHashError
-  | Error;
+  CollectorSettingsVersionConflictError | DuplicateSourceUrlHashError | Error;
 
 export class DuplicateSourceUrlHashError extends Error {
   public constructor(urlHash: string) {

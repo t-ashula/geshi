@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { createNoopLogger } from "../../../../src/logger/index.js";
 import { rssPlugin } from "../../../../src/plugins/collector/rss/plugin.js";
 
+const KONNICHIWA_SHIFT_JIS = Uint8Array.from([
+  0x82, 0xb1, 0x82, 0xf1, 0x82, 0xc9, 0x82, 0xbf, 0x82, 0xcd,
+]);
+
 function createPluginContext() {
   return {
     getHost() {
@@ -341,6 +345,42 @@ describe("rssPlugin.extract", () => {
       format: "html",
     });
   });
+
+  it("extracts shift_jis html using meta charset", async () => {
+    const body = joinBytes([
+      asciiBytes(`
+        <html>
+          <head>
+            <meta charset="Shift_JIS" />
+          </head>
+          <body>
+            <main class="article-body">
+              <p>`),
+      KONNICHIWA_SHIFT_JIS,
+      asciiBytes(`</p>
+            </main>
+          </body>
+        </html>
+      `),
+    ]);
+
+    await expect(
+      rssPlugin.extract(
+        {
+          asset: {
+            body,
+            kind: "html",
+            mimeType: "text/html",
+            sourceUrl: "https://example.com/posts/1",
+          },
+        },
+        createPluginContext(),
+      ),
+    ).resolves.toEqual({
+      body: "<article><p>こんにちは</p></article>",
+      format: "html",
+    });
+  });
 });
 
 describe("rssPlugin.acquire", () => {
@@ -398,3 +438,20 @@ describe("rssPlugin.acquire", () => {
     ).toBe(true);
   });
 });
+
+function asciiBytes(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+function joinBytes(chunks: Uint8Array[]): Uint8Array {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  return result;
+}

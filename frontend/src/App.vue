@@ -3235,8 +3235,7 @@ function normalizeCollectorSettingFormValue(
               <pre
                 v-if="detailDisplayFormat(contentDetail) === 'plain'"
                 class="detail-body-text"
-                >{{ detailDisplayBody(contentDetail) }}</pre
-              >
+                >{{ detailDisplayBody(contentDetail) }}</pre>
               <div v-else v-html="detailDisplayBody(contentDetail) ?? ''"></div>
             </div>
 

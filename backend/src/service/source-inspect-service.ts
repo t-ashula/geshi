@@ -25,9 +25,7 @@ export type InspectSourceUnknownError = {
 };
 
 export type InspectSourceError =
-  | InspectSourceUnknownError
-  | SourceCollectorInspectError
-  | SourceUrlError;
+  InspectSourceUnknownError | SourceCollectorInspectError | SourceUrlError;
 
 export type InspectSourceResult = SourceMetadata & {
   sourceSlug: string;

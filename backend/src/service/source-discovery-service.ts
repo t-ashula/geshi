@@ -278,8 +278,7 @@ export function createSourceDiscoveryService(
 function createExecutionContext(
   plugin: Extract<RegisteredSourceCollectorPlugin, { status: "available" }>,
   pluginGlobalRuntimeStateRepository:
-    | PluginGlobalRuntimeStateRepository
-    | undefined,
+    PluginGlobalRuntimeStateRepository | undefined,
   logger: Logger,
 ) {
   return {

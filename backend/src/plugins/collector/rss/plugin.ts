@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { parse } from "parse5";
 
 import { createSourceSlug } from "../../../lib/source-slug.js";
 import type {
@@ -70,12 +71,25 @@ type RssEnclosure = {
   "@_url"?: string;
 };
 
+type Parse5Attribute = {
+  name: string;
+  value: string;
+};
+
+type Parse5Node = {
+  attrs?: Parse5Attribute[];
+  childNodes?: Parse5Node[];
+  tagName?: string;
+};
+
 const parser = new XMLParser({
   attributeNamePrefix: "@_",
   ignoreAttributes: false,
   parseTagValue: false,
   trimValues: true,
 });
+const TEXT_DECODER_FALLBACK_ENCODING = "utf-8";
+const META_CHARSET_SCAN_LENGTH = 2048;
 
 class SourceCollectorInspectPluginError extends Error {
   public readonly code: SourceCollectorInspectErrorCode;
@@ -223,7 +237,7 @@ export const plugin: SourceCollectorPlugin = {
       return Promise.resolve(null);
     }
 
-    const html = new TextDecoder().decode(input.asset.body);
+    const html = decodeHtmlDocument(input.asset.body, input.asset.mimeType);
 
     return Promise.resolve(extractHtmlDetailBody(html, input.asset.sourceUrl));
   },
@@ -550,6 +564,98 @@ function normalizeString(value: string | undefined): string | null {
 
 function normalizeContentType(value: string | null): string | null {
   const normalizedValue = value?.split(";")[0]?.trim();
+
+  return normalizedValue ? normalizedValue : null;
+}
+
+function decodeHtmlDocument(
+  body: Uint8Array,
+  contentType: string | null,
+): string {
+  const encoding = detectHtmlEncoding(body, contentType);
+
+  try {
+    return new TextDecoder(encoding).decode(body);
+  } catch {
+    return new TextDecoder(TEXT_DECODER_FALLBACK_ENCODING).decode(body);
+  }
+}
+
+function detectHtmlEncoding(
+  body: Uint8Array,
+  contentType: string | null,
+): string {
+  const headerCharset = extractCharsetFromContentType(contentType);
+
+  if (headerCharset !== null) {
+    return headerCharset;
+  }
+
+  const metaCharset = extractCharsetFromHtmlMeta(body);
+
+  if (metaCharset !== null) {
+    return metaCharset;
+  }
+
+  return TEXT_DECODER_FALLBACK_ENCODING;
+}
+
+function extractCharsetFromContentType(value: string | null): string | null {
+  if (value === null) {
+    return null;
+  }
+
+  const match = value.match(/charset\s*=\s*["']?([^;"'\s]+)/iu);
+
+  return normalizeEncodingLabel(match?.[1] ?? null);
+}
+
+function extractCharsetFromHtmlMeta(body: Uint8Array): string | null {
+  const scanBody = new TextDecoder("latin1").decode(
+    body.subarray(0, META_CHARSET_SCAN_LENGTH),
+  );
+  const document = parse(scanBody) as Parse5Node;
+  const nodes = [document];
+
+  while (nodes.length > 0) {
+    const node = nodes.shift();
+
+    if (node === undefined) {
+      continue;
+    }
+
+    if (node.tagName === "meta") {
+      const attributes = Object.fromEntries(
+        (node.attrs ?? []).map((attribute) => [
+          attribute.name,
+          attribute.value,
+        ]),
+      );
+      const charset = normalizeEncodingLabel(attributes.charset ?? null);
+
+      if (charset !== null) {
+        return charset;
+      }
+
+      if (attributes["http-equiv"]?.toLowerCase() === "content-type") {
+        const contentCharset = extractCharsetFromContentType(
+          attributes.content ?? null,
+        );
+
+        if (contentCharset !== null) {
+          return contentCharset;
+        }
+      }
+    }
+
+    nodes.push(...(node.childNodes ?? []));
+  }
+
+  return null;
+}
+
+function normalizeEncodingLabel(value: string | null): string | null {
+  const normalizedValue = value?.trim().toLowerCase();
 
   return normalizedValue ? normalizedValue : null;
 }
