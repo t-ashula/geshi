@@ -1577,6 +1577,17 @@ async function retryFailedTranscript(
   }
 }
 
+async function retryFailedTranscriptForCurrentContent(
+  transcriptId: string,
+): Promise<void> {
+  const detail = contentDetail.value;
+  if (detail === null) {
+    return;
+  }
+
+  await retryFailedTranscript(detail.id, transcriptId);
+}
+
 function navigateTo(pathname: string): void {
   if (window.location.pathname === pathname) {
     return;
@@ -3288,7 +3299,7 @@ function normalizeCollectorSettingFormValue(
                         class="ghost-button"
                         :disabled="isTranscriptSubmitting === transcript.id"
                         @click="
-                          retryFailedTranscript(contentDetail.id, transcript.id)
+                          retryFailedTranscriptForCurrentContent(transcript.id)
                         "
                       >
                         {{
