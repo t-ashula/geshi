@@ -626,7 +626,10 @@ function extractCharsetFromHtmlMeta(body: Uint8Array): string | null {
 
     if (node.tagName === "meta") {
       const attributes = Object.fromEntries(
-        (node.attrs ?? []).map((attribute) => [attribute.name, attribute.value]),
+        (node.attrs ?? []).map((attribute) => [
+          attribute.name,
+          attribute.value,
+        ]),
       );
       const charset = normalizeEncodingLabel(attributes.charset ?? null);
 
