@@ -395,8 +395,7 @@ export async function createSourceCollection(request: {
     method: "POST",
   });
   const payload = (await response.json()) as
-    | { data: SourceCollectionListItem }
-    | ErrorResponse;
+    { data: SourceCollectionListItem } | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -424,8 +423,7 @@ export async function assignSourceToCollection(
     method: "PATCH",
   });
   const payload = (await response.json()) as
-    | { data: SourceListItem }
-    | ErrorResponse;
+    { data: SourceListItem } | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -472,8 +470,7 @@ export async function updateSourceCollection(
     method: "PATCH",
   });
   const payload = (await response.json()) as
-    | { data: SourceCollectionListItem }
-    | ErrorResponse;
+    { data: SourceCollectionListItem } | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -497,8 +494,7 @@ export async function createSource(
     method: "POST",
   });
   const payload = (await response.json()) as
-    | CreateSourceResponse
-    | ErrorResponse;
+    CreateSourceResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -522,8 +518,7 @@ export async function inspectSource(
     method: "POST",
   });
   const payload = (await response.json()) as
-    | InspectSourceResponse
-    | ErrorResponse;
+    InspectSourceResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -547,8 +542,7 @@ export async function discoverSources(
     method: "POST",
   });
   const payload = (await response.json()) as
-    | DiscoverSourcesResponse
-    | ErrorResponse;
+    DiscoverSourcesResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -572,8 +566,7 @@ export async function previewSource(
     method: "POST",
   });
   const payload = (await response.json()) as
-    | PreviewSourceResponse
-    | ErrorResponse;
+    PreviewSourceResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -659,8 +652,7 @@ export async function getContentDetail(
 ): Promise<ContentDetailItem> {
   const response = await fetch(`/api/v1/contents/${contentId}`);
   const payload = (await response.json()) as
-    | ContentDetailResponse
-    | ErrorResponse;
+    ContentDetailResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -680,8 +672,7 @@ export async function requestTranscripts(
     method: "POST",
   });
   const payload = (await response.json()) as
-    | TranscriptRequestResponse
-    | ErrorResponse;
+    TranscriptRequestResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -705,8 +696,7 @@ export async function retryTranscript(
     },
   );
   const payload = (await response.json()) as
-    | { data: { jobId: string; transcriptId: string } }
-    | ErrorResponse;
+    { data: { jobId: string; transcriptId: string } } | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -722,8 +712,7 @@ export async function retryTranscript(
 export async function getPeriodicCrawlSettings(): Promise<PeriodicCrawlSettings> {
   const response = await fetch("/api/v1/settings/periodic-crawl");
   const payload = (await response.json()) as
-    | PeriodicCrawlSettingsResponse
-    | ErrorResponse;
+    PeriodicCrawlSettingsResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -747,8 +736,7 @@ export async function updatePeriodicCrawlSettings(
     method: "PATCH",
   });
   const payload = (await response.json()) as
-    | PeriodicCrawlSettingsResponse
-    | ErrorResponse;
+    PeriodicCrawlSettingsResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -776,8 +764,7 @@ export async function updateSourceCollectorSettings(
     },
   );
   const payload = (await response.json()) as
-    | CreateSourceResponse
-    | ErrorResponse;
+    CreateSourceResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -797,8 +784,7 @@ export async function getSourceCollectorSettings(
     `/api/v1/sources/${sourceId}/collector-settings`,
   );
   const payload = (await response.json()) as
-    | SourceCollectorSettingsResponse
-    | ErrorResponse;
+    SourceCollectorSettingsResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -816,8 +802,7 @@ export async function getPluginGlobalSettings(
 ): Promise<PluginGlobalSettingsDetail> {
   const response = await fetch(`/api/v1/settings/plugins/${pluginSlug}`);
   const payload = (await response.json()) as
-    | PluginGlobalSettingsResponse
-    | ErrorResponse;
+    PluginGlobalSettingsResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -842,8 +827,7 @@ export async function updatePluginGlobalSettings(
     method: "PATCH",
   });
   const payload = (await response.json()) as
-    | PluginGlobalSettingsResponse
-    | ErrorResponse;
+    PluginGlobalSettingsResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -861,8 +845,7 @@ export async function listSourceDetectionTargets(): Promise<
 > {
   const response = await fetch("/api/v1/settings/source-detection/targets");
   const payload = (await response.json()) as
-    | SourceDetectionTargetsResponse
-    | ErrorResponse;
+    SourceDetectionTargetsResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -886,8 +869,7 @@ export async function createSourceDetectionTarget(
     method: "POST",
   });
   const payload = (await response.json()) as
-    | SourceDetectionTargetResponse
-    | ErrorResponse;
+    SourceDetectionTargetResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -915,8 +897,7 @@ export async function updateSourceDetectionTarget(
     },
   );
   const payload = (await response.json()) as
-    | SourceDetectionTargetResponse
-    | ErrorResponse;
+    SourceDetectionTargetResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -934,8 +915,7 @@ export async function listDetectedSourceCandidates(): Promise<
 > {
   const response = await fetch("/api/v1/settings/source-detection/candidates");
   const payload = (await response.json()) as
-    | DetectedSourceCandidatesResponse
-    | ErrorResponse;
+    DetectedSourceCandidatesResponse | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -958,8 +938,7 @@ export async function dismissDetectedSourceCandidate(
     },
   );
   const payload = (await response.json()) as
-    | { data: DetectedSourceCandidate }
-    | ErrorResponse;
+    { data: DetectedSourceCandidate } | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);
@@ -982,8 +961,7 @@ export async function registerDetectedSourceCandidate(
     },
   );
   const payload = (await response.json()) as
-    | { data: DetectedSourceCandidate }
-    | ErrorResponse;
+    { data: DetectedSourceCandidate } | ErrorResponse;
 
   if (!response.ok && "error" in payload) {
     throw new Error(payload.error.message);

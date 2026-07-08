@@ -731,8 +731,7 @@ function visitNode(
   root: DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
   visitor: (
     node:
-      | DefaultTreeAdapterTypes.ParentNode
-      | DefaultTreeAdapterTypes.ChildNode,
+      DefaultTreeAdapterTypes.ParentNode | DefaultTreeAdapterTypes.ChildNode,
   ) => void,
 ): void {
   visitor(root);

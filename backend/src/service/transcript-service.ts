@@ -46,8 +46,7 @@ export type TranscriptServiceError =
 class TranscriptServiceOperationError extends Error {
   public constructor(
     public readonly code:
-      | "transcript_not_found"
-      | "transcript_retry_not_available",
+      "transcript_not_found" | "transcript_retry_not_available",
     message: string,
   ) {
     super(message);
