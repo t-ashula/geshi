@@ -58,9 +58,7 @@ import { Context } from "hono";
 import { service } from "src/services/contents.js";
 const handlers = {
   getList: async (c: Context) => {
-    const args = {
-      /** build arguments via Context */
-    };
+    const args = {/** build arguments via Context */};
     const r = service.getContents(args);
     if (!r.ok) {
       return c.json({ error: r.error }, 404 /** or 500 ?  */);
