@@ -49,11 +49,7 @@ export type SourceDetectionStateSnapshot = {
 };
 
 export type DetectedSourceCandidateStatus =
-  | "detected"
-  | "previewed"
-  | "registered"
-  | "dismissed"
-  | "duplicate";
+  "detected" | "previewed" | "registered" | "dismissed" | "duplicate";
 
 export type SaveDetectedSourceCandidateInput = {
   description: string | null;

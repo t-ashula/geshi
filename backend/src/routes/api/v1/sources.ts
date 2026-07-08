@@ -27,12 +27,7 @@ import { err, ok } from "../../../lib/result.js";
 import { createLogger } from "../../../logger/index.js";
 
 type JsonValue =
-  | boolean
-  | null
-  | number
-  | string
-  | { [key: string]: JsonValue }
-  | JsonValue[];
+  boolean | null | number | string | { [key: string]: JsonValue } | JsonValue[];
 
 export function createSourceRoutes(dependencies: AppDependencies): Hono {
   const router = new Hono();

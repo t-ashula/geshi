@@ -102,8 +102,7 @@ export type SourceCollectorNonActionableReason =
   | "unsupported";
 
 export type SourceCollectorExpirationAction =
-  | "mark_failed"
-  | "mark_non_actionable";
+  "mark_failed" | "mark_non_actionable";
 
 export type SourceCollectorExpirationPolicy = {
   action: SourceCollectorExpirationAction;
@@ -126,8 +125,7 @@ type SourceCollectorNoneNextAction = {
 };
 
 export type SourceCollectorNextAction =
-  | SourceCollectorScheduledNextAction
-  | SourceCollectorNoneNextAction;
+  SourceCollectorScheduledNextAction | SourceCollectorNoneNextAction;
 
 export type ObservedAsset = {
   kind: string;

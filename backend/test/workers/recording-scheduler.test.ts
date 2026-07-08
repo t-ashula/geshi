@@ -338,8 +338,7 @@ describe("recording scheduler", () => {
 
     expect(result).toEqual(ok(undefined));
     const firstReplaceMetadataCall = replaceMetadata.mock.calls[0] as
-      | unknown[]
-      | undefined;
+      unknown[] | undefined;
     const replaceMetadataJobId = firstReplaceMetadataCall?.[0];
     const replaceMetadataInput = firstReplaceMetadataCall?.[1] as
       | {
