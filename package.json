@@ -71,7 +71,7 @@
     "@geshi/sdk": "file:packages/geshi-sdk",
     "@hono/node-server": "^2.0.10",
     "fast-xml-parser": "^5.10.0",
-    "hono": "^4.12.29",
+    "hono": "^4.12.30",
     "kysely": "^0.29.4",
     "parse5": "^8.0.1",
     "pg": "^8.22.0",
