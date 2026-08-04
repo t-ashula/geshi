@@ -44,7 +44,7 @@
     "node": ">=24 <25"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.0",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^25.9.5",
     "@types/pg": "^8.20.3",
     "@vitejs/plugin-vue": "^6.0.8",
