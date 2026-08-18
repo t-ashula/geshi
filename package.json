@@ -72,7 +72,7 @@
     "@hono/node-server": "^2.1.1",
     "fast-xml-parser": "^5.10.1",
     "hono": "^4.13.2",
-    "kysely": "^0.29.4",
+    "kysely": "^0.29.5",
     "parse5": "^8.0.1",
     "pg": "^8.23.0",
     "pg-boss": "^12.27.0",
