@@ -46,7 +46,7 @@
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@types/node": "^25.9.5",
-    "@types/pg": "^8.21.0",
+    "@types/pg": "^8.23.1",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^9.39.5",
