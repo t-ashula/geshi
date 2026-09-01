@@ -70,7 +70,7 @@
     "@geshi/plugin-sample-streaming": "file:packages/geshi-plugin-sample-streaming",
     "@geshi/sdk": "file:packages/geshi-sdk",
     "@hono/node-server": "^2.1.1",
-    "fast-xml-parser": "^5.11.0",
+    "fast-xml-parser": "^5.11.1",
     "hono": "^4.13.5",
     "kysely": "^0.29.5",
     "parse5": "^8.0.1",
